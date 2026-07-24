@@ -1,6 +1,6 @@
-const asyncHandler = require("express-async-handler");
-const Chat = require("../modals/chatModel");
-const User = require("../modals/userModel");
+import asyncHandler from "express-async-handler";
+import Chat from "../chat/chatModel.js";
+import User from "../user/userModel.js";
 
 const accessChat = asyncHandler(async (req, res) => {
   const { userId } = req.body;
@@ -38,7 +38,7 @@ const accessChat = asyncHandler(async (req, res) => {
       const createdChat = await Chat.create(chatData);
       const FullChat = await Chat.findOne({ _id: createdChat._id }).populate(
         "users",
-        "-password"
+        "-password",
       );
       res.status(200).json(FullChat);
     } catch (error) {
@@ -119,7 +119,7 @@ const groupExit = asyncHandler(async (req, res) => {
     },
     {
       new: true,
-    }
+    },
   )
     .populate("users", "-password")
     .populate("groupAdmin", "-password");
@@ -132,10 +132,4 @@ const groupExit = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = {
-  accessChat,
-  fetchChats,
-  fetchGroups,
-  createGroupChat,
-  groupExit,
-};
+export { accessChat, fetchChats, fetchGroups, createGroupChat, groupExit };

@@ -1,6 +1,6 @@
-const generateToken = require("../Config/generateToken");
-const UserModel = require("../modals/userModel");
-const expressAsyncHandler = require("express-async-handler");
+import generateToken from "../../config/generateToken.js";
+import UserModel from "./userModel.js";
+import expressAsyncHandler from "express-async-handler";
 // Login
 const loginController = expressAsyncHandler(async (req, res) => {
   console.log(req.body);
@@ -82,8 +82,4 @@ const fetchAllUsersController = expressAsyncHandler(async (req, res) => {
   res.send(users);
 });
 
-module.exports = {
-  loginController,
-  registerController,
-  fetchAllUsersController,
-};
+export { loginController, registerController, fetchAllUsersController };

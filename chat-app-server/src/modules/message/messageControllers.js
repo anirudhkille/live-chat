@@ -1,7 +1,7 @@
-const expressAsyncHandler = require("express-async-handler");
-const Message = require("../modals/messageModel");
-const User = require("../modals/userModel");
-const Chat = require("../modals/chatModel");
+import expressAsyncHandler from "express-async-handler";
+import Message from "./messageModel.js";
+import User from "../user/userModel.js";
+import Chat from "../chat/chatModel.js";
 
 const allMessages = expressAsyncHandler(async (req, res) => {
   try {
@@ -50,4 +50,4 @@ const sendMessage = expressAsyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { allMessages, sendMessage };
+export { allMessages, sendMessage };
