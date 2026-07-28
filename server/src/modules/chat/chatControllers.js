@@ -1,5 +1,5 @@
 import asyncHandler from "express-async-handler";
-import Chat from "../chat/chatModel.js";
+import Chat from "./chatModel.js";
 import User from "../user/userModel.js";
 
 const accessChat = asyncHandler(async (req, res) => {
