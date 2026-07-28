@@ -9,5 +9,9 @@ export const findEmail = (email) => {
 };
 
 export const findById = (id) => {
-  return User.findById(id).lean();
+  return User.findById(id);
+};
+
+export const updateById = (id, data) => {
+  return User.findByIdAndUpdate(id, data, { new: true });
 };

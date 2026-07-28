@@ -24,3 +24,7 @@ export const findUserByIdOrThrow = async (id) => {
   }
   return user;
 };
+
+export const updateUser = async (id, data) => {
+  return userRepository.updateById(id, data);
+};

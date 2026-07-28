@@ -9,8 +9,15 @@ import {
   createUser,
   findUserByEmail,
   findUserByEmailOrThrow,
+  findUserByIdOrThrow,
+  updateUser,
 } from "../user/user.service.js";
 import jwt from "jsonwebtoken";
+import {
+  getGoogleAuthURL as googleAuthUrl,
+  getGoogleTokens,
+  getGoogleUser,
+} from "./auth.google.js";
 
 export const loginUser = async (email) => {
   const user = await findUserByEmail(email);
@@ -97,4 +104,49 @@ export const logout = async (token) => {
   const decoded = jwt.verify(token, env.JWT_REFRESH_SECRET);
 
   await redis.del(`refreshToken:${decoded._id}`);
+};
+
+export const updateUserProfile = async (userId, body) => {
+  const user = await findUserByIdOrThrow(userId);
+  const { name } = body;
+
+  if (name) {
+    user.name = name;
+  }
+
+  return user.save();
+};
+
+export const getGoogleAuthURL = () => {
+  return googleAuthUrl();
+};
+
+export const googleLogin = async (code) => {
+  const tokens = await getGoogleTokens(code);
+  const googleUser = await getGoogleUser(tokens.access_token);
+
+  const { email, name } = googleUser;
+
+  let user = await findUserByEmail(email);
+
+  if (!user) {
+    user = await createUser(email);
+  }
+
+  if (!user.name && name) {
+    user.name = name;
+    user = await user.save();
+  }
+
+  const accessToken = generateAccessToken(user._id);
+  const refreshToken = generateRefreshToken(user._id);
+
+  await redis.set(
+    `refreshToken:${user._id}`,
+    refreshToken,
+    "EX",
+    60 * 60 * 24 * 7,
+  );
+
+  return { user, accessToken, refreshToken };
 };

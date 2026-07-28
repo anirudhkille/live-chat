@@ -4,5 +4,5 @@ import { env } from "./config/env.config.js";
 
 connectDb();
 
-const PORT = env.PORT || 5000;
+const PORT = env.PORT || 8080;
 app.listen(PORT, console.log("Server is Running..."));
