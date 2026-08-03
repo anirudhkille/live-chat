@@ -3,7 +3,7 @@ import { redis } from "../../config/redis.js";
 import { otpTemplate } from "../../templates/otp.template.js";
 import { AppError } from "../../utils/AppError.js";
 import { generateAccessToken, generateRefreshToken } from "../../utils/jwt.js";
-import { sendEmail } from "../../utils/sendEMail.js";
+import { sendEmail } from "../../utils/sendEmail.js";
 import { generateOtp } from "../../utils/otp.js";
 import {
   createUser,
@@ -48,11 +48,11 @@ export const verifyOtp = async (email, otp) => {
   await redis.del(otpKey);
 
   const user = await findUserByEmailOrThrow(email);
-  const accessToken = generateAccessToken(user._id);
-  const refreshToken = generateRefreshToken(user._id);
+  const accessToken = generateAccessToken(user.id);
+  const refreshToken = generateRefreshToken(user.id);
 
   await redis.set(
-    `refreshToken:${user._id}`,
+    `refreshToken:${user.id}`,
     refreshToken,
     "EX",
     60 * 60 * 24 * 7,
@@ -107,14 +107,13 @@ export const logout = async (token) => {
 };
 
 export const updateUserProfile = async (userId, body) => {
-  const user = await findUserByIdOrThrow(userId);
   const { name } = body;
 
-  if (name) {
-    user.name = name;
+  if (!name) {
+    throw new AppError(400, "Name is required");
   }
 
-  return user.save();
+  return updateUser(userId, { name });
 };
 
 export const getGoogleAuthURL = () => {
@@ -134,15 +133,14 @@ export const googleLogin = async (code) => {
   }
 
   if (!user.name && name) {
-    user.name = name;
-    user = await user.save();
+    user = await updateUser(user.id, { name });
   }
 
-  const accessToken = generateAccessToken(user._id);
-  const refreshToken = generateRefreshToken(user._id);
+  const accessToken = generateAccessToken(user.id);
+  const refreshToken = generateRefreshToken(user.id);
 
   await redis.set(
-    `refreshToken:${user._id}`,
+    `refreshToken:${user.id}`,
     refreshToken,
     "EX",
     60 * 60 * 24 * 7,

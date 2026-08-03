@@ -2,9 +2,6 @@ import express from "express";
 import cors from "cors";
 import { errorHandler } from "./middleware/error.middleware.js";
 import authRoutes from "./modules/auth/auth.route.js";
-import userRoutes from "./modules/user/userRoutes.js";
-import chatRoutes from "./modules/chat/chatRoutes.js";
-import messageRoutes from "./modules/message/messageRoutes.js";
 import { sendResponse } from "./utils/response.js";
 import { env } from "./config/env.config.js";
 
@@ -27,9 +24,6 @@ app.get("/api/health", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
-app.use("/user", userRoutes);
-app.use("/api/chat", chatRoutes);
-app.use("/api/message", messageRoutes);
 
 app.use((req, res) => {
   sendResponse(res, 404, "Route not found");

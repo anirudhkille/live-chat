@@ -1,17 +1,17 @@
-import User from "./userModel.js";
+import { prisma } from "../../config/prisma.js";
 
 export const create = (email) => {
-  return User.create({ email });
+  return prisma.user.create({ data: { email } });
 };
 
 export const findEmail = (email) => {
-  return User.findOne({ email });
+  return prisma.user.findUnique({ where: { email } });
 };
 
 export const findById = (id) => {
-  return User.findById(id);
+  return prisma.user.findUnique({ where: { id } });
 };
 
 export const updateById = (id, data) => {
-  return User.findByIdAndUpdate(id, data, { new: true });
+  return prisma.user.update({ where: { id }, data });
 };

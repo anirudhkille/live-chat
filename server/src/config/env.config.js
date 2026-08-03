@@ -5,7 +5,7 @@ import { logger } from "./logger.js";
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production"]).default("development"),
   PORT: z.coerce.number().default(8080),
-  MONGO_URI: z.string(),
+  DATABASE_URL: z.string(),
   JWT_SECRET: z.string(),
   ALLOWED_ORIGNS: z
     .string()

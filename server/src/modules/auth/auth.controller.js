@@ -47,7 +47,7 @@ export const logout = asyncHandler(async (req, res) => {
 });
 
 export const updateProfile = asyncHandler(async (req, res) => {
-  const user = await authService.updateUserProfile(req.user._id, req.body);
+  const user = await authService.updateUserProfile(req.user.id, req.body);
   sendResponse(res, 200, "Profile updated", { user });
 });
 
@@ -74,7 +74,7 @@ export const googleCallback = asyncHandler(async (req, res) => {
   });
 
   const userData = {
-    _id: user._id,
+    _id: user.id,
     name: user.name,
     email: user.email,
   };

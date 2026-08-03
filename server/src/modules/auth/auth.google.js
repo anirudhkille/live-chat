@@ -13,7 +13,6 @@ export const getGoogleAuthURL = () => {
     prompt: "consent",
   });
 
-  console.log(env.GOOGLE_CALLBACK_URL)
   return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
 };
 
