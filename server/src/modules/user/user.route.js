@@ -1,8 +1,11 @@
-import express from "express";
+import { Router } from "express"
+import { authenticate } from "../../middleware/auth.middleware.js"
+import {searchUser} from "./user.controller.js"
 
+const router = Router()
 
-import { protect } from "../../middleware/authMiddleware.js";
+router.use(authenticate)
 
-const Router = express.Router();
+router.get("/search", searchUser)
 
-export default Router;
+export default router

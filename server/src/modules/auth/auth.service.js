@@ -5,14 +5,9 @@ import { AppError } from "../../utils/AppError.js";
 import { generateAccessToken, generateRefreshToken } from "../../utils/jwt.js";
 import { sendEmail } from "../../utils/sendEmail.js";
 import { generateOtp } from "../../utils/otp.js";
-import {
-  createUser,
-  findUserByEmail,
-  findUserByEmailOrThrow,
-  findUserByIdOrThrow,
-  updateUser,
-} from "../user/user.service.js";
+import * as userService from "../user/user.service.js";
 import jwt from "jsonwebtoken";
+import * as userRepository from "../user/user.repository.js";
 import {
   getGoogleAuthURL as googleAuthUrl,
   getGoogleTokens,
@@ -20,10 +15,10 @@ import {
 } from "./auth.google.js";
 
 export const loginUser = async (email) => {
-  const user = await findUserByEmail(email);
+  const user = await userRepository.findEmail(email);
 
   if (!user) {
-    await createUser(email);
+    await  userRepository.create(email);
   }
 
   const otp = generateOtp();
@@ -47,7 +42,7 @@ export const verifyOtp = async (email, otp) => {
 
   await redis.del(otpKey);
 
-  const user = await findUserByEmailOrThrow(email);
+  const user = await userService.findUserByEmailOrThrow(email);
   const accessToken = generateAccessToken(user.id);
   const refreshToken = generateRefreshToken(user.id);
 
@@ -113,7 +108,7 @@ export const updateUserProfile = async (userId, body) => {
     throw new AppError(400, "Name is required");
   }
 
-  return updateUser(userId, { name });
+  return userRepository.updateById(userId, { name });
 };
 
 export const getGoogleAuthURL = () => {
@@ -126,14 +121,14 @@ export const googleLogin = async (code) => {
 
   const { email, name } = googleUser;
 
-  let user = await findUserByEmail(email);
+  let user = await userRepository.findEmail(email);
 
   if (!user) {
-    user = await createUser(email);
+    user = await  userRepository.create(email);
   }
 
   if (!user.name && name) {
-    user = await updateUser(user.id, { name });
+    user = await userRepository.updateById(user.id, { name });
   }
 
   const accessToken = generateAccessToken(user.id);

@@ -1,10 +1,6 @@
 import { AppError } from "../../utils/AppError.js";
 import * as userRepository from "./user.repository.js";
 
-export const findUserByEmail = async (email) => {
-  return userRepository.findEmail(email);
-};
-
 export const findUserByEmailOrThrow = async (email) => {
   const user = await userRepository.findEmail(email);
   if (!user) {
@@ -27,4 +23,10 @@ export const findUserByIdOrThrow = async (id) => {
 
 export const updateUser = async (id, data) => {
   return userRepository.updateById(id, data);
+};
+
+export const searchUser = async (search, page, limit,id) => {
+  const safePage = Math.max(1, parseInt(page, 10) || 1);
+  const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 10));
+  return userRepository.searchUser(search, safePage, safeLimit,id);
 };

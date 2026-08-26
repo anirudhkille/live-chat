@@ -16,6 +16,67 @@ model User {
   id        String   @id @default(cuid())
   name      String?
   email     String   @unique
-  createAt  DateTime @default(now())
+  createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+  reads        MessageRead[]
+}
+
+model Conversation {
+  id            String    @id @default(cuid())
+  isGroup       Boolean   @default(false)
+  name          String?
+  photoUrl      String?
+  lastMessageAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+}
+
+model ConversationParticipant {
+  id             String    @id @default(cuid())
+  role           String    @default("member")
+  lastReadAt     DateTime?
+  joinedAt       DateTime  @default(now())
+
+  user           User         @relation(fields: [userId], references: [id])
+  userId         String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  conversationId String
+
+  @@unique([userId, conversationId])
+  @@index([userId])
+}
+
+model Message {
+  id             String    @id @default(cuid())
+  content        String
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  sender         User         @relation(fields: [senderId], references: [id])
+  senderId       String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  conversationId String
+  reads          MessageRead[]
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+}
+
+model MessageRead {
+  id        String   @id @default(cuid())
+  readAt    DateTime @default(now())
+
+  message   Message  @relation(fields: [messageId], references: [id])
+  messageId String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+
+  @@unique([messageId, userId])
 }
