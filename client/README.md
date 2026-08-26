@@ -1,70 +1,91 @@
-# Getting Started with Create React App
+# Live Chat — Next.js frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Live chat frontend built with Next.js App Router, TypeScript, Tailwind CSS v4,
+TanStack React Query, Zustand, and Socket.IO client.
 
-## Available Scripts
+## Getting started
 
-In the project directory, you can run:
+```bash
+npm install
+cp .env.example .env.local   # adjust URLs to point at your API
+npm run dev                  # http://localhost:3000
+```
 
-### `npm start`
+## Environment variables
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+| Variable              | Purpose                                                        |
+| --------------------- | -------------------------------------------------------------- |
+| `NEXT_PUBLIC_API_URL` | REST base URL, e.g. `http://localhost:8080/api`                |
+| `NEXT_PUBLIC_WS_URL`  | Socket.IO URL. Empty = socket layer stays dormant (no backend yet) |
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+> Server-side note: add `http://localhost:3000` to `ALLOWED_ORIGNS` and set
+> `CLIENT_URL=http://localhost:3000` in `server/.env`, otherwise CORS and the
+> Google callback redirect will still point at the old Vite dev server.
 
-### `npm test`
+## Auth flow (matches `server/src/modules/auth`)
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+1. `POST /auth/send-login-otp` — email OTP
+2. `POST /auth/verify-login-otp` — returns `{ user, accessToken }`; the server
+   also sets an httpOnly `refreshToken` cookie (`withCredentials: true`)
+3. Access token is kept in a persisted Zustand store and attached as a
+   `Bearer` header by the axios request interceptor (`src/lib/api/client.ts`)
+4. On 401/403 the response interceptor queues requests, calls
+   `GET /auth/refresh`, stores the rotated access token, and replays them
+5. Google: `GET /auth/google` → callback redirects to `/auth/callback`
+   with `accessToken` + `user` query params
 
-### `npm run build`
+## Routes
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+| Route                     | Description                                    |
+| ------------------------- | ---------------------------------------------- |
+| `/`                       | Landing page                                   |
+| `/login`                  | Email OTP sign-in (+ Google)                   |
+| `/verify-email?email=`    | OTP verification                               |
+| `/complete-profile`       | Name setup after first login                   |
+| `/auth/callback`          | Google OAuth callback handler                  |
+| `/chats`                  | Protected shell: sidebar + chat pane           |
+| `/chats/new`              | New chat placeholder                           |
+| `/chats/[conversationId]` | Thread placeholder (awaiting chat APIs)        |
+| `/search`                 | Search placeholder                             |
+| `/settings`               | Account overview, theme toggle, logout         |
+| `/settings/profile`       | Edit name via `PATCH /auth/profile`            |
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Structure
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```
+src/
+├── app/                 # App Router pages ((auth) group, (app) protected group)
+├── components/
+│   ├── ui/              # Primitives (button, input, card, input-otp, …)
+│   ├── layout/          # Sidebar, BottomNav
+│   └── auth/            # ProtectedRoute guard
+├── features/
+│   ├── auth/            # Forms + mutation hooks for the auth flow
+│   └── settings/        # Profile update hook
+├── hooks/               # use-auth, use-socket, use-logout, use-media-query
+├── lib/
+│   ├── api/             # axios singleton + typed endpoint functions
+│   ├── socket/          # Socket.IO singleton + event-name contract
+│   └── utils.ts         # cn()
+├── schemas/             # zod schemas (types inferred from these)
+├── store/               # zustand: auth (persisted), socket status
+└── types/               # shared API types/helpers
+```
 
-### `npm run eject`
+## Chat integration status
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+Auth is fully wired to the live backend. Conversation/message REST endpoints
+and the websocket server don't exist on the backend yet, so the chat, new-chat,
+and search screens render honest empty states. The socket singleton
+(`src/lib/socket/socket.ts`), event-name contract (`events.ts`), and React
+Query provider are already in place — when the backend ships:
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+1. Add typed functions in `src/lib/api/` for the new endpoints
+2. Bind listeners in a feature hook via `useSocket()`
+3. Invalidate/patch React Query caches from those listeners
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## Scripts
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- `npm run dev` — dev server
+- `npm run build` / `npm start` — production build & serve
+- `npm run lint` — ESLint
