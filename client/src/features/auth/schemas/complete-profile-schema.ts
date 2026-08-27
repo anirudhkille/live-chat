@@ -1,4 +1,4 @@
-import { z } from "zod"
+import { z } from "zod";
 
 export const completeProfileSchema = z.object({
   name: z
@@ -6,6 +6,6 @@ export const completeProfileSchema = z.object({
     .trim()
     .min(1, "Name can't be empty")
     .min(2, "Name must be at least 2 characters"),
-})
+});
 
-export type CompleteProfileValues = z.infer<typeof completeProfileSchema>
+export type CompleteProfileValues = z.infer<typeof completeProfileSchema>;

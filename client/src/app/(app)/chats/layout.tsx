@@ -1,18 +1,18 @@
-"use client"
+"use client";
 
-import { usePathname } from "next/navigation"
+import { usePathname } from "next/navigation";
 
-import { BottomNav } from "@/components/layout/bottom-nav"
-import { Sidebar } from "@/components/layout/sidebar"
-import { cn } from "@/lib/utils"
+import { BottomNav } from "@/layout/bottom-nav";
+import { Sidebar } from "@/layout/sidebar";
+import { cn } from "@/lib/utils";
 
 export default function ChatsLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  const pathname = usePathname()
-  const isRoot = pathname === "/chats"
+  const pathname = usePathname();
+  const isRoot = pathname === "/chats";
 
   return (
     <div className="flex h-dvh flex-col">
@@ -21,7 +21,7 @@ export default function ChatsLayout({
         <main
           className={cn(
             "min-w-0 flex-1 overflow-hidden",
-            isRoot && "hidden md:block",
+            isRoot && "hidden md:block"
           )}
         >
           {children}
@@ -29,5 +29,5 @@ export default function ChatsLayout({
       </div>
       {isRoot && <BottomNav />}
     </div>
-  )
+  );
 }

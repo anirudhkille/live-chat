@@ -1,15 +1,15 @@
-import type { Metadata } from "next"
+import type { Metadata } from "next";
 
-import "@fontsource-variable/geist"
-import "./globals.css"
+import "@fontsource-variable/geist";
+import "./globals.css";
 
-import { Providers } from "./providers"
+import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "Live Chat",
   description:
     "Fast, simple messaging with real-time delivery, read receipts, and group chats.",
-}
+};
 
 const themeInitScript = `
 try {
@@ -17,7 +17,7 @@ try {
   const dark = stored ? stored === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
   document.documentElement.classList.toggle("dark", dark);
 } catch {}
-`
+`;
 
 export default function RootLayout({
   children,
@@ -31,5 +31,5 @@ export default function RootLayout({
         <Providers>{children}</Providers>
       </body>
     </html>
-  )
+  );
 }

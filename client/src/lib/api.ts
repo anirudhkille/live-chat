@@ -1,30 +1,27 @@
-import axios, {
-  type AxiosError,
-  type InternalAxiosRequestConfig,
-} from "axios"
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 
-import { API_BASE_URL } from "@/lib/env"
-import { useAuthStore } from "@/store/auth-store"
+import { API_BASE_URL } from "@/lib/env";
+import { useAuthStore } from "@/store/auth-store";
 
-type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean }
+type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
 interface PendingRequest {
-  resolve: (token: string) => void
-  reject: (error: unknown) => void
+  resolve: (token: string) => void;
+  reject: (error: unknown) => void;
 }
 
-let isRefreshing = false
-let pendingRequests: PendingRequest[] = []
+let isRefreshing = false;
+let pendingRequests: PendingRequest[] = [];
 
 function processQueue(token: string | null, error?: unknown) {
   pendingRequests.forEach((request) => {
     if (token && !error) {
-      request.resolve(token)
+      request.resolve(token);
     } else {
-      request.reject(error)
+      request.reject(error);
     }
-  })
-  pendingRequests = []
+  });
+  pendingRequests = [];
 }
 
 export const api = axios.create({
@@ -33,32 +30,32 @@ export const api = axios.create({
     "Content-Type": "application/json",
   },
   withCredentials: true,
-})
+});
 
 api.interceptors.request.use((config) => {
   if (!API_BASE_URL) {
     return Promise.reject(
       new Error(
-        "NEXT_PUBLIC_API_URL is not set. Add it to client/.env.local (see .env.example).",
-      ),
-    )
+        "NEXT_PUBLIC_API_URL is not set. Add it to client/.env.local (see .env.example)."
+      )
+    );
   }
 
-  const token = useAuthStore.getState().token
+  const token = useAuthStore.getState().token;
 
   if (token && !config.url?.includes("/auth/refresh")) {
-    config.headers.Authorization = `Bearer ${token}`
+    config.headers.Authorization = `Bearer ${token}`;
   }
 
-  return config
-})
+  return config;
+});
 
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as RetriableConfig | undefined
-    const status = error.response?.status
-    const authStore = useAuthStore.getState()
+    const originalRequest = error.config as RetriableConfig | undefined;
+    const status = error.response?.status;
+    const authStore = useAuthStore.getState();
 
     if (
       (status === 401 || status === 403) &&
@@ -67,46 +64,46 @@ api.interceptors.response.use(
       !originalRequest._retry
     ) {
       if (originalRequest.url?.includes("/auth/refresh")) {
-        authStore.clearSession()
-        return Promise.reject(error)
+        authStore.clearSession();
+        return Promise.reject(error);
       }
 
-      originalRequest._retry = true
+      originalRequest._retry = true;
 
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           pendingRequests.push({
             resolve: (token) => {
-              originalRequest.headers.Authorization = `Bearer ${token}`
-              resolve(api(originalRequest))
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+              resolve(api(originalRequest));
             },
             reject,
-          })
-        })
+          });
+        });
       }
 
-      isRefreshing = true
+      isRefreshing = true;
 
       try {
         const response = await api.get<{ data: { accessToken: string } }>(
-          "/auth/refresh",
-        )
-        const newAccessToken = response.data.data.accessToken
+          "/auth/refresh"
+        );
+        const newAccessToken = response.data.data.accessToken;
 
-        authStore.setToken(newAccessToken)
-        processQueue(newAccessToken)
+        authStore.setToken(newAccessToken);
+        processQueue(newAccessToken);
 
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
-        return api(originalRequest)
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        return api(originalRequest);
       } catch (refreshError) {
-        authStore.clearSession()
-        processQueue(null, refreshError)
-        return Promise.reject(refreshError)
+        authStore.clearSession();
+        processQueue(null, refreshError);
+        return Promise.reject(refreshError);
       } finally {
-        isRefreshing = false
+        isRefreshing = false;
       }
     }
 
-    return Promise.reject(error)
-  },
-)
+    return Promise.reject(error);
+  }
+);

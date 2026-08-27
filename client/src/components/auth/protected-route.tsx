@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-import { Spinner } from "@/components/ui/spinner"
-import { useAuth } from "@/hooks/use-auth"
+import { Spinner } from "@/components/ui/spinner";
+import { useAuth } from "@/hooks/use-auth";
 
 /**
  * Client-side auth gate for the protected segment. The refresh cookie lives
@@ -12,27 +12,27 @@ import { useAuth } from "@/hooks/use-auth"
  * here against the hydrated zustand store instead.
  */
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
-  const { token, user, hasHydrated } = useAuth()
+  const router = useRouter();
+  const { token, user, hasHydrated } = useAuth();
 
   useEffect(() => {
-    if (!hasHydrated) return
+    if (!hasHydrated) return;
     if (!token) {
-      router.replace("/login")
-      return
+      router.replace("/login");
+      return;
     }
     if (!user?.name) {
-      router.replace("/complete-profile")
+      router.replace("/complete-profile");
     }
-  }, [router, token, user, hasHydrated])
+  }, [router, token, user, hasHydrated]);
 
   if (!hasHydrated || !token || !user?.name) {
     return (
       <div className="flex h-dvh items-center justify-center">
         <Spinner />
       </div>
-    )
+    );
   }
 
-  return <>{children}</>
+  return <>{children}</>;
 }

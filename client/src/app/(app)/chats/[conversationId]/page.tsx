@@ -1,21 +1,49 @@
-"use client"
+"use client";
 
-import { use } from "react"
-import { useRouter } from "next/navigation"
-import { ArrowLeft, Info, MessageSquareOff, Paperclip, Send } from "lucide-react"
+import { use, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Info, Loader2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { useIsDesktop } from "@/hooks/use-media-query"
+import { Button } from "@/components/ui/button";
+import { MessageList } from "@/components/chat/message-list";
+import { MessageInput } from "@/components/chat/message-input";
+import { useSendMessage } from "@/features/conversations/hooks/useSendMessage";
+import { useIsDesktop } from "@/hooks/use-media-query";
+import { useGetConversationById } from "@/features/conversations/hooks/useConversationById";
+
+function initials(name: string) {
+  return (
+    name
+      .split(" ")
+      .map((p) => p[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "?"
+  );
+}
 
 export default function ChatThreadPage({
   params,
 }: {
-  params: Promise<{ conversationId: string }>
+  params: Promise<{ conversationId: string }>;
 }) {
-  const { conversationId } = use(params)
-  const router = useRouter()
-  const isDesktop = useIsDesktop()
+  const { conversationId } = use(params);
+  const router = useRouter();
+  const isDesktop = useIsDesktop();
+
+  const { data: conversation, isLoading: loadingConversation } =
+    useGetConversationById(conversationId);
+  const sendMessage = useSendMessage();
+
+  const handleSend = useCallback(
+    (content: string) => {
+      sendMessage.mutate({ conversationId, content });
+    },
+    [sendMessage, conversationId]
+  );
+  const otherUser = conversation?.name;
+  const otherUserName = conversation?.name ?? conversation?.email ?? "Unknown";
 
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col">
@@ -30,14 +58,19 @@ export default function ChatThreadPage({
             <ArrowLeft className="h-4 w-4" />
           </button>
         )}
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium">Conversation</p>
-          <p
-            className="truncate text-xs text-muted-foreground"
-            title={conversationId}
-          >
-            {conversationId}
-          </p>
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="bg-muted text-muted-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-medium">
+            {conversation ? (
+              initials(otherUserName)
+            ) : (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium">
+              {loadingConversation ? "Loading..." : otherUserName}
+            </p>
+          </div>
         </div>
         <Button
           variant="ghost"
@@ -50,34 +83,13 @@ export default function ChatThreadPage({
         </Button>
       </header>
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-muted-foreground">
-        <MessageSquareOff className="h-8 w-8" />
-        <p className="text-sm">Messaging isn&apos;t connected yet</p>
-        <p className="max-w-xs text-xs">
-          Messages will load here once the conversations and messages API is
-          available.
-        </p>
-      </div>
+      <MessageList conversationId={conversationId} />
 
-      <form
-        aria-hidden="true"
-        onSubmit={(event) => event.preventDefault()}
-        className="flex items-center gap-2 border-t p-3 opacity-50"
-      >
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="Attach file"
-          disabled
-        >
-          <Paperclip className="h-4 w-4" />
-        </Button>
-        <Input placeholder="Message" disabled className="flex-1" />
-        <Button type="submit" size="icon" aria-label="Send message" disabled>
-          <Send className="h-4 w-4" />
-        </Button>
-      </form>
+      <MessageInput
+        conversationId={conversationId}
+        onSend={handleSend}
+        disabled={sendMessage.isPending}
+      />
     </div>
-  )
+  );
 }

@@ -1,4 +1,4 @@
-import { z } from "zod"
+import { z } from "zod";
 
 export const verifyEmailSchema = z.object({
   email: z
@@ -9,6 +9,6 @@ export const verifyEmailSchema = z.object({
     .string()
     .min(6, "Otp should contain 6 digits")
     .max(6, "Otp can't exceed 6 digits"),
-})
+});
 
-export type VerifyEmailValues = z.infer<typeof verifyEmailSchema>
+export type VerifyEmailValues = z.infer<typeof verifyEmailSchema>;

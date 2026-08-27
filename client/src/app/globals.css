@@ -34,6 +34,7 @@
   --animate-caret-blink: caret-blink 1.25s ease-out infinite;
   --animate-fade-in-up: fade-in-up 0.3s ease-out;
   --animate-message-in: message-in 0.25s ease-out;
+  --animate-typing-bounce: typing-bounce 1.4s ease-in-out infinite;
 
   @keyframes caret-blink {
     0%,
@@ -66,6 +67,17 @@
     to {
       opacity: 1;
       transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes typing-bounce {
+    0%,
+    60%,
+    100% {
+      transform: translateY(0);
+    }
+    30% {
+      transform: translateY(-3px);
     }
   }
 }

@@ -13,9 +13,9 @@ npm run dev                  # http://localhost:3000
 
 ## Environment variables
 
-| Variable              | Purpose                                                        |
-| --------------------- | -------------------------------------------------------------- |
-| `NEXT_PUBLIC_API_URL` | REST base URL, e.g. `http://localhost:8080/api`                |
+| Variable              | Purpose                                                            |
+| --------------------- | ------------------------------------------------------------------ |
+| `NEXT_PUBLIC_API_URL` | REST base URL, e.g. `http://localhost:8080/api`                    |
 | `NEXT_PUBLIC_WS_URL`  | Socket.IO URL. Empty = socket layer stays dormant (no backend yet) |
 
 > Server-side note: add `http://localhost:3000` to `ALLOWED_ORIGNS` and set
@@ -36,19 +36,19 @@ npm run dev                  # http://localhost:3000
 
 ## Routes
 
-| Route                     | Description                                    |
-| ------------------------- | ---------------------------------------------- |
-| `/`                       | Landing page                                   |
-| `/login`                  | Email OTP sign-in (+ Google)                   |
-| `/verify-email?email=`    | OTP verification                               |
-| `/complete-profile`       | Name setup after first login                   |
-| `/auth/callback`          | Google OAuth callback handler                  |
-| `/chats`                  | Protected shell: sidebar + chat pane           |
-| `/chats/new`              | New chat placeholder                           |
-| `/chats/[conversationId]` | Thread placeholder (awaiting chat APIs)        |
-| `/search`                 | Search placeholder                             |
-| `/settings`               | Account overview, theme toggle, logout         |
-| `/settings/profile`       | Edit name via `PATCH /auth/profile`            |
+| Route                     | Description                             |
+| ------------------------- | --------------------------------------- |
+| `/`                       | Landing page                            |
+| `/login`                  | Email OTP sign-in (+ Google)            |
+| `/verify-email?email=`    | OTP verification                        |
+| `/complete-profile`       | Name setup after first login            |
+| `/auth/callback`          | Google OAuth callback handler           |
+| `/chats`                  | Protected shell: sidebar + chat pane    |
+| `/chats/new`              | New chat placeholder                    |
+| `/chats/[conversationId]` | Thread placeholder (awaiting chat APIs) |
+| `/search`                 | Search placeholder                      |
+| `/settings`               | Account overview, theme toggle, logout  |
+| `/settings/profile`       | Edit name via `PATCH /auth/profile`     |
 
 ## Structure
 

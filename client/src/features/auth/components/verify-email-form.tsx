@@ -1,33 +1,28 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import {
-  Controller,
-  useForm,
-} from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
-} from "@/components/ui/input-otp"
-import { getApiErrorMessage } from "@/types/api"
-import type {
-  ApiResponse,
-} from "@/types/api"
-import type { AuthPayload } from "../api/auth-api"
+} from "@/components/ui/input-otp";
+import { getApiErrorMessage } from "@/types/api";
+import type { ApiResponse } from "@/types/api";
+import type { AuthPayload } from "../api/auth-api";
 import {
   verifyEmailSchema,
   type VerifyEmailValues,
-} from "../schemas/verify-email-schema"
-import { useVerifyLoginOtp } from "../hooks/use-verify-email"
+} from "../schemas/verify-email-schema";
+import { useVerifyLoginOtp } from "../hooks/use-verify-email";
 
 interface VerifyEmailFormProps {
-  email: string
-  onSuccess: (result: ApiResponse<AuthPayload>) => void
-  onResend: () => void
+  email: string;
+  onSuccess: (result: ApiResponse<AuthPayload>) => void;
+  onResend: () => void;
 }
 
 export function VerifyEmailForm({
@@ -35,9 +30,9 @@ export function VerifyEmailForm({
   onSuccess,
   onResend,
 }: VerifyEmailFormProps) {
-  const [countdown, setCountdown] = useState(30)
+  const [countdown, setCountdown] = useState(30);
 
-  const { mutate: verifyOtp, isPending, isError, error } = useVerifyLoginOtp()
+  const { mutate: verifyOtp, isPending, isError, error } = useVerifyLoginOtp();
 
   const {
     control,
@@ -47,30 +42,30 @@ export function VerifyEmailForm({
   } = useForm<VerifyEmailValues>({
     resolver: zodResolver(verifyEmailSchema),
     defaultValues: { email, otp: "" },
-  })
+  });
 
   useEffect(() => {
-    if (countdown <= 0) return
-    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000)
-    return () => clearTimeout(timer)
-  }, [countdown])
+    if (countdown <= 0) return;
+    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
 
   const submitWithCurrentOtp = () => {
-    verifyOtp(
-      { email, otp: getValues("otp") },
-      { onSuccess },
-    )
-  }
+    verifyOtp({ email, otp: getValues("otp") }, { onSuccess });
+  };
 
   const handleResend = () => {
-    if (countdown > 0) return
-    onResend()
-    setCountdown(30)
-  }
+    if (countdown > 0) return;
+    onResend();
+    setCountdown(30);
+  };
 
   return (
     <div className="space-y-4">
-      <form onSubmit={handleSubmit(() => submitWithCurrentOtp())} className="space-y-4">
+      <form
+        onSubmit={handleSubmit(() => submitWithCurrentOtp())}
+        className="space-y-4"
+      >
         <Controller
           control={control}
           name="otp"
@@ -79,10 +74,10 @@ export function VerifyEmailForm({
               maxLength={6}
               value={field.value}
               onChange={(value) => {
-                field.onChange(value)
+                field.onChange(value);
                 if (value.length === 6 && !isPending) {
                   // auto-submit once all six digits are entered
-                  setTimeout(submitWithCurrentOtp, 0)
+                  setTimeout(submitWithCurrentOtp, 0);
                 }
               }}
               disabled={isPending}
@@ -96,13 +91,13 @@ export function VerifyEmailForm({
           )}
         />
         {errors.otp && (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className="text-destructive text-sm">
             {errors.otp.message}
           </p>
         )}
 
         {isError && (
-          <p role="alert" className="text-center text-sm text-destructive">
+          <p role="alert" className="text-destructive text-center text-sm">
             {getApiErrorMessage(error, "Invalid OTP")}
           </p>
         )}
@@ -114,7 +109,7 @@ export function VerifyEmailForm({
 
       <button
         type="button"
-        className="w-full text-sm text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+        className="text-muted-foreground hover:text-foreground w-full text-sm transition-colors disabled:opacity-50"
         onClick={handleResend}
         disabled={countdown > 0}
       >
@@ -123,5 +118,5 @@ export function VerifyEmailForm({
           : "Resend code"}
       </button>
     </div>
-  )
+  );
 }

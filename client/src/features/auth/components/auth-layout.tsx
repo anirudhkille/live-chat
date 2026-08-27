@@ -4,12 +4,12 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/ui/card";
 
 interface AuthLayoutProps {
-  title: string
-  description?: string
-  children: React.ReactNode
+  title: string;
+  description?: string;
+  children: React.ReactNode;
 }
 
 export default function AuthLayout({
@@ -19,7 +19,7 @@ export default function AuthLayout({
 }: AuthLayoutProps) {
   return (
     <div className="flex h-dvh items-center justify-center p-4">
-      <Card className="w-full max-w-sm animate-fade-in-up">
+      <Card className="animate-fade-in-up w-full max-w-sm">
         <CardHeader>
           <CardTitle>{title}</CardTitle>
           {description && <CardDescription>{description}</CardDescription>}
@@ -27,5 +27,5 @@ export default function AuthLayout({
         <CardContent className="space-y-3">{children}</CardContent>
       </Card>
     </div>
-  )
+  );
 }

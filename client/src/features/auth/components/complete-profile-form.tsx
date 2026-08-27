@@ -1,27 +1,24 @@
-"use client"
+"use client";
 
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-import { Button } from "@/components/ui/button"
-import { FormField } from "@/components/ui/form-field"
-import {
-  getApiErrorMessage,
-  type ApiResponse,
-} from "@/types/api"
-import { type User } from "@/types/api"
+import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
+import { getApiErrorMessage, type ApiResponse } from "@/types/api";
+import { type User } from "@/types/api";
 import {
   completeProfileSchema,
   type CompleteProfileValues,
-} from "../schemas/complete-profile-schema"
-import { useCompleteProfile } from "../hooks/use-complete-profile"
+} from "../schemas/complete-profile-schema";
+import { useCompleteProfile } from "../hooks/use-complete-profile";
 
 interface CompleteProfileFormProps {
-  onSuccess: (result: ApiResponse<{ user: User }>) => void
+  onSuccess: (result: ApiResponse<{ user: User }>) => void;
 }
 
 export function CompleteProfileForm({ onSuccess }: CompleteProfileFormProps) {
-  const { mutate, isPending, isError, error } = useCompleteProfile()
+  const { mutate, isPending, isError, error } = useCompleteProfile();
 
   const {
     register,
@@ -30,11 +27,11 @@ export function CompleteProfileForm({ onSuccess }: CompleteProfileFormProps) {
   } = useForm<CompleteProfileValues>({
     resolver: zodResolver(completeProfileSchema),
     defaultValues: { name: "" },
-  })
+  });
 
   const onSubmit = (values: CompleteProfileValues) => {
-    mutate(values, { onSuccess })
-  }
+    mutate(values, { onSuccess });
+  };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
@@ -49,7 +46,7 @@ export function CompleteProfileForm({ onSuccess }: CompleteProfileFormProps) {
       />
 
       {isError && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-destructive text-sm">
           {getApiErrorMessage(error)}
         </p>
       )}
@@ -58,5 +55,5 @@ export function CompleteProfileForm({ onSuccess }: CompleteProfileFormProps) {
         {isPending ? "Saving..." : "Start chatting"}
       </Button>
     </form>
-  )
+  );
 }

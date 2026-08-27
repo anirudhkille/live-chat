@@ -1,24 +1,25 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { MessageCircle, Search, Settings } from "lucide-react"
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { MessageCircle, Search, Settings } from "lucide-react";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 const TABS = [
   { to: "/chats", label: "Chats", icon: MessageCircle },
   { to: "/search", label: "Search", icon: Search },
   { to: "/settings", label: "Settings", icon: Settings },
-]
+];
 
 export function BottomNav() {
-  const pathname = usePathname()
+  const pathname = usePathname();
 
   return (
-    <nav className="flex h-14 shrink-0 items-center justify-around border-t bg-card md:hidden">
+    <nav className="bg-card flex h-14 shrink-0 items-center justify-around border-t md:hidden">
       {TABS.map(({ to, label, icon: Icon }) => {
-        const active = to === "/chats" ? pathname === "/chats" : pathname === to
+        const active =
+          to === "/chats" ? pathname === "/chats" : pathname === to;
         return (
           <Link
             key={to}
@@ -26,14 +27,14 @@ export function BottomNav() {
             aria-current={active ? "page" : undefined}
             className={cn(
               "flex flex-col items-center gap-0.5 px-4 text-[11px] transition-colors",
-              active ? "text-primary" : "text-muted-foreground",
+              active ? "text-primary" : "text-muted-foreground"
             )}
           >
             <Icon className="h-5 w-5" />
             {label}
           </Link>
-        )
+        );
       })}
     </nav>
-  )
+  );
 }

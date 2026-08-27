@@ -1,25 +1,21 @@
-"use client"
+"use client";
 
-import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { ArrowLeft, Camera, Loader2 } from "lucide-react"
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { ArrowLeft, Camera, Loader2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button"
-import { FormField } from "@/components/ui/form-field"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { useAuth } from "@/hooks/use-auth"
-import { useIsDesktop } from "@/hooks/use-media-query"
-import { getApiErrorMessage } from "@/types/api"
-import type {
-  CompleteProfileValues,
-} from "@/features/auth/schemas/complete-profile-schema"
-import {
-  completeProfileSchema,
-} from "@/features/auth/schemas/complete-profile-schema"
-import { useAuthStore } from "@/store/auth-store"
-import { useUpdateProfile } from "@/features/settings/hooks/use-update-profile"
+import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/use-auth";
+import { useIsDesktop } from "@/hooks/use-media-query";
+import { getApiErrorMessage } from "@/types/api";
+import type { CompleteProfileValues } from "@/features/auth/schemas/complete-profile-schema";
+import { completeProfileSchema } from "@/features/auth/schemas/complete-profile-schema";
+import { useAuthStore } from "@/store/auth-store";
+import { useUpdateProfile } from "@/features/settings/hooks/use-update-profile";
 
 function initials(source: string) {
   return (
@@ -30,14 +26,14 @@ function initials(source: string) {
       .slice(0, 2)
       .join("")
       .toUpperCase() || "?"
-  )
+  );
 }
 
 export default function EditProfilePage() {
-  const router = useRouter()
-  const isDesktop = useIsDesktop()
-  const { user } = useAuth()
-  const setUser = useAuthStore((state) => state.setUser)
+  const router = useRouter();
+  const isDesktop = useIsDesktop();
+  const { user } = useAuth();
+  const setUser = useAuthStore((state) => state.setUser);
 
   const {
     register,
@@ -46,18 +42,18 @@ export default function EditProfilePage() {
   } = useForm<CompleteProfileValues>({
     resolver: zodResolver(completeProfileSchema),
     defaultValues: { name: user?.name ?? "" },
-  })
+  });
 
-  const mutation = useUpdateProfile()
+  const mutation = useUpdateProfile();
 
   const onSubmit = (values: CompleteProfileValues) => {
     mutation.mutate(values, {
       onSuccess: (result) => {
-        if (result.data.user) setUser(result.data.user)
-        router.push("/settings")
+        if (result.data.user) setUser(result.data.user);
+        router.push("/settings");
       },
-    })
-  }
+    });
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -83,7 +79,7 @@ export default function EditProfilePage() {
         <div className="flex justify-center">
           <div
             aria-hidden="true"
-            className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary text-lg font-medium text-primary-foreground"
+            className="bg-primary text-primary-foreground relative flex h-16 w-16 items-center justify-center rounded-full text-lg font-medium"
           >
             {initials(user?.name ?? user?.email ?? "?")}
             <button
@@ -91,9 +87,9 @@ export default function EditProfilePage() {
               aria-label="Change photo"
               disabled
               title="Photo upload coming soon"
-              className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border bg-card opacity-70"
+              className="bg-card absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full border opacity-70"
             >
-              <Camera className="h-3 w-3 text-muted-foreground" />
+              <Camera className="text-muted-foreground h-3 w-3" />
             </button>
           </div>
         </div>
@@ -110,13 +106,13 @@ export default function EditProfilePage() {
         <div className="grid gap-2">
           <Label htmlFor="email">Email</Label>
           <Input id="email" value={user?.email ?? ""} disabled readOnly />
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             Email can&apos;t be changed
           </p>
         </div>
 
         {mutation.isError && (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className="text-destructive text-sm">
             {getApiErrorMessage(mutation.error)}
           </p>
         )}
@@ -141,5 +137,5 @@ export default function EditProfilePage() {
         </Button>
       </form>
     </div>
-  )
+  );
 }
