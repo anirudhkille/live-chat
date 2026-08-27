@@ -25,8 +25,8 @@ export const updateUser = async (id, data) => {
   return userRepository.updateById(id, data);
 };
 
-export const searchUser = async (search, page, limit,id) => {
+export const searchUser = async (search, page, limit, id) => {
   const safePage = Math.max(1, parseInt(page, 10) || 1);
   const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 10));
-  return userRepository.searchUser(search, safePage, safeLimit,id);
+  return userRepository.searchUser(search, safePage, safeLimit, id);
 };

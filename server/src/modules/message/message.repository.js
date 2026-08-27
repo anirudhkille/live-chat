@@ -8,5 +8,15 @@ export const getMessages = (conversationId) => {
 };
 
 export const sendMessage = (senderId, conversationId, content) => {
-  return prisma.message.create({ data: { senderId, conversationId, content } });
+  const now = new Date();
+  const [message] = prisma.$transaction([
+    prisma.message.create({ data: { senderId, conversationId, content } }),
+    prisma.conversation.update({
+      where: { id: conversationId },
+      data: {
+        lastMessageAt: now,
+      },
+    }),
+  ]);
+  return message;
 };

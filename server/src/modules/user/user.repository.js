@@ -16,28 +16,30 @@ export const updateById = (id, data) => {
   return prisma.user.update({ where: { id }, data });
 };
 
-export const searchUser = (search, page, limit,id) => {
+export const searchUser = (search, page, limit, id) => {
   return prisma.user.findMany({
     where: {
       AND: [
-     { OR: [
         {
-          name: {
-            contains: search,
-            mode: "insensitive",
-          },
-         
+          OR: [
+            {
+              name: {
+                contains: search,
+                mode: "insensitive",
+              },
+            },
+            {
+              email: {
+                contains: search,
+                mode: "insensitive",
+              },
+            },
+          ],
         },
         {
-          email: {
-            contains: search,
-            mode: "insensitive",
-          },
-          
+          id: { not: id },
         },
-      ]},{
-        id:{ not:id}
-      }]
+      ],
     },
     take: limit,
     skip: (page - 1) * limit,

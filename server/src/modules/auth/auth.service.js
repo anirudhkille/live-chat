@@ -18,7 +18,7 @@ export const loginUser = async (email) => {
   const user = await userRepository.findEmail(email);
 
   if (!user) {
-    await  userRepository.create(email);
+    await userRepository.create(email);
   }
 
   const otp = generateOtp();
@@ -124,7 +124,7 @@ export const googleLogin = async (code) => {
   let user = await userRepository.findEmail(email);
 
   if (!user) {
-    user = await  userRepository.create(email);
+    user = await userRepository.create(email);
   }
 
   if (!user.name && name) {

@@ -4,10 +4,8 @@ import { sendResponse } from "../../utils/response.js";
 
 export const getMessages = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
-  const messages = await messageService.getMessages(   
-    conversationId,
-  );
-  
+  const messages = await messageService.getMessages(conversationId);
+
   sendResponse(res, 200, "Messages fetched", messages);
 });
 

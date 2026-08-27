@@ -1,11 +1,17 @@
-import { Router } from "express"
-import { authenticate } from "../../middleware/auth.middleware.js"
-import {createOrGetConversation} from "./conversation.controller.js"
+import { Router } from "express";
+import { authenticate } from "../../middleware/auth.middleware.js";
+import {
+  createOrGetConversation,
+  getConversations,
+  getConversationById,
+} from "./conversation.controller.js";
 
-const router = Router()
+const router = Router();
 
-router.use(authenticate)
+router.use(authenticate);
 
-router.post("/",createOrGetConversation)
+router.post("/", createOrGetConversation);
+router.get("/", getConversations);
+router.get("/:id", getConversationById);
 
-export default router
+export default router;

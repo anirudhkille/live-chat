@@ -1,4 +1,5 @@
 import * as conversationRepository from "./conversation.repository.js";
+import { toConversationResponse } from "./conversation.mapper.js";
 
 export const createOrGetConversation = async (userId1, userId2) => {
   if (userId1 === userId2) {
@@ -11,5 +12,15 @@ export const createOrGetConversation = async (userId1, userId2) => {
     conversation = await conversationRepository.create(userId1, userId2);
   }
 
-  return conversation;
+  return toConversationResponse(conversation, userId1);
+};
+
+export const getConversations = async (userId1) => {
+  const conversation = await conversationRepository.getAll(userId1);
+  return conversation.map((c) => toConversationResponse(c, userId1));
+};
+
+export const getConversationById = async (conversationId, userId) => {
+  const conversation = await conversationRepository.getById(conversationId);
+  return toConversationResponse(conversation, userId);
 };
