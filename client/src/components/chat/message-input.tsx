@@ -20,6 +20,7 @@ export function MessageInput({
 }: MessageInputProps) {
   const draft = useChatStore((s) => s.drafts[conversationId] ?? "");
   const setDraft = useChatStore((s) => s.setDraft);
+  const clearDraft = useChatStore((s) => s.clearDraft);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize textarea as content grows
@@ -34,6 +35,7 @@ export function MessageInput({
     const content = draft.trim();
     if (!content || disabled) return;
     onSend(content);
+    clearDraft(conversationId)
   }, [draft, disabled, onSend]);
 
   const handleKeyDown = useCallback(

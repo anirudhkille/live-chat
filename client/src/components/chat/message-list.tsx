@@ -1,21 +1,39 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import {  useRef ,useEffect,useState} from "react";
 import { Loader2 } from "lucide-react";
-
+import { socket } from "@/lib/socket";
 import { useGetMessages } from "@/features/conversations/hooks/useGetMessages";
 import { MessageBubble } from "./message-bubble";
-import type { Message } from "@/types/api";
 
 interface MessageListProps {
   conversationId: string;
 }
 
 export function MessageList({ conversationId }: MessageListProps) {
-  const { data, isLoading, isError } = useGetMessages(conversationId);
-
+  const { data=[], isLoading, isError } = useGetMessages(conversationId);
+ const [messages, setMessages] = useState(data);
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(()=>{
+    setMessages(data)
+
+  },[data])
+
+    useEffect(()=>{
+   const handleNewMessage=(newMessage:any)=>{
+    console.log("NEW MESSAGE RECEIVED:", newMessage);
+
+    setMessages((prev)=>[...prev,newMessage])
+   }
+
+   socket.on("new-message",handleNewMessage)
+
+     return () => {
+      socket.off("new-message", handleNewMessage);
+    };
+  },[])
 
   if (isLoading) {
     return (
@@ -49,7 +67,7 @@ export function MessageList({ conversationId }: MessageListProps) {
       className="flex flex-1 flex-col-reverse overflow-y-auto p-4"
     >
       <div ref={bottomRef} />
-      {[...data].reverse().map((message) => (
+      {[...messages].reverse().map((message) => (
         <MessageBubble key={message.id} message={message} />
       ))}
     </div>
