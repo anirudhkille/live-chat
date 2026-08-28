@@ -102,7 +102,18 @@ export default function SearchPage() {
                 className="hover:bg-accent flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors"
               >
                 <div className="bg-muted text-muted-foreground flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-medium">
-                  {initials(user.name ?? user.email)}
+                  {user.avatar ? (
+                    <img
+                      src={user.avatar}
+                      alt={user.name}
+                      className="h-full w-full rounded-full border object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    initials(user.name ?? user.email)
+                  )}
                 </div>
                 <div className="min-w-0">
                   <p className="truncate font-medium">

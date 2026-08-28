@@ -45,3 +45,11 @@ export const searchUser = (search, page, limit, id) => {
     skip: (page - 1) * limit,
   });
 };
+
+export const updateAvatar=(userId,avatarUrl)=>{
+
+return  prisma.user.update({
+    where: { id: userId },
+    data: { avatar: avatarUrl },
+  })
+}

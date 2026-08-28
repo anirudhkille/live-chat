@@ -2,12 +2,13 @@ export const toConversationResponse = (conversation, userId) => {
   const otherUser = conversation.participants.find((p) => p.userId !== userId);
 
   const lastMessage = conversation.messages?.[0] ?? null;
+  const isGroup =conversation.isGroup
   return {
     id: conversation.id,
-    name: conversation.isGroup
+    name: isGroup
       ? conversation.name
       : otherUser?.user?.name || null,
-    photoUrl: conversation.photoUrl,
+    photoUrl: isGroup?conversation.photoUrl:otherUser?.user?.avatar,
     lastMessage: lastMessage
       ? {
           id: lastMessage.id,

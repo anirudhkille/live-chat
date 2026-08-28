@@ -2,6 +2,7 @@ export type User = {
   id: string;
   name: string | null;
   email: string;
+  avatar: string | null;
 };
 
 export type ApiResponse<T = unknown> = {
@@ -10,10 +11,10 @@ export type ApiResponse<T = unknown> = {
   data: T;
 };
 
-/** Conversations endpoint */
 export type Conversation = {
   id: string;
   name: string | null;
+  photoUrl: string | null;
   email: string;
   lastMessage: Message | null;
   unreadCount: number;
@@ -54,7 +55,9 @@ export function normalizeUser(raw: unknown): User | null {
   const email = typeof record.email === "string" ? record.email : "";
   const name =
     typeof record.name === "string" && record.name ? record.name : null;
-  return { id, name, email };
+  const avatar =
+    typeof record.avatar === "string" && record.avatar ? record.avatar : null;
+  return { id, name, email, avatar };
 }
 
 export function getApiErrorMessage(

@@ -61,7 +61,18 @@ function ConversationItem({
     >
       <div className="relative shrink-0">
         <div className="bg-muted text-muted-foreground flex h-9 w-9 items-center justify-center rounded-full text-xs font-medium">
-          {initials(name ?? "")}
+          {conversation.photoUrl ? (
+            <img
+              src={conversation.photoUrl}
+              alt={senderName}
+              className="h-full w-full rounded-full border object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          ) : (
+            initials(name ?? "")
+          )}
         </div>
         {/* Online status dot — placeholder for presence event wiring */}
       </div>

@@ -11,3 +11,51 @@ export async function searchUser(
   );
   return response.data;
 }
+
+export type AvatarUploadUrl = {
+  uploadUrl: string;
+  key: string;
+};
+
+export async function getAvatarUploadUrl(
+  contentType: string
+): Promise<ApiResponse<AvatarUploadUrl>> {
+  const response = await api.post<ApiResponse<AvatarUploadUrl>>(
+    "/user/me/avatar-url",
+    { contentType }
+  );
+  return response.data;
+}
+
+export async function putPresignedObject(
+  uploadUrl: string,
+  blob: Blob,
+  contentType: string
+): Promise<void> {
+  const response = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": contentType },
+    body: blob,
+  });
+  if (!response.ok) {
+    throw new Error(`Upload failed (${response.status})`);
+  }
+}
+
+export async function confirmAvatarUpload(
+  key: string
+): Promise<ApiResponse<User>> {
+  const response = await api.post<ApiResponse<User>>("/user/me/avatar", {
+    key,
+  });
+  return response.data;
+}
+
+export async function uploadAvatar(
+  blob: Blob,
+  contentType: string
+): Promise<ApiResponse<User>> {
+  const { data: urlData } = await getAvatarUploadUrl(contentType);
+  await putPresignedObject(urlData.uploadUrl, blob, contentType);
+  return confirmAvatarUpload(urlData.key);
+}

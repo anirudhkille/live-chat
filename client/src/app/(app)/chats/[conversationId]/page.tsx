@@ -70,7 +70,18 @@ export default function ChatThreadPage({
         <div className="flex min-w-0 items-center gap-2">
           <div className="bg-muted text-muted-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-medium">
             {conversation ? (
-              initials(otherUserName)
+              conversation?.photoUrl ? (
+                <img
+                  src={conversation.photoUrl}
+                  alt={otherUserName}
+                  className="h-full w-full rounded-full border object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : (
+                initials(otherUserName)
+              )
             ) : (
               <Loader2 className="h-3 w-3 animate-spin" />
             )}

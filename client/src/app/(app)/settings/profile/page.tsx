@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AvatarCropDialog } from "@/components/avatar/avatar-crop-dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { getApiErrorMessage } from "@/types/api";
@@ -16,6 +18,16 @@ import type { CompleteProfileValues } from "@/features/auth/schemas/complete-pro
 import { completeProfileSchema } from "@/features/auth/schemas/complete-profile-schema";
 import { useAuthStore } from "@/store/auth-store";
 import { useUpdateProfile } from "@/features/settings/hooks/use-update-profile";
+import { useAvatarUpload } from "@/features/users/hooks/useAvatarUpload";
+
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_SIZE = 5 * 1024 * 1024;
+
+type PendingAvatar = {
+  src: string;
+  blob: Blob;
+  contentType: string;
+};
 
 function initials(source: string) {
   return (
@@ -34,6 +46,14 @@ export default function EditProfilePage() {
   const isDesktop = useIsDesktop();
   const { user } = useAuth();
   const setUser = useAuthStore((state) => state.setUser);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [pendingAvatar, setPendingAvatar] = useState<PendingAvatar | null>(
+    null
+  );
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const {
     register,
@@ -45,15 +65,66 @@ export default function EditProfilePage() {
   });
 
   const mutation = useUpdateProfile();
+  const avatarMutation = useAvatarUpload();
 
-  const onSubmit = (values: CompleteProfileValues) => {
-    mutation.mutate(values, {
-      onSuccess: (result) => {
-        if (result.data.user) setUser(result.data.user);
-        router.push("/settings");
-      },
-    });
+  const handleFileSelected = (file: File | undefined) => {
+    setFileError(null);
+    if (!file) return;
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setFileError("Please choose a JPG, PNG, or WebP image.");
+      return;
+    }
+    if (file.size > MAX_SIZE) {
+      setFileError("Image must be 5MB or smaller.");
+      return;
+    }
+
+    setCropImageSrc(URL.createObjectURL(file));
   };
+
+  const handleCropConfirm = useCallback((blob: Blob, contentType: string) => {
+    setPendingAvatar((prev) => {
+      if (prev) URL.revokeObjectURL(prev.src);
+      return { src: URL.createObjectURL(blob), blob, contentType };
+    });
+    setCropImageSrc(null);
+  }, []);
+
+  const onSubmit = async (values: CompleteProfileValues) => {
+    setSaveError(null);
+    try {
+      const namePromise = mutation.mutateAsync(values);
+      const avatarPromise = pendingAvatar
+        ? avatarMutation.mutateAsync({
+            blob: pendingAvatar.blob,
+            contentType: pendingAvatar.contentType,
+          })
+        : null;
+
+      const [nameResult, avatarResult] = await Promise.all([
+        namePromise,
+        avatarPromise,
+      ]);
+
+      const nextUser = {
+        ...user,
+        ...(avatarResult?.data ?? {}),
+        ...(nameResult?.data.user ?? {}),
+      };
+      setUser(nextUser);
+      router.push("/settings");
+    } catch (error) {
+      setSaveError(getApiErrorMessage(error));
+    }
+  };
+
+  const saveDisabled =
+    mutation.isPending ||
+    avatarMutation.isPending ||
+    (!isDirty && !pendingAvatar);
+
+  const avatarSrc = pendingAvatar?.src ?? user?.avatar ?? null;
 
   return (
     <div className="flex h-full flex-col">
@@ -76,22 +147,46 @@ export default function EditProfilePage() {
         noValidate
         className="mx-auto flex w-full max-w-sm flex-col gap-6 p-6"
       >
-        <div className="flex justify-center">
+        <div className="flex flex-col items-center gap-2">
           <div
             aria-hidden="true"
-            className="bg-primary text-primary-foreground relative flex h-16 w-16 items-center justify-center rounded-full text-lg font-medium"
+            className="bg-primary text-primary-foreground relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full text-lg font-medium"
           >
-            {initials(user?.name ?? user?.email ?? "?")}
+            {avatarSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={avatarSrc}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              initials(user?.name ?? user?.email ?? "?")
+            )}
             <button
               type="button"
               aria-label="Change photo"
-              disabled
-              title="Photo upload coming soon"
-              className="bg-card absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full border opacity-70"
+              onClick={() => fileInputRef.current?.click()}
+              title="Change photo"
+              className="bg-card absolute right-1 bottom-1 flex h-6 w-6 items-center justify-center rounded-full border"
             >
               <Camera className="text-muted-foreground h-3 w-3" />
             </button>
           </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              handleFileSelected(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+          {fileError && (
+            <p role="alert" className="text-destructive text-xs">
+              {fileError}
+            </p>
+          )}
         </div>
 
         <FormField
@@ -111,22 +206,24 @@ export default function EditProfilePage() {
           </p>
         </div>
 
-        {mutation.isError && (
+        {(mutation.isError || avatarMutation.isError) && (
           <p role="alert" className="text-destructive text-sm">
-            {getApiErrorMessage(mutation.error)}
+            {getApiErrorMessage(mutation.error ?? avatarMutation.error)}
           </p>
         )}
-        {mutation.isSuccess && (
+        {saveError && (
+          <p role="alert" className="text-destructive text-sm">
+            {saveError}
+          </p>
+        )}
+        {mutation.isSuccess && !mutation.isPending && (
           <p className="text-sm text-green-600 dark:text-green-400">
             Profile updated.
           </p>
         )}
 
-        <Button
-          type="submit"
-          disabled={mutation.isPending || (!isDirty && !!user?.name)}
-        >
-          {mutation.isPending ? (
+        <Button type="submit" disabled={saveDisabled}>
+          {mutation.isPending || avatarMutation.isPending ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
               Saving…
@@ -136,6 +233,17 @@ export default function EditProfilePage() {
           )}
         </Button>
       </form>
+
+      {cropImageSrc && (
+        <AvatarCropDialog
+          imageSrc={cropImageSrc}
+          onClose={() => {
+            URL.revokeObjectURL(cropImageSrc);
+            setCropImageSrc(null);
+          }}
+          onConfirm={handleCropConfirm}
+        />
+      )}
     </div>
   );
 }

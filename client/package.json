@@ -22,6 +22,7 @@
     "next": "16.3.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "react-easy-crop": "^6.2.3",
     "react-hook-form": "^7.86.0",
     "socket.io-client": "^4.8.3",
     "tailwind-merge": "^3.6.0",

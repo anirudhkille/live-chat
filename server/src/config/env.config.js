@@ -21,6 +21,11 @@ const envSchema = z.object({
   SMTP_PORT: z.coerce.number().default(587),
   SMTP_EMAIL: z.string(),
   SMTP_PASSWORD: z.string(),
+  R2_ACCOUNT_ID: z.string(),
+  R2_ACCESS_KEY_ID: z.string(),
+  R2_SECRET_ACCESS_KEY: z.string(),
+  R2_BUCKET: z.string(),
+  R2_PUBLIC_URL: z.string(),
 });
 
 const result = envSchema.safeParse(process.env);

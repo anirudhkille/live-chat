@@ -66,8 +66,17 @@ export default function SettingsPage() {
       </header>
 
       <div className="flex flex-col items-center border-b p-6">
-        <div className="bg-primary text-primary-foreground flex h-14 w-14 items-center justify-center rounded-full text-base font-medium">
-          {initials(user?.name ?? user?.email ?? "?")}
+        <div className="bg-primary text-primary-foreground flex h-14 w-14 items-center justify-center overflow-hidden rounded-full text-base font-medium">
+          {user?.avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={user.avatar}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            initials(user?.name ?? user?.email ?? "?")
+          )}
         </div>
         <p className="mt-2 text-sm font-medium">{user?.name}</p>
         <p className="text-muted-foreground text-xs">{user?.email}</p>

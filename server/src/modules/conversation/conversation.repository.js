@@ -6,6 +6,7 @@ const participantsWithUser = {
       select: {
         id: true,
         name: true,
+        avatar: true,
       },
     },
   },
