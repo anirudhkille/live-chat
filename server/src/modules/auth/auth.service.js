@@ -13,6 +13,7 @@ import {
   getGoogleTokens,
   getGoogleUser,
 } from "./auth.google.js";
+import { logger } from "../../config/logger.js";
 
 export const loginUser = async (email) => {
   const user = await userRepository.findEmail(email);
@@ -65,6 +66,7 @@ export const refreshToken = async (token) => {
   try {
     decoded = jwt.verify(token, env.JWT_REFRESH_SECRET);
   } catch (err) {
+    logger.error(err);
     throw new AppError(401, "Invalid or expired token");
   }
 

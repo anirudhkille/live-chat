@@ -1,5 +1,6 @@
 import * as conversationRepository from "./conversation.repository.js";
 import { toConversationResponse } from "./conversation.mapper.js";
+import { AppError } from "../../utils/AppError.js";
 
 export const createOrGetConversation = async (userId1, userId2) => {
   if (userId1 === userId2) {

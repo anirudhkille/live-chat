@@ -3,6 +3,7 @@ import { AppError } from "../utils/AppError.js";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.config.js";
 import { findUserByIdOrThrow } from "../modules/user/user.service.js";
+import { logger } from "../config/logger.js";
 
 export const authenticate = asyncHandler(async (req, res, next) => {
   let token;
@@ -23,6 +24,7 @@ export const authenticate = asyncHandler(async (req, res, next) => {
     req.user = await findUserByIdOrThrow(decoded._id);
     next();
   } catch (error) {
+    logger.error(error);
     throw new AppError(401, "Not authorized, token failed");
   }
 });

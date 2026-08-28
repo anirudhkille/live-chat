@@ -3,6 +3,7 @@ import globals from "globals";
 import prettierConfig from "eslint-config-prettier";
 
 export default [
+  { ignores: ["src/generated/**"], },
   js.configs.recommended,
   prettierConfig,
   {

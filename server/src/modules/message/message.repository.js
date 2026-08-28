@@ -7,9 +7,9 @@ export const getMessages = (conversationId) => {
   });
 };
 
-export const sendMessage = async(senderId, conversationId, content) => {
+export const sendMessage = async (senderId, conversationId, content) => {
   const now = new Date();
-  const [message] =await  prisma.$transaction([
+  const [message] = await prisma.$transaction([
     prisma.message.create({ data: { senderId, conversationId, content } }),
     prisma.conversation.update({
       where: { id: conversationId },

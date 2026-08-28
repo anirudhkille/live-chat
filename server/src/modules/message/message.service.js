@@ -6,10 +6,14 @@ export const getMessages = async (conversationId) => {
 };
 
 export const sendMessage = async (senderId, conversationId, content) => {
-  const message= await messageRepository.sendMessage(senderId, conversationId, content);
-   
-  const io=getIO()
-  io.to(`conversation:${conversationId}`).emit('new-message',message)
+  const message = await messageRepository.sendMessage(
+    senderId,
+    conversationId,
+    content,
+  );
+
+  const io = getIO();
+  io.to(`conversation:${conversationId}`).emit("new-message", message);
 
   return message;
 };
