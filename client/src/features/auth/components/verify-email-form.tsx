@@ -19,11 +19,11 @@ import {
 } from "../schemas/verify-email-schema";
 import { useVerifyLoginOtp } from "../hooks/use-verify-email";
 
-interface VerifyEmailFormProps {
+type VerifyEmailFormProps = {
   email: string;
   onSuccess: (result: ApiResponse<AuthPayload>) => void;
   onResend: () => void;
-}
+};
 
 export function VerifyEmailForm({
   email,

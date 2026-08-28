@@ -3,7 +3,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import type { User } from "@/types/api";
 
-interface AuthState {
+type AuthState = {
   token: string | null;
   user: User | null;
   hasHydrated: boolean;
@@ -12,7 +12,7 @@ interface AuthState {
   setUser: (user: User) => void;
   clearSession: () => void;
   setHasHydrated: (hasHydrated: boolean) => void;
-}
+};
 
 export const useAuthStore = create<AuthState>()(
   persist(

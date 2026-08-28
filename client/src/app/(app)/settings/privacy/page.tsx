@@ -6,13 +6,13 @@ import { ArrowLeft, Lock } from "lucide-react";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 
-interface ToggleOptionProps {
+type ToggleOptionProps = {
   label: string;
   description?: string;
   enabled: boolean;
   disabled?: boolean;
   onChange?: (enabled: boolean) => void;
-}
+};
 
 function ToggleOption({
   label,

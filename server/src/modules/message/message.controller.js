@@ -18,5 +18,5 @@ export const sendMessage = asyncHandler(async (req, res) => {
     conversationId,
     content,
   );
-  sendResponse(res, 200, "Messages fetched", messages);
+  sendResponse(res, 200, "Messages sent successfully", messages);
 });

@@ -2,10 +2,10 @@ import type { ApiResponse, User } from "@/types/api";
 
 import { api } from "@/lib/api";
 
-export interface AuthPayload {
+export type AuthPayload = {
   user: User;
   accessToken: string;
-}
+};
 
 export async function sendLoginOtp(email: string): Promise<ApiResponse> {
   const response = await api.post<ApiResponse>("/auth/send-login-otp", {

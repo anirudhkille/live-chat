@@ -1,25 +1,26 @@
-export interface User {
+export type User = {
   id: string;
   name: string | null;
   email: string;
-}
+};
 
-export interface ApiResponse<T = unknown> {
+export type ApiResponse<T = unknown> = {
   success: boolean;
   message: string;
   data: T;
-}
+};
 
 /** Conversations endpoint */
-export interface Conversation {
+export type Conversation = {
   id: string;
-  otherUser: User;
+  name: string | null;
+  email: string;
   lastMessage: Message | null;
   unreadCount: number;
   createdAt: string;
-}
+};
 
-export interface Message {
+export type Message = {
   id: string;
   content: string;
   senderId: string;
@@ -27,14 +28,15 @@ export interface Message {
   conversationId: string;
   readAt: string | null;
   createdAt: string;
-}
+  sender?: User;
+};
 
-export interface MessagePage {
+export type MessagePage = {
   messages: Message[];
   nextCursor: string | null;
-}
+};
 
-export interface Notification {
+export type Notification = {
   id: string;
   type: string;
   title: string;
@@ -42,7 +44,7 @@ export interface Notification {
   read: boolean;
   link: string | null;
   createdAt: string;
-}
+};
 
 export function normalizeUser(raw: unknown): User | null {
   if (typeof raw !== "object" || raw === null) return null;

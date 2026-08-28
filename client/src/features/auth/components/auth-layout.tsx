@@ -6,11 +6,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-interface AuthLayoutProps {
+type AuthLayoutProps = {
   title: string;
   description?: string;
   children: React.ReactNode;
-}
+};
 
 export default function AuthLayout({
   title,

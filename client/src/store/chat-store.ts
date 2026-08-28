@@ -1,10 +1,10 @@
 import { create } from "zustand";
 
-interface ConversationDraft {
+type ConversationDraft = {
   [conversationId: string]: string;
-}
+};
 
-interface ChatState {
+type ChatState = {
   activeConversationId: string | null;
   typingUserIds: Map<string, number>;
   drafts: ConversationDraft;
@@ -17,7 +17,7 @@ interface ChatState {
   setDraft: (conversationId: string, text: string) => void;
   clearDraft: (conversationId: string) => void;
   clearAll: () => void;
-}
+};
 
 export const useChatStore = create<ChatState>((set) => ({
   activeConversationId: null,

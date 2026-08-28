@@ -6,9 +6,9 @@ import { LoginForm } from "@/features/auth/components/login-form";
 
 export const metadata: Metadata = { title: "Sign in · Live Chat" };
 
-interface LoginPageProps {
+type LoginPageProps = {
   searchParams: Promise<{ error?: string }>;
-}
+};
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const { error } = await searchParams;

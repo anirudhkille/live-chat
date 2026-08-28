@@ -13,9 +13,9 @@ import {
 } from "../schemas/complete-profile-schema";
 import { useCompleteProfile } from "../hooks/use-complete-profile";
 
-interface CompleteProfileFormProps {
+type CompleteProfileFormProps = {
   onSuccess: (result: ApiResponse<{ user: User }>) => void;
-}
+};
 
 export function CompleteProfileForm({ onSuccess }: CompleteProfileFormProps) {
   const { mutate, isPending, isError, error } = useCompleteProfile();

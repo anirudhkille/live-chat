@@ -7,11 +7,11 @@ import { Paperclip, Send } from "lucide-react";
 
 import { useChatStore } from "@/store/chat-store";
 
-interface MessageInputProps {
+type MessageInputProps = {
   conversationId: string;
   onSend: (content: string) => void;
   disabled?: boolean;
-}
+};
 
 export function MessageInput({
   conversationId,
@@ -35,8 +35,8 @@ export function MessageInput({
     const content = draft.trim();
     if (!content || disabled) return;
     onSend(content);
-    clearDraft(conversationId)
-  }, [draft, disabled, onSend]);
+    clearDraft(conversationId);
+  }, [draft, disabled, onSend, clearDraft, conversationId]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

@@ -5,10 +5,10 @@ import { useAuthStore } from "@/store/auth-store";
 
 type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
-interface PendingRequest {
+type PendingRequest = {
   resolve: (token: string) => void;
   reject: (error: unknown) => void;
-}
+};
 
 let isRefreshing = false;
 let pendingRequests: PendingRequest[] = [];

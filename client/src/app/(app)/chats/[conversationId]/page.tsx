@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback ,useEffect} from "react";
+import { use, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Info, Loader2 } from "lucide-react";
 import { socket } from "@/lib/socket";
@@ -42,17 +42,17 @@ export default function ChatThreadPage({
     },
     [sendMessage, conversationId]
   );
-  
+
   const otherUserName = conversation?.name ?? conversation?.email ?? "Unknown";
 
-  useEffect(()=>{
+  useEffect(() => {
     socket.connect();
- 
-    socket.emit("join-conversation",conversationId)
-    return()=>{
-      socket.disconnect()
-    }
-  },[conversationId])
+
+    socket.emit("join-conversation", conversationId);
+    return () => {
+      socket.disconnect();
+    };
+  }, [conversationId]);
 
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col">

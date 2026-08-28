@@ -3,21 +3,18 @@ import type { ApiResponse, Conversation, Message } from "@/types/api";
 
 export async function createConversation(
   userId: string
-): Promise<ApiResponse<Conversation[]>> {
-  const response = await api.post<ApiResponse<Conversation[]>>(
-    `/conversation`,
-    {
-      userId,
-    }
-  );
+): Promise<ApiResponse<Conversation>> {
+  const response = await api.post<ApiResponse<Conversation>>(`/conversation`, {
+    userId,
+  });
   return response.data;
 }
 
 export async function sendMessage(
   conversationId: string,
   content: string
-): Promise<ApiResponse<Conversation[]>> {
-  const response = await api.post<ApiResponse<Conversation[]>>(
+): Promise<ApiResponse<Message>> {
+  const response = await api.post<ApiResponse<Message>>(
     `/message/${conversationId}`,
     {
       content,
@@ -42,8 +39,8 @@ export async function getConversations(): Promise<ApiResponse<Conversation[]>> {
 
 export async function getConversationById(
   conversationId: string
-): Promise<ApiResponse<Conversation[]>> {
-  const response = await api.get<ApiResponse<Conversation[]>>(
+): Promise<ApiResponse<Conversation>> {
+  const response = await api.get<ApiResponse<Conversation>>(
     `/conversation/${conversationId}`
   );
   return response.data;
