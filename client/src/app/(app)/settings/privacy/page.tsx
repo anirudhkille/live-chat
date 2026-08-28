@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Lock } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
@@ -68,8 +68,7 @@ export default function PrivacyPage() {
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
-        )}
-        <Lock className="text-muted-foreground h-4 w-4" />
+        )}   
         <span className="text-sm font-medium">Privacy</span>
       </header>
 

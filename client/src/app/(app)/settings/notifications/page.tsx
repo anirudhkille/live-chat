@@ -65,8 +65,7 @@ export default function NotificationsPage() {
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
-        )}
-        <Bell className="text-muted-foreground h-4 w-4" />
+        )}      
         <span className="text-sm font-medium">Notifications</span>
         {unreadCount > 0 && (
           <Button
