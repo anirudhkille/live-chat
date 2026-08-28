@@ -4,22 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search, SquarePen, Settings } from "lucide-react";
 
-import { ConversationList } from "@/components/chat/conversation-list";
+import { ConversationList } from "@/features/conversations/components/conversation-list";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Avatar } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
-
-function initials(source: string) {
-  return (
-    source
-      .split(" ")
-      .map((part) => part[0])
-      .filter(Boolean)
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "?"
-  );
-}
 
 export function Sidebar({ className }: { className?: string }) {
   const pathname = usePathname();
@@ -30,9 +19,13 @@ export function Sidebar({ className }: { className?: string }) {
       className={cn("bg-card flex h-full w-full flex-col border-r", className)}
     >
       <div className="flex items-center gap-2 border-b p-3">
-        <div className="bg-primary text-primary-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-medium">
-          {initials(user?.name ?? user?.email ?? "?")}
-        </div>
+        <Avatar
+          name={user?.name}
+          email={user?.email}
+          src={user?.avatar}
+          size="xs"
+          variant="primary"
+        />
         <span className="truncate text-sm font-medium">
           {user?.name ?? "Account"}
         </span>

@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AvatarCropDialog } from "@/components/avatar/avatar-crop-dialog";
+import { Avatar } from "@/components/ui/avatar";
+import { AvatarCropDialog } from "@/features/settings/components/avatar-crop-dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { getApiErrorMessage } from "@/types/api";
@@ -28,18 +29,6 @@ type PendingAvatar = {
   blob: Blob;
   contentType: string;
 };
-
-function initials(source: string) {
-  return (
-    source
-      .split(" ")
-      .map((part) => part[0])
-      .filter(Boolean)
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "?"
-  );
-}
 
 export default function EditProfilePage() {
   const router = useRouter();
@@ -148,20 +137,14 @@ export default function EditProfilePage() {
         className="mx-auto flex w-full max-w-sm flex-col gap-6 p-6"
       >
         <div className="flex flex-col items-center gap-2">
-          <div
-            aria-hidden="true"
-            className="bg-primary text-primary-foreground relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full text-lg font-medium"
-          >
-            {avatarSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={avatarSrc}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              initials(user?.name ?? user?.email ?? "?")
-            )}
+          <div className="relative">
+            <Avatar
+              name={user?.name}
+              email={user?.email}
+              src={avatarSrc}
+              size="lg"
+              variant="primary"
+            />
             <button
               type="button"
               aria-label="Change photo"

@@ -5,23 +5,12 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Info, Loader2 } from "lucide-react";
 import { socket } from "@/lib/socket";
 import { Button } from "@/components/ui/button";
-import { MessageList } from "@/components/chat/message-list";
-import { MessageInput } from "@/components/chat/message-input";
+import { Avatar } from "@/components/ui/avatar";
+import { MessageList } from "@/features/conversations/components/message-list";
+import { MessageInput } from "@/features/conversations/components/message-input";
 import { useSendMessage } from "@/features/conversations/hooks/useSendMessage";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { useGetConversationById } from "@/features/conversations/hooks/useConversationById";
-
-function initials(name: string) {
-  return (
-    name
-      .split(" ")
-      .map((p) => p[0])
-      .filter(Boolean)
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "?"
-  );
-}
 
 export default function ChatThreadPage({
   params,
@@ -68,24 +57,18 @@ export default function ChatThreadPage({
           </button>
         )}
         <div className="flex min-w-0 items-center gap-2">
-          <div className="bg-muted text-muted-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-medium">
-            {conversation ? (
-              conversation?.photoUrl ? (
-                <img
-                  src={conversation.photoUrl}
-                  alt={otherUserName}
-                  className="h-full w-full rounded-full border object-cover"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              ) : (
-                initials(otherUserName)
-              )
-            ) : (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            )}
-          </div>
+          {conversation ? (
+            <Avatar
+              name={conversation.name ?? otherUserName}
+              email={conversation.email}
+              src={conversation.photoUrl}
+              size="xs"
+            />
+          ) : (
+            <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
+              <Loader2 className="text-muted-foreground h-3 w-3 animate-spin" />
+            </div>
+          )}
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">
               {loadingConversation ? "Loading..." : otherUserName}

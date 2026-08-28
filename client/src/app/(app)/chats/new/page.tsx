@@ -5,22 +5,11 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, MessageSquarePlus } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
+import { Avatar } from "@/components/ui/avatar";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { useSearchUsers } from "@/features/users/hooks/useSearch";
 import { useCreateConversation } from "@/features/conversations/hooks/useCreateConversation";
 import { getApiErrorMessage } from "@/types/api";
-
-function initials(name: string) {
-  return (
-    name
-      .split(" ")
-      .map((p) => p[0])
-      .filter(Boolean)
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "?"
-  );
-}
 
 export default function NewChatPage() {
   const router = useRouter();
@@ -102,9 +91,7 @@ export default function NewChatPage() {
             onClick={() => handleStartChat(user.id)}
             className="hover:bg-accent flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors disabled:opacity-50"
           >
-            <div className="bg-muted text-muted-foreground flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-medium">
-              {initials(user.name ?? user.email)}
-            </div>
+            <Avatar name={user.name} email={user.email} src={user.avatar} size="sm" />
             <div className="min-w-0">
               <p className="truncate font-medium">{user.name ?? "Unnamed"}</p>
               <p className="text-muted-foreground truncate text-xs">

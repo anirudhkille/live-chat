@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { ProtectedRoute } from "@/components/auth/protected-route";
+import { ProtectedRoute } from "@/layout/protected-route";
 
 export const metadata: Metadata = { title: "Chats" };
 

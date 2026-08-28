@@ -7,19 +7,8 @@ import { Loader2 } from "lucide-react";
 import { useConversations } from "@/features/conversations/hooks/useConversations";
 import { useAuthStore } from "@/store/auth-store";
 import { cn } from "@/lib/utils";
+import { Avatar } from "@/components/ui/avatar";
 import type { Conversation } from "@/types/api";
-
-function initials(name: string) {
-  return (
-    name
-      .split(" ")
-      .map((p) => p[0])
-      .filter(Boolean)
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "?"
-  );
-}
 
 function formatTime(iso: string) {
   const date = new Date(iso);
@@ -46,7 +35,7 @@ function ConversationItem({
   isActive: boolean;
   currentUserId: string | undefined;
 }) {
-  const { name, lastMessage, unreadCount } = conversation;
+  const { name, email, photoUrl, lastMessage, unreadCount } = conversation;
   const sender = lastMessage?.sender;
   const senderName = sender?.id === currentUserId ? "You" : sender?.name;
 
@@ -60,20 +49,7 @@ function ConversationItem({
       )}
     >
       <div className="relative shrink-0">
-        <div className="bg-muted text-muted-foreground flex h-9 w-9 items-center justify-center rounded-full text-xs font-medium">
-          {conversation.photoUrl ? (
-            <img
-              src={conversation.photoUrl}
-              alt={senderName}
-              className="h-full w-full rounded-full border object-cover"
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
-            />
-          ) : (
-            initials(name ?? "")
-          )}
-        </div>
+        <Avatar name={name} email={email} src={photoUrl} size="sm" />
         {/* Online status dot — placeholder for presence event wiring */}
       </div>
 
