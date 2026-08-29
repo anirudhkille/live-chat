@@ -1,18 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Paperclip, Send } from "lucide-react";
+import { AlertTriangle, Loader2, Paperclip, Send, X } from "lucide-react";
 import { socket } from "@/lib/socket";
 import { useChatStore } from "@/store/chat-store";
 import { useSendMessage } from "@/features/conversations/hooks/useSendMessage";
+import {
+  uploadAttachment,
+  validateAttachmentFile,
+} from "@/features/attachments/api/attachment-api";
 
 const TYPING_THROTTLE_MS = 2000;
 const TYPING_STOP_DELAY_MS = 1500;
+const MAX_PENDING_ATTACHMENTS = 4;
 
 type MessageInputProps = {
   conversationId: string;
+};
+
+type PendingAttachment = {
+  localId: string;
+  file: File;
+  previewUrl: string;
+  attachmentId: string | null;
+  status: "uploading" | "ready" | "error";
 };
 
 export function MessageInput({ conversationId }: MessageInputProps) {
@@ -20,11 +33,21 @@ export function MessageInput({ conversationId }: MessageInputProps) {
   const setDraft = useChatStore((s) => s.setDraft);
   const clearDraft = useChatStore((s) => s.clearDraft);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const revokeOnUnmountRef = useRef<string[]>([]);
   const sendMessage = useSendMessage();
   const typingStopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
   const lastTypingEmitAtRef = useRef(0);
+
+  const [pending, setPending] = useState<PendingAttachment[]>([]);
+  const [pickerError, setPickerError] = useState<string | null>(null);
+
+  const isUploading = pending.some((p) => p.status === "uploading");
+  const readyAttachmentIds = pending
+    .filter((p) => p.status === "ready" && p.attachmentId)
+    .map((p) => p.attachmentId as string);
 
   // Auto-resize textarea as content grows
   useEffect(() => {
@@ -61,12 +84,104 @@ export function MessageInput({ conversationId }: MessageInputProps) {
     };
   }, [conversationId]);
 
+  useEffect(() => {
+    return () => {
+      revokeOnUnmountRef.current.forEach((url) => URL.revokeObjectURL(url));
+      revokeOnUnmountRef.current = [];
+    };
+  }, []);
+
+  const startAttachmentUploads = useCallback(
+    (files: File[]) => {
+      const remaining = Math.max(
+        0,
+        MAX_PENDING_ATTACHMENTS - pending.length
+      );
+
+      files.slice(0, remaining).forEach((file) => {
+        const previewUrl = URL.createObjectURL(file);
+        revokeOnUnmountRef.current.push(previewUrl);
+        const localId = crypto.randomUUID();
+        setPending((prev) => [
+          ...prev,
+          { localId, file, previewUrl, attachmentId: null, status: "uploading" },
+        ]);
+
+        uploadAttachment(file)
+          .then((attachment) =>
+            setPending((prev) =>
+              prev.map((item) =>
+                item.localId === localId
+                  ? { ...item, attachmentId: attachment.id, status: "ready" }
+                  : item
+              )
+            )
+          )
+          .catch(() =>
+            setPending((prev) =>
+              prev.map((item) =>
+                item.localId === localId ? { ...item, status: "error" } : item
+              )
+            )
+          );
+      });
+    },
+    [pending.length]
+  );
+
+  const handleFiles = useCallback(
+    (files: FileList | null) => {
+      if (!files?.length) return;
+      const list = Array.from(files);
+      const invalid = list.find(
+        (file) => !!validateAttachmentFile(file)
+      );
+      setPickerError(invalid ? validateAttachmentFile(invalid) : null);
+      startAttachmentUploads(
+        list.filter((file) => !validateAttachmentFile(file))
+      );
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    },
+    [startAttachmentUploads]
+  );
+
+  const removePending = useCallback(
+    (localId: string) => {
+      const item = pending.find((p) => p.localId === localId);
+      if (item) URL.revokeObjectURL(item.previewUrl);
+      setPending((prev) => prev.filter((p) => p.localId !== localId));
+    },
+    [pending]
+  );
+
   const handleSend = useCallback(() => {
     const content = draft.trim();
-    if (!content || sendMessage.isPending) return;
-    sendMessage.mutate({ conversationId, content });
+    if (
+      (!content && readyAttachmentIds.length === 0) ||
+      sendMessage.isPending ||
+      isUploading
+    ) {
+      return;
+    }
+    sendMessage.mutate({
+      conversationId,
+      content,
+      attachmentIds: readyAttachmentIds,
+    });
     clearDraft(conversationId);
-  }, [draft, sendMessage, conversationId, clearDraft]);
+    if (pending.length) {
+      pending.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+      setPending([]);
+    }
+  }, [
+    draft,
+    pending,
+    readyAttachmentIds,
+    isUploading,
+    sendMessage,
+    conversationId,
+    clearDraft,
+  ]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -78,49 +193,93 @@ export function MessageInput({ conversationId }: MessageInputProps) {
     [handleSend]
   );
 
-  useEffect(()=>{
-      socket.on("typing-conversation", (conversationId) => {
- socket.emit(`conversation:${conversationId}`, conversationId);
-})
-  },[])
-
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        handleSend();
-      }}
-      className="flex items-end gap-2 border-t p-3"
-    >
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        aria-label="Attach file"
-        disabled
-        className="shrink-0"
+    <div className="border-t">
+      {pending.length > 0 && (
+        <div className="flex flex-wrap gap-2 p-3 pb-0">
+          {pending.map((item) => (
+            <div key={item.localId} className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={item.previewUrl}
+                alt={item.file.name}
+                className="bg-muted h-16 w-16 rounded-md object-cover"
+              />
+              {item.status === "uploading" && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-md bg-black/50">
+                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                </div>
+              )}
+              {item.status === "error" && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-md bg-black/50">
+                  <AlertTriangle className="h-4 w-4 text-red-400" />
+                </div>
+              )}
+              <button
+                type="button"
+                aria-label={`Remove ${item.file.name}`}
+                onClick={() => removePending(item.localId)}
+                className="bg-background border-muted-foreground/30 text-muted-foreground absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full border"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {pickerError && (
+        <p className="text-destructive px-3 pt-2 text-[11px]">{pickerError}</p>
+      )}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSend();
+        }}
+        className="flex items-end gap-2 p-3"
       >
-        <Paperclip className="h-4 w-4" />
-      </Button>
-      <textarea
-        ref={textareaRef}
-        value={draft}
-        onChange={(e) => setDraft(conversationId, e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="Message"
-        rows={1}
-        disabled={sendMessage.isPending}
-        className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex max-h-37.5 min-h-10 flex-1 resize-none rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-      />
-      <Button
-        type="submit"
-        size="icon"
-        aria-label="Send message"
-        disabled={!draft.trim() || sendMessage.isPending}
-        className="shrink-0"
-      >
-        <Send className="h-4 w-4" />
-      </Button>
-    </form>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          className="hidden"
+          onChange={(e) => handleFiles(e.target.files)}
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="Add image"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploading}
+          className="shrink-0"
+        >
+          <Paperclip className="h-4 w-4" />
+        </Button>
+        <textarea
+          ref={textareaRef}
+          value={draft}
+          onChange={(e) => setDraft(conversationId, e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Message"
+          rows={1}
+          disabled={sendMessage.isPending}
+          className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex max-h-37.5 min-h-10 flex-1 resize-none rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        />
+        <Button
+          type="submit"
+          size="icon"
+          aria-label="Send message"
+          disabled={
+            (!draft.trim() && readyAttachmentIds.length === 0) ||
+            sendMessage.isPending ||
+            isUploading
+          }
+          className="shrink-0"
+        >
+          <Send className="h-4 w-4" />
+        </Button>
+      </form>
+    </div>
   );
 }

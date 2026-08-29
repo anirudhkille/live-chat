@@ -38,7 +38,37 @@ export function MessageBubble({ message }: { message: Message }) {
         isOptimistic && "opacity-70"
       )}
     >
-      <p className="break-words whitespace-pre-wrap">{message.content}</p>
+      {(message.attachments ?? []).map((attachment) =>
+        attachment.type === "IMAGE" ? (
+          <a
+            key={attachment.id}
+            href={attachment.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={attachment.url}
+              alt={attachment.fileName}
+              className="max-h-64 w-full max-w-56 rounded-md object-contain"
+            />
+          </a>
+        ) : (
+          <a
+            key={attachment.id}
+            href={attachment.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs underline"
+          >
+            {attachment.fileName}
+          </a>
+        )
+      )}
+      {message.content ? (
+        <p className="break-words whitespace-pre-wrap">{message.content}</p>
+      ) : null}
       <span
         className={cn(
           "text-[10px] leading-tight",

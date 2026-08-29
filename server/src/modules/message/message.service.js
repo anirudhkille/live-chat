@@ -6,11 +6,17 @@ export const getMessages = async (conversationId, before, limit) => {
   return await messageRepository.getMessages(conversationId, before, safeLimit);
 };
 
-export const sendMessage = async (senderId, conversationId, content) => {
+export const sendMessage = async (
+  senderId,
+  conversationId,
+  content,
+  attachmentIds,
+) => {
   const message = await messageRepository.sendMessage(
     senderId,
     conversationId,
     content,
+    attachmentIds,
   );
 
   const io = getIO();

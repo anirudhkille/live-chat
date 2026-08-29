@@ -31,6 +31,20 @@ export type Message = {
   readAt: string | null;
   createdAt: string;
   sender?: User;
+  attachments?: Attachment[];
+};
+
+export type Attachment = {
+  id: string;
+  url: string;
+  type: "IMAGE" | "VIDEO" | "AUDIO" | "FILE";
+  fileName: string;
+  fileSize: number;
+  width: number | null;
+  height: number | null;
+  duration: string | null;
+  thumbnailUrl: string | null;
+  createdAt: string;
 };
 
 export type MessagePage = {

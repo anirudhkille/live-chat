@@ -107,3 +107,18 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+export async function putPresignedObject(
+  uploadUrl: string,
+  blob: Blob,
+  contentType: string
+): Promise<void> {
+  const response = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": contentType },
+    body: blob,
+  });
+  if (!response.ok) {
+    throw new Error(`Upload failed (${response.status})`);
+  }
+}

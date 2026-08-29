@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { env } from "../../config/env.config.js";
-import { generatePresignedUploadUrl } from "../../lib/storage.js"; // adjust to your actual module
+import { generatePresignedUploadUrl } from "../storage/storage.service.js";
 import * as attachmentRepository from "./attachment.repository.js";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];

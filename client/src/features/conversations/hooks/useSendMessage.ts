@@ -1,11 +1,15 @@
 import { useMutation } from "@tanstack/react-query";
 import { sendMessage } from "../api/conversation-api";
 
-type SendMessageInput = { conversationId: string; content: string };
+export type SendMessageInput = {
+  conversationId: string;
+  content: string;
+  attachmentIds?: string[];
+};
 
 export function useSendMessage() {
   return useMutation({
-    mutationFn: ({ conversationId, content }: SendMessageInput) =>
-      sendMessage(conversationId, content),
+    mutationFn: ({ conversationId, content, attachmentIds }: SendMessageInput) =>
+      sendMessage(conversationId, content, attachmentIds),
   });
 }

@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api, putPresignedObject } from "@/lib/api";
 import type { ApiResponse, User } from "@/types/api";
 
 export async function searchUser(
@@ -25,21 +25,6 @@ export async function getAvatarUploadUrl(
     { contentType }
   );
   return response.data;
-}
-
-export async function putPresignedObject(
-  uploadUrl: string,
-  blob: Blob,
-  contentType: string
-): Promise<void> {
-  const response = await fetch(uploadUrl, {
-    method: "PUT",
-    headers: { "Content-Type": contentType },
-    body: blob,
-  });
-  if (!response.ok) {
-    throw new Error(`Upload failed (${response.status})`);
-  }
 }
 
 export async function confirmAvatarUpload(

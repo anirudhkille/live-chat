@@ -16,12 +16,13 @@ export const getMessages = asyncHandler(async (req, res) => {
 
 export const sendMessage = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
-  const { content } = req.body;
+  const { content, attachmentIds } = req.body;
 
   const messages = await messageService.sendMessage(
     req.user.id,
     conversationId,
     content,
+    Array.isArray(attachmentIds) ? attachmentIds : undefined,
   );
   sendResponse(res, 200, "Messages sent successfully", messages);
 });

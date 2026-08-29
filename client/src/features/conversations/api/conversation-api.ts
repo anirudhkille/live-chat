@@ -12,12 +12,14 @@ export async function createConversation(
 
 export async function sendMessage(
   conversationId: string,
-  content: string
+  content: string,
+  attachmentIds?: string[]
 ): Promise<ApiResponse<Message>> {
   const response = await api.post<ApiResponse<Message>>(
     `/message/${conversationId}`,
     {
       content,
+      ...(attachmentIds?.length ? { attachmentIds } : {}),
     }
   );
   return response.data;
