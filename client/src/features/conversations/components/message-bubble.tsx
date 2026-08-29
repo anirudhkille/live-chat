@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth-store";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import type { Message } from "@/types/api";
 import { useEditMessage } from "../hooks/useEditMessage";
 import { useDeleteMessage } from "../hooks/useDeleteMessage";
@@ -39,6 +42,8 @@ export function MessageBubble({ message }: { message: Message }) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
   const [draftSource, setDraftSource] = useState(message.content);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   if (!isEditing && message.content !== draftSource) {
     setDraftSource(message.content);
@@ -48,7 +53,28 @@ export function MessageBubble({ message }: { message: Message }) {
   const editMutation = useEditMessage();
   const deleteMutation = useDeleteMessage();
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (event: MouseEvent | TouchEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
+
   const beginEditing = () => {
+    setMenuOpen(false);
     setIsEditing(true);
     setDraft(message.content);
   };
@@ -67,10 +93,20 @@ export function MessageBubble({ message }: { message: Message }) {
     );
   };
 
-  const handleDelete = () => {
+  const confirmDelete = () => {
+    setMenuOpen(false);
     if (deleteMutation.isPending) return;
-    if (!window.confirm("Delete this message?")) return;
-    deleteMutation.mutate(message.id);
+    toast("Delete this message?", {
+      description: "This can't be undone.",
+      cancel: {
+        label: "Cancel",
+        onClick: () => toast.dismiss(),
+      },
+      action: {
+        label: "Delete",
+        onClick: () => deleteMutation.mutate(message.id),
+      },
+    });
   };
 
   return (
@@ -81,49 +117,84 @@ export function MessageBubble({ message }: { message: Message }) {
         isOptimistic && "opacity-70"
       )}
     >
-      {isOwn && !isDeleted && (
-        <div className="absolute -top-4 right-0 z-10 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-          <button
+      {isOwn && !isDeleted && !isEditing && (
+        <div className="absolute -top-4 right-0 z-20 opacity-0 transition-opacity group-hover:opacity-100">
+          <Button
             type="button"
-            onClick={beginEditing}
-            className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            aria-label="Edit message"
-            title="Edit message"
+            variant={menuOpen ? "secondary" : "ghost"}
+            size="icon"
+            onClick={() => setMenuOpen((open) => !open)}
+            className="h-7 w-7"
+            aria-label="Message options"
+            title="Message options"
           >
             <svg
-              className="h-3.5 w-3.5"
+              className="h-4 w-4"
               viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+              fill="currentColor"
+              aria-hidden="true"
             >
-              <path d="M12 20h9" />
-              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+              <circle cx="5" cy="12" r="1.5" />
+              <circle cx="12" cy="12" r="1.5" />
+              <circle cx="19" cy="12" r="1.5" />
             </svg>
-          </button>
-          <button
-            type="button"
-            onClick={handleDelete}
-            className="rounded p-1 text-muted-foreground transition-colors hover:bg-red-500/20 hover:text-red-500"
-            aria-label="Delete message"
-            title="Delete message"
-          >
-            <svg
-              className="h-3.5 w-3.5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          </Button>
+
+          {menuOpen && (
+            <div
+              ref={menuRef}
+              className="absolute right-0 top-full z-20 mt-1 w-40 rounded-md border bg-background p-1 shadow-lg"
+              role="menu"
             >
-              <path d="M3 6h18" />
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-              <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-            </svg>
-          </button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                role="menuitem"
+                onClick={beginEditing}
+                className="w-full justify-start"
+              >
+                <svg
+                  className="h-3.5 w-3.5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                </svg>
+                Edit
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                role="menuitem"
+                onClick={confirmDelete}
+                className="w-full justify-start text-red-500 hover:bg-red-500/10 hover:text-red-500"
+              >
+                <svg
+                  className="h-3.5 w-3.5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3 6h18" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                  <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+                Delete
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -131,42 +202,6 @@ export function MessageBubble({ message }: { message: Message }) {
         <p className="text-[13px] italic opacity-60">
           {"This message was deleted"}
         </p>
-      ) : isEditing ? (
-        <div className="flex flex-col gap-1">
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            rows={2}
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                saveEdit();
-              }
-            }}
-            className={cn(
-              "resize-none rounded-sm border bg-background p-1.5 text-sm text-foreground outline-none",
-              "focus:border-primary focus:ring-1 focus:ring-primary"
-            )}
-          />
-          <div className="flex justify-end gap-1">
-            <button
-              type="button"
-              onClick={cancelEdit}
-              className="rounded px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={saveEdit}
-              disabled={!draft.trim() || editMutation.isPending}
-              className="rounded bg-foreground px-2 py-0.5 text-xs text-background transition-opacity hover:opacity-80 disabled:opacity-50"
-            >
-              Save
-            </button>
-          </div>
-        </div>
       ) : (
         <>
           {(message.attachments ?? []).map((attachment) =>
@@ -202,6 +237,39 @@ export function MessageBubble({ message }: { message: Message }) {
           ) : null}
         </>
       )}
+
+      <Dialog
+        open={isEditing}
+        onClose={cancelEdit}
+        title="Edit message"
+        footer={
+          <>
+            <Button variant="ghost" onClick={cancelEdit}>
+              Cancel
+            </Button>
+            <Button
+              onClick={saveEdit}
+              disabled={!draft.trim() || editMutation.isPending}
+            >
+              Save
+            </Button>
+          </>
+        }
+      >
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          rows={4}
+          autoFocus
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              saveEdit();
+            }
+          }}
+          className="w-full resize-none rounded-md border bg-background p-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+        />
+      </Dialog>
 
       <span
         className={cn(

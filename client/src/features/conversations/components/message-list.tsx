@@ -9,13 +9,16 @@ import {
   useState,
 } from "react";
 import { Loader2 } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import {
+  useQueryClient,
+  type InfiniteData,
+} from "@tanstack/react-query";
 import { socket } from "@/lib/socket";
 import { useGetMessages } from "@/features/conversations/hooks/useGetMessages";
 import { useMarkConversationRead } from "@/features/conversations/hooks/useMarkConversationRead";
 import { MessageBubble } from "./message-bubble";
 import { useAuthStore } from "@/store/auth-store";
-import type { Message } from "@/types/api";
+import type { ApiResponse, Message } from "@/types/api";
 
 type MessageListProps = {
   conversationId: string;
@@ -24,6 +27,26 @@ type MessageListProps = {
 const SCROLL_BOTTOM_THRESHOLD = 80;
 const SCROLL_TOP_THRESHOLD = 40;
 const LOAD_OLDER_COOLDOWN_MS = 600;
+
+function updateCachedMessages(
+  queryClient: ReturnType<typeof useQueryClient>,
+  conversationId: string,
+  transform: (message: Message) => Message
+) {
+  queryClient.setQueryData<InfiniteData<ApiResponse<Message[]>>>(
+    ["messages", conversationId],
+    (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        pages: old.pages.map((page) => ({
+          ...page,
+          data: page.data.map(transform),
+        })),
+      };
+    }
+  );
+}
 
 export function MessageList({ conversationId }: MessageListProps) {
   const {
@@ -90,16 +113,13 @@ export function MessageList({ conversationId }: MessageListProps) {
             : message
         )
       );
-      queryClient.setQueryData<Message[][]>(
-        ["messages", conversationId],
-        (pages) =>
-          pages?.map((page) =>
-            page.map((message) =>
-              message.senderId === currentUserId
-                ? { ...message, readAt: payload.readAt }
-                : message
-            )
-          )
+      updateCachedMessages(
+        queryClient,
+        conversationId,
+        (message) =>
+          message.senderId === currentUserId
+            ? { ...message, readAt: payload.readAt }
+            : message
       );
     };
     socket.on("messages-read", handleMessagesRead);
@@ -118,12 +138,10 @@ export function MessageList({ conversationId }: MessageListProps) {
       setSocketMessages((prev) =>
         prev.map((message) => (message.id === updated.id ? updated : message))
       );
-      queryClient.setQueryData<Message[][]>(
-        ["messages", conversationId],
-        (pages) =>
-          pages?.map((page) =>
-            page.map((message) => (message.id === updated.id ? updated : message))
-          )
+      updateCachedMessages(
+        queryClient,
+        conversationId,
+        (message) => (message.id === updated.id ? updated : message)
       );
     };
 
@@ -136,12 +154,10 @@ export function MessageList({ conversationId }: MessageListProps) {
       setSocketMessages((prev) =>
         prev.map((message) => (message.id === deleted.id ? deleted : message))
       );
-      queryClient.setQueryData<Message[][]>(
-        ["messages", conversationId],
-        (pages) =>
-          pages?.map((page) =>
-            page.map((message) => (message.id === deleted.id ? deleted : message))
-          )
+      updateCachedMessages(
+        queryClient,
+        conversationId,
+        (message) => (message.id === deleted.id ? deleted : message)
       );
     };
 

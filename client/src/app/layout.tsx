@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "@fontsource-variable/geist";
 import "./globals.css";
 
+import { Toaster } from "sonner";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
@@ -27,8 +28,9 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className="antialiased">
+      <body className="antialiased" suppressHydrationWarning>
         <Providers>{children}</Providers>
+        <Toaster richColors position="top-center" />
       </body>
     </html>
   );

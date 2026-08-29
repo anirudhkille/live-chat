@@ -6,5 +6,5 @@ export const updateMessageSchema = z.object({
 
 export const sendMessageSchema = z.object({
   content: z.string(),
-  attachmentIds: z.string(),
+  attachmentIds: z.string().optional(),
 });
