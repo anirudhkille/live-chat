@@ -9,9 +9,12 @@ import {
   useState,
 } from "react";
 import { Loader2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { socket } from "@/lib/socket";
 import { useGetMessages } from "@/features/conversations/hooks/useGetMessages";
+import { useMarkConversationRead } from "@/features/conversations/hooks/useMarkConversationRead";
 import { MessageBubble } from "./message-bubble";
+import { useAuthStore } from "@/store/auth-store";
 import type { Message } from "@/types/api";
 
 type MessageListProps = {
@@ -41,6 +44,10 @@ export function MessageList({ conversationId }: MessageListProps) {
   const prevScrollHeightRef = useRef(0);
   const lastLoadOlderAtRef = useRef(0);
 
+  const currentUserId = useAuthStore((s) => s.user?.id);
+  const queryClient = useQueryClient();
+  const { mutate: markConversationRead } = useMarkConversationRead();
+
   if (conversationId !== prevConversationId) {
     setPrevConversationId(conversationId);
     setSocketMessages([]);
@@ -60,12 +67,51 @@ export function MessageList({ conversationId }: MessageListProps) {
     const handleNewMessage = (newMessage: Message) => {
       if (newMessage.conversationId !== conversationId) return;
       setSocketMessages((prev) => [...prev, newMessage]);
+      markConversationRead(conversationId);
     };
     socket.on("new-message", handleNewMessage);
     return () => {
       socket.off("new-message", handleNewMessage);
     };
-  }, [conversationId]);
+  }, [conversationId, markConversationRead]);
+
+  useEffect(() => {
+    const handleMessagesRead = (payload: {
+      conversationId: string;
+      userId: string;
+      readAt: string;
+    }) => {
+      if (payload.conversationId !== conversationId || !currentUserId) return;
+
+      setSocketMessages((prev) =>
+        prev.map((message) =>
+          message.senderId === currentUserId
+            ? { ...message, readAt: payload.readAt }
+            : message
+        )
+      );
+      queryClient.setQueryData<Message[][]>(
+        ["messages", conversationId],
+        (pages) =>
+          pages?.map((page) =>
+            page.map((message) =>
+              message.senderId === currentUserId
+                ? { ...message, readAt: payload.readAt }
+                : message
+            )
+          )
+      );
+    };
+    socket.on("messages-read", handleMessagesRead);
+    return () => {
+      socket.off("messages-read", handleMessagesRead);
+    };
+  }, [conversationId, currentUserId, queryClient]);
+
+  useEffect(() => {
+    if (!conversationId || isLoading) return;
+    markConversationRead(conversationId);
+  }, [conversationId, isLoading, markConversationRead]);
 
   const scrollToBottom = useCallback((behavior?: ScrollBehavior) => {
     bottomRef.current?.scrollIntoView({ behavior });

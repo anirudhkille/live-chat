@@ -14,6 +14,15 @@ export const getMessages = asyncHandler(async (req, res) => {
   sendResponse(res, 200, "Messages fetched", messages);
 });
 
+export const markMessagesRead = asyncHandler(async (req, res) => {
+  const { conversationId } = req.params;
+  const result = await messageService.markMessagesRead(
+    req.user.id,
+    conversationId,
+  );
+  sendResponse(res, 200, "Messages marked as read", result);
+});
+
 export const sendMessage = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
   const { content, attachmentIds } = req.body;

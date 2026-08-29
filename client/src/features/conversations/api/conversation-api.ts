@@ -53,3 +53,12 @@ export async function getConversationById(
   );
   return response.data;
 }
+
+export async function markConversationRead(
+  conversationId: string
+): Promise<ApiResponse<{ conversationId: string; updatedCount: number }>> {
+  const response = await api.post<ApiResponse<{ conversationId: string; updatedCount: number }>>(
+    `/message/read/${conversationId}`
+  );
+  return response.data;
+}

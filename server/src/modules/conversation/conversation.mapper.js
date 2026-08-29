@@ -8,6 +8,7 @@ export const toConversationResponse = (conversation, userId) => {
     name: isGroup ? conversation.name : otherUser?.user?.name || null,
     photoUrl: isGroup ? conversation.photoUrl : otherUser?.user?.avatar,
     otherUserId: otherUser?.userId ?? null,
+    unreadCount: conversation._unreadCount ?? 0,
     lastMessage: lastMessage
       ? {
           id: lastMessage.id,

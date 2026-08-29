@@ -36,8 +36,8 @@ export const get = (userId1, userId2) => {
   });
 };
 
-export const getAll = (userId) => {
-  return prisma.conversation.findMany({
+export const getAll = async (userId) => {
+  const conversations = await prisma.conversation.findMany({
     where: {
       isGroup: false,
       AND: [{ participants: { some: { userId: userId } } }],
@@ -63,6 +63,23 @@ export const getAll = (userId) => {
       lastMessageAt: "desc",
     },
   });
+
+  const unreadCounts = await Promise.all(
+    conversations.map((conversation) =>
+      prisma.message.count({
+        where: {
+          conversationId: conversation.id,
+          senderId: { not: userId },
+          reads: { none: { userId } },
+        },
+      }),
+    ),
+  );
+
+  return conversations.map((conversation, index) => ({
+    ...conversation,
+    _unreadCount: unreadCounts[index],
+  }));
 };
 
 export const getById = (conversationId) => {

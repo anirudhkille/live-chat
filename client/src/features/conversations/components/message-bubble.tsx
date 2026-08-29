@@ -33,7 +33,7 @@ export function MessageBubble({ message }: { message: Message }) {
   return (
     <div
       className={cn(
-        "animate-message-in mb-3 flex max-w-[75%] flex-col gap-0.5 rounded-md px-3 py-2 text-sm",
+        "animate-message-in mb-3 flex max-w-[75%] w-fit flex-col gap-0.5 rounded-md px-3 py-2 text-sm",
         isOwn ? "bg-primary text-primary-foreground ml-auto" : "bg-muted",
         isOptimistic && "opacity-70"
       )}
