@@ -6,6 +6,7 @@ import attachmentRoutes from "./modules/attachment/attachment.route.js";
 import authRoutes from "./modules/auth/auth.route.js";
 import conversationRoutes from "./modules/conversation/conversation.route.js";
 import messageRoutes from "./modules/message/message.route.js";
+import pushRoutes from "./modules/push/push.route.js";
 import userRoutes from "./modules/user/user.route.js";
 import { sendResponse } from "./utils/response.js";
 import { env } from "./config/env.config.js";
@@ -33,6 +34,7 @@ app.use("/api/attachment", attachmentRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/conversation", conversationRoutes);
 app.use("/api/message", messageRoutes);
+app.use("/api/push", pushRoutes);
 app.use("/api/user", userRoutes);
 
 app.use((req, res) => {

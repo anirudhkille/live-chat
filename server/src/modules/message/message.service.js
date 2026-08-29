@@ -1,6 +1,9 @@
-import { getIO } from "../../config/socket.js";
+import { getIO, isUserOnline } from "../../config/socket.js";
+import { logger } from "../../config/logger.js";
 import { AppError } from "../../utils/AppError.js";
 import * as messageRepository from "./message.repository.js";
+import * as conversationRepository from "../conversation/conversation.repository.js";
+import * as pushService from "../push/push.service.js";
 import { toMessageResponse } from "./message.mapper.js";
 
 export const getMessages = async (conversationId, before, limit) => {
@@ -92,5 +95,41 @@ export const sendMessage = async (
   const io = getIO();
   io.to(`conversation:${conversationId}`).emit("new-message", message);
 
+  notifyOfflineRecipient(senderId, conversationId, content, attachmentIds);
+
   return message;
+};
+
+const notifyOfflineRecipient = async (
+  senderId,
+  conversationId,
+  content,
+  attachmentIds,
+) => {
+  try {
+    const conversation = await conversationRepository.getById(conversationId);
+    if (!conversation) return;
+
+    const recipient = conversation.participants.find(
+      (participant) => participant.userId !== senderId,
+    );
+    if (!recipient || isUserOnline(recipient.userId)) return;
+
+    const sender = conversation.participants.find(
+      (participant) => participant.userId === senderId,
+    );
+
+    await pushService.sendMessageNotification({
+      userId: recipient.userId,
+      senderName: sender?.user?.name ?? null,
+      conversationId,
+      content,
+      attachmentCount: Array.isArray(attachmentIds) ? attachmentIds.length : 0,
+    });
+  } catch (error) {
+    logger.error(
+      { err: error.message, conversationId, userId: senderId },
+      "Web push notification failed",
+    );
+  }
 };

@@ -26,6 +26,9 @@ const envSchema = z.object({
   R2_SECRET_ACCESS_KEY: z.string(),
   R2_BUCKET: z.string(),
   R2_PUBLIC_URL: z.string(),
+  VAPID_SUBJECT: z.string(),
+  VAPID_PUBLIC_KEY: z.string(),
+  VAPID_PRIVATE_KEY: z.string(),
 });
 
 const result = envSchema.safeParse(process.env);

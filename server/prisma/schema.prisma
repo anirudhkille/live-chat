@@ -23,6 +23,7 @@ model User {
   participants ConversationParticipant[]
   messages     Message[]
   reads        MessageRead[]
+  pushSubscriptions PushSubscription[]
 }
 
 model Conversation {
@@ -106,4 +107,14 @@ model Attachment {
   messageId String?
 
   @@index([messageId, createdAt])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  keys      Json     // { p256dh, auth }
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
 }

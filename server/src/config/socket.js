@@ -4,6 +4,12 @@ import { env } from "./env.config.js";
 import { logger } from "./logger.js";
 
 let io;
+const online = new Map(); // userId -> Set<socketId>
+
+export const isUserOnline = (userId) => {
+  const sockets = online.get(userId);
+  return Boolean(sockets && sockets.size > 0);
+};
 
 export const createSocketServer = (httpServer) => {
   io = new Server(httpServer, {
@@ -12,8 +18,6 @@ export const createSocketServer = (httpServer) => {
       credentials: true,
     },
   });
-
-  const online = new Map(); // userId -> Set<socketId>
 
   io.use(async (socket, next) => {
     try {
