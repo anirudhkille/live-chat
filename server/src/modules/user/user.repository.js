@@ -46,10 +46,9 @@ export const searchUser = (search, page, limit, id) => {
   });
 };
 
-export const updateAvatar=(userId,avatarUrl)=>{
-
-return  prisma.user.update({
+export const updateAvatar = (userId, avatarUrl) => {
+  return prisma.user.update({
     where: { id: userId },
     data: { avatar: avatarUrl },
-  })
-}
+  });
+};

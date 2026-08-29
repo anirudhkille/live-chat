@@ -16,6 +16,7 @@ export type Conversation = {
   name: string | null;
   photoUrl: string | null;
   email: string;
+  otherUserId: string | null;
   lastMessage: Message | null;
   unreadCount: number;
   createdAt: string;

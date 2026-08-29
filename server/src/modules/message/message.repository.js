@@ -1,9 +1,13 @@
 import { prisma } from "../../config/prisma.js";
 
-export const getMessages = (conversationId) => {
+export const getMessages = (conversationId, before, limit) => {
   return prisma.message.findMany({
-    where: { conversationId },
-    orderBy: { createdAt: "asc" },
+    where: {
+      conversationId,
+      ...(before ? { createdAt: { lt: new Date(before) } } : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit,
   });
 };
 

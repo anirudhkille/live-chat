@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback, useEffect } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Info, Loader2 } from "lucide-react";
 import { socket } from "@/lib/socket";
@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { MessageList } from "@/features/conversations/components/message-list";
 import { MessageInput } from "@/features/conversations/components/message-input";
-import { useSendMessage } from "@/features/conversations/hooks/useSendMessage";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { useGetConversationById } from "@/features/conversations/hooks/useConversationById";
 
@@ -17,31 +16,76 @@ export default function ChatThreadPage({
 }: {
   params: Promise<{ conversationId: string }>;
 }) {
+  const [status, setStatus] = useState<null | "typing..." | "online">(null);
   const { conversationId } = use(params);
   const router = useRouter();
   const isDesktop = useIsDesktop();
 
   const { data: conversation, isLoading: loadingConversation } =
     useGetConversationById(conversationId);
-  const sendMessage = useSendMessage();
-
-  const handleSend = useCallback(
-    (content: string) => {
-      sendMessage.mutate({ conversationId, content });
-    },
-    [sendMessage, conversationId]
-  );
 
   const otherUserName = conversation?.name ?? conversation?.email ?? "Unknown";
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [prevConversationId, setPrevConversationId] = useState(conversationId);
+
+  if (conversationId !== prevConversationId) {
+    setPrevConversationId(conversationId);
+    setStatus(null);
+  }
 
   useEffect(() => {
     socket.connect();
-
     socket.emit("join-conversation", conversationId);
-    return () => {
-      socket.disconnect();
+  }, [conversationId, conversation?.otherUserId]);
+
+  useEffect(() => {
+    const otherUserId = conversation?.otherUserId;
+
+    const handleUserTyping = (payload: {
+      conversationId: string;
+      userId: string;
+      isTyping?: boolean;
+    }) => {
+      if (payload.conversationId !== conversationId) return;
+      if (payload.isTyping === false) {
+        setStatus("online");
+        return;
+      }
+      setStatus("typing...");
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        setStatus("online");
+      }, 3000);
     };
-  }, [conversationId]);
+
+    const handleUserOnline = (payload: { userId: string }) => {
+      if (!otherUserId || payload.userId !== otherUserId) return;
+      setStatus("online");
+    };
+
+    const handleUserOffline = (payload: { userId: string }) => {
+      if (!otherUserId || payload.userId !== otherUserId) return;
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      setStatus(null);
+    };
+
+    const handleOnlineUsers = (userIds: string[]) => {
+      if (otherUserId && userIds.includes(otherUserId)) setStatus("online");
+    };
+
+    socket.on("user-typing", handleUserTyping);
+    socket.on("user-online", handleUserOnline);
+    socket.on("user-offline", handleUserOffline);
+    socket.on("online-users", handleOnlineUsers);
+
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      socket.off("user-typing", handleUserTyping);
+      socket.off("user-online", handleUserOnline);
+      socket.off("user-offline", handleUserOffline);
+      socket.off("online-users", handleOnlineUsers);
+    };
+  }, [conversationId, conversation?.otherUserId]);
 
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col">
@@ -73,6 +117,7 @@ export default function ChatThreadPage({
             <p className="truncate text-sm font-medium">
               {loadingConversation ? "Loading..." : otherUserName}
             </p>
+            <p className="text-muted-foreground text-xs">{status}</p>
           </div>
         </div>
         <Button
@@ -88,11 +133,7 @@ export default function ChatThreadPage({
 
       <MessageList conversationId={conversationId} />
 
-      <MessageInput
-        conversationId={conversationId}
-        onSend={handleSend}
-        disabled={sendMessage.isPending}
-      />
+      <MessageInput conversationId={conversationId} />
     </div>
   );
 }

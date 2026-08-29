@@ -91,7 +91,12 @@ export default function NewChatPage() {
             onClick={() => handleStartChat(user.id)}
             className="hover:bg-accent flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors disabled:opacity-50"
           >
-            <Avatar name={user.name} email={user.email} src={user.avatar} size="sm" />
+            <Avatar
+              name={user.name}
+              email={user.email}
+              src={user.avatar}
+              size="sm"
+            />
             <div className="min-w-0">
               <p className="truncate font-medium">{user.name ?? "Unnamed"}</p>
               <p className="text-muted-foreground truncate text-xs">

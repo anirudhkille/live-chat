@@ -65,7 +65,7 @@ export default function NotificationsPage() {
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
-        )}      
+        )}
         <span className="text-sm font-medium">Notifications</span>
         {unreadCount > 0 && (
           <Button

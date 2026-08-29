@@ -14,10 +14,10 @@ npm run dev                  # http://localhost:3000
 
 ## Environment variables
 
-| Variable              | Purpose                                                            |
-| --------------------- | ------------------------------------------------------------------ |
-| `NEXT_PUBLIC_API_URL` | REST base URL, e.g. `http://localhost:8080/api`                    |
-| `NEXT_PUBLIC_WS_URL`  | Socket.IO URL (falls back to the API host)                         |
+| Variable              | Purpose                                         |
+| --------------------- | ----------------------------------------------- |
+| `NEXT_PUBLIC_API_URL` | REST base URL, e.g. `http://localhost:8080/api` |
+| `NEXT_PUBLIC_WS_URL`  | Socket.IO URL (falls back to the API host)      |
 
 > Add `http://localhost:3000` to `ALLOWED_ORIGNS` and set
 > `CLIENT_URL=http://localhost:3000` in `server/.env`, otherwise CORS and the
@@ -38,7 +38,7 @@ npm run dev                  # http://localhost:3000
 | `/search`                 | People search                         |
 | `/settings`               | Account, theme toggle, logout         |
 | `/settings/profile`       | Edit name + avatar (crop & upload)    |
-| `/settings/notifications` | Notifications                 |
+| `/settings/notifications` | Notifications                         |
 | `/settings/privacy`       | Privacy toggles (placeholder)         |
 
 ## Structure

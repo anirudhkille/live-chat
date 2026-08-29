@@ -77,6 +77,7 @@ export const googleCallback = asyncHandler(async (req, res) => {
     _id: user.id,
     name: user.name,
     email: user.email,
+    avatar: user.avatar,
   };
 
   const redirectURL = `${env.CLIENT_URL}/auth/callback?accessToken=${accessToken}&user=${encodeURIComponent(JSON.stringify(userData))}`;

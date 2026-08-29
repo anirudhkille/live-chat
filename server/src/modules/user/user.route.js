@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { authenticate } from "../../middleware/auth.middleware.js";
-import { searchUser,getAvatarUploadUrl ,confirmAvatarUpload} from "./user.controller.js";
+import {
+  searchUser,
+  getAvatarUploadUrl,
+  confirmAvatarUpload,
+} from "./user.controller.js";
 
 const router = Router();
 

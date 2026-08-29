@@ -68,7 +68,7 @@ export default function PrivacyPage() {
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
-        )}   
+        )}
         <span className="text-sm font-medium">Privacy</span>
       </header>
 

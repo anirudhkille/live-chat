@@ -90,7 +90,12 @@ export default function SearchPage() {
                 onClick={() => router.push(`/chats/new`)}
                 className="hover:bg-accent flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors"
               >
-                <Avatar name={user.name} email={user.email} src={user.avatar} size="sm" />
+                <Avatar
+                  name={user.name}
+                  email={user.email}
+                  src={user.avatar}
+                  size="sm"
+                />
                 <div className="min-w-0">
                   <p className="truncate font-medium">
                     {user.name ?? "Unnamed"}

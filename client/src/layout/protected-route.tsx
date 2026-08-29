@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/hooks/use-auth";
+import { socket } from "@/lib/socket";
 
 /**
  * Client-side auth gate for the protected segment. The refresh cookie lives
@@ -25,6 +26,18 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
       router.replace("/complete-profile");
     }
   }, [router, token, user, hasHydrated]);
+
+    useEffect(() => {
+    if (!hasHydrated || !token || !user?.name) return;
+
+    socket.auth = { token };
+    socket.connect();
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [hasHydrated, token, user?.name]);
+
 
   if (!hasHydrated || !token || !user?.name) {
     return (

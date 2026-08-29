@@ -1,7 +1,10 @@
 import { AppError } from "../../utils/AppError.js";
 import * as userRepository from "./user.repository.js";
-import { generatePresignedUploadUrl, buildKey } from "../storage/storage.service.js";
-import {env} from "../../config/env.config.js"
+import {
+  generatePresignedUploadUrl,
+  buildKey,
+} from "../storage/storage.service.js";
+import { env } from "../../config/env.config.js";
 
 export const findUserByEmailOrThrow = async (email) => {
   const user = await userRepository.findEmail(email);

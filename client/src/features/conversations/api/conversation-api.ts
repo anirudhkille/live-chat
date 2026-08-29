@@ -24,11 +24,17 @@ export async function sendMessage(
 }
 
 export async function getMessages(
-  conversationId: string
+  conversationId: string,
+  params?: { before?: string; limit?: number }
 ): Promise<ApiResponse<Message[]>> {
-  const response = await api.get<ApiResponse<Message[]>>(
-    `/message/${conversationId}`
-  );
+  const searchParams = new URLSearchParams();
+  if (params?.before) searchParams.set("before", params.before);
+  if (params?.limit) searchParams.set("limit", String(params.limit));
+  const query = searchParams.toString();
+  const url = query
+    ? `/message/${conversationId}?${query}`
+    : `/message/${conversationId}`;
+  const response = await api.get<ApiResponse<Message[]>>(url);
   return response.data;
 }
 
