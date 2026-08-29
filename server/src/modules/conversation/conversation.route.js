@@ -5,12 +5,14 @@ import {
   getConversations,
   getConversationById,
 } from "./conversation.controller.js";
+import { validate } from "../../middleware/validate.middleware.js";
+import { createConversationSchema } from "./conversation.schema.js";
 
 const router = Router();
 
 router.use(authenticate);
 
-router.post("/", createOrGetConversation);
+router.post("/", validate(createConversationSchema), createOrGetConversation);
 router.get("/", getConversations);
 router.get("/:id", getConversationById);
 

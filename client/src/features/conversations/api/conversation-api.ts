@@ -62,3 +62,20 @@ export async function markConversationRead(
   );
   return response.data;
 }
+
+export async function editMessage(
+  messageId: string,
+  content: string
+): Promise<ApiResponse<Message>> {
+  const response = await api.patch<ApiResponse<Message>>(`/message/${messageId}`, {
+    content,
+  });
+  return response.data;
+}
+
+export async function removeMessage(
+  messageId: string
+): Promise<ApiResponse<Message>> {
+  const response = await api.delete<ApiResponse<Message>>(`/message/${messageId}`);
+  return response.data;
+}

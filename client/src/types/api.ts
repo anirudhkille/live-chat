@@ -30,6 +30,8 @@ export type Message = {
   conversationId: string;
   readAt: string | null;
   createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
   sender?: User;
   attachments?: Attachment[];
 };

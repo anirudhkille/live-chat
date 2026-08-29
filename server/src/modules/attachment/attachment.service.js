@@ -12,7 +12,10 @@ const CONTENT_TYPE_TO_ENUM = {
   "image/webp": "IMAGE",
 };
 
-export async function getAttachmentUploadUrl(userId, { contentType, fileSize }) {
+export async function getAttachmentUploadUrl(
+  userId,
+  { contentType, fileSize },
+) {
   if (!ALLOWED_TYPES.includes(contentType)) {
     throw new Error("Unsupported file type");
   }
@@ -23,13 +26,18 @@ export async function getAttachmentUploadUrl(userId, { contentType, fileSize }) 
   const extension = contentType.split("/")[1];
   const key = `attachments/${userId}/${randomUUID()}.${extension}`;
 
-  const uploadUrl = await generatePresignedUploadUrl(key, contentType, MAX_SIZE);
+  const uploadUrl = await generatePresignedUploadUrl(
+    key,
+    contentType,
+    MAX_SIZE,
+  );
 
   return { uploadUrl, key };
 }
 
 export async function confirmAttachmentUpload(userId, data) {
-  const { key, contentType, fileName, fileSize, width, height, duration } = data;
+  const { key, contentType, fileName, fileSize, width, height, duration } =
+    data;
 
   if (!ALLOWED_TYPES.includes(contentType)) {
     throw new Error("Unsupported file type");

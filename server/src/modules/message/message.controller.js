@@ -23,6 +23,23 @@ export const markMessagesRead = asyncHandler(async (req, res) => {
   sendResponse(res, 200, "Messages marked as read", result);
 });
 
+export const updateMessage = asyncHandler(async (req, res) => {
+  const { messageId } = req.params;
+  const { content } = req.body;
+  const message = await messageService.updateMessage(
+    req.user.id,
+    messageId,
+    content,
+  );
+  sendResponse(res, 200, "Message updated", message);
+});
+
+export const deleteMessage = asyncHandler(async (req, res) => {
+  const { messageId } = req.params;
+  const message = await messageService.deleteMessage(req.user.id, messageId);
+  sendResponse(res, 200, "Message deleted", message);
+});
+
 export const sendMessage = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
   const { content, attachmentIds } = req.body;

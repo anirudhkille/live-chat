@@ -109,6 +109,51 @@ export function MessageList({ conversationId }: MessageListProps) {
   }, [conversationId, currentUserId, queryClient]);
 
   useEffect(() => {
+    const handleMessageUpdated = (payload: {
+      conversationId: string;
+      message: Message;
+    }) => {
+      if (payload.conversationId !== conversationId) return;
+      const updated = payload.message;
+      setSocketMessages((prev) =>
+        prev.map((message) => (message.id === updated.id ? updated : message))
+      );
+      queryClient.setQueryData<Message[][]>(
+        ["messages", conversationId],
+        (pages) =>
+          pages?.map((page) =>
+            page.map((message) => (message.id === updated.id ? updated : message))
+          )
+      );
+    };
+
+    const handleMessageDeleted = (payload: {
+      conversationId: string;
+      message: Message;
+    }) => {
+      if (payload.conversationId !== conversationId) return;
+      const deleted = payload.message;
+      setSocketMessages((prev) =>
+        prev.map((message) => (message.id === deleted.id ? deleted : message))
+      );
+      queryClient.setQueryData<Message[][]>(
+        ["messages", conversationId],
+        (pages) =>
+          pages?.map((page) =>
+            page.map((message) => (message.id === deleted.id ? deleted : message))
+          )
+      );
+    };
+
+    socket.on("message-updated", handleMessageUpdated);
+    socket.on("message-deleted", handleMessageDeleted);
+    return () => {
+      socket.off("message-updated", handleMessageUpdated);
+      socket.off("message-deleted", handleMessageDeleted);
+    };
+  }, [conversationId, queryClient]);
+
+  useEffect(() => {
     if (!conversationId || isLoading) return;
     markConversationRead(conversationId);
   }, [conversationId, isLoading, markConversationRead]);

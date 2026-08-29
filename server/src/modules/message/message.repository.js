@@ -1,5 +1,16 @@
 import { prisma } from "../../config/prisma.js";
 
+const withDetails = {
+  include: {
+    attachments: true,
+    reads: true,
+  },
+};
+
+export const findById = (messageId) => {
+  return prisma.message.findUnique({ where: { id: messageId } });
+};
+
 export const getMessages = (conversationId, before, limit) => {
   return prisma.message.findMany({
     where: {
@@ -8,10 +19,23 @@ export const getMessages = (conversationId, before, limit) => {
     },
     orderBy: { createdAt: "desc" },
     take: limit,
-    include: {
-      attachments: true,
-      reads: true,
-    },
+    ...withDetails,
+  });
+};
+
+export const updateMessage = (messageId, content) => {
+  return prisma.message.update({
+    where: { id: messageId },
+    data: { content },
+    ...withDetails,
+  });
+};
+
+export const deleteMessage = (messageId) => {
+  return prisma.message.update({
+    where: { id: messageId },
+    data: { deletedAt: new Date() },
+    ...withDetails,
   });
 };
 

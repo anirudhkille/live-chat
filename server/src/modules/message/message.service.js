@@ -1,4 +1,5 @@
 import { getIO } from "../../config/socket.js";
+import { AppError } from "../../utils/AppError.js";
 import * as messageRepository from "./message.repository.js";
 import { toMessageResponse } from "./message.mapper.js";
 
@@ -10,6 +11,53 @@ export const getMessages = async (conversationId, before, limit) => {
     safeLimit,
   );
   return messages.map(toMessageResponse);
+};
+
+const assertCanModify = (message, userId) => {
+  if (!message) {
+    throw new AppError("Message not found", 404);
+  }
+  if (message.senderId !== userId) {
+    throw new AppError("Not authorized to modify this message", 403);
+  }
+  if (message.deletedAt) {
+    throw new AppError("Cannot modify a deleted message", 400);
+  }
+};
+
+export const updateMessage = async (userId, messageId, content) => {
+  const existing = await messageRepository.findById(messageId);
+  assertCanModify(existing, userId);
+
+  const trimmed = content?.trim();
+  if (!trimmed) {
+    throw new AppError("Message content cannot be empty", 400);
+  }
+
+  const message = await messageRepository.updateMessage(messageId, trimmed);
+  getIO()
+    .to(`conversation:${existing.conversationId}`)
+    .emit("message-updated", {
+      conversationId: existing.conversationId,
+      message: toMessageResponse(message),
+    });
+
+  return toMessageResponse(message);
+};
+
+export const deleteMessage = async (userId, messageId) => {
+  const existing = await messageRepository.findById(messageId);
+  assertCanModify(existing, userId);
+
+  const message = await messageRepository.deleteMessage(messageId);
+  getIO()
+    .to(`conversation:${existing.conversationId}`)
+    .emit("message-deleted", {
+      conversationId: existing.conversationId,
+      message: toMessageResponse(message),
+    });
+
+  return toMessageResponse(message);
 };
 
 export const markMessagesRead = async (userId, conversationId) => {

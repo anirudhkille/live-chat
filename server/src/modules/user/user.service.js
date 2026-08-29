@@ -1,9 +1,6 @@
 import { AppError } from "../../utils/AppError.js";
 import * as userRepository from "./user.repository.js";
-import {
-  generatePresignedUploadUrl,
-  buildKey,
-} from "../storage/storage.service.js";
+import { generatePresignedUploadUrl } from "../storage/storage.service.js";
 import { env } from "../../config/env.config.js";
 
 export const findUserByEmailOrThrow = async (email) => {
@@ -29,7 +26,6 @@ export const searchUser = async (search, page, limit, id) => {
 };
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_SIZE = 5 * 1024 * 1024; // 5MB, enforce client-side too
 
 export async function getAvatarUploadUrl(userId, contentType) {
   if (!ALLOWED_TYPES.includes(contentType)) {
