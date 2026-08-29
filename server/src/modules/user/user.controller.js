@@ -21,5 +21,5 @@ export const confirmAvatarUpload = asyncHandler(async (req, res) => {
   const { key } = req.body;
 
   const user = await userService.confirmAvatarUpload(req.user.id, key);
-  sendResponse(res, 200, "User fetched successfully", user);
+  sendResponse(res, 200, "Avatar saved successfully", user);
 });

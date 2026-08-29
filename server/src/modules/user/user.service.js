@@ -14,20 +14,12 @@ export const findUserByEmailOrThrow = async (email) => {
   return user;
 };
 
-export const createUser = async (email) => {
-  return userRepository.create(email);
-};
-
 export const findUserByIdOrThrow = async (id) => {
   const user = await userRepository.findById(id);
   if (!user) {
     throw new AppError(404, "User not found");
   }
   return user;
-};
-
-export const updateUser = async (id, data) => {
-  return userRepository.updateById(id, data);
 };
 
 export const searchUser = async (search, page, limit, id) => {

@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { errorHandler } from "./middleware/error.middleware.js";
+import attachmentRoutes from "./modules/attachment/attachment.route.js";
 import authRoutes from "./modules/auth/auth.route.js";
 import conversationRoutes from "./modules/conversation/conversation.route.js";
 import messageRoutes from "./modules/message/message.route.js";
@@ -28,6 +29,7 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+app.use("/api/attachment", attachmentRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/conversation", conversationRoutes);
 app.use("/api/message", messageRoutes);
