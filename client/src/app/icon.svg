@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="240 60 200 200" role="img">
+  <title>Live Chat logo</title>
+  <rect x="240" y="60" width="200" height="200" rx="56" fill="#0b0b0b" />
+  <path d="M290 190 L290 220 L322 190 Z" fill="#0b0b0b" />
+  <circle cx="300" cy="140" r="12" fill="#ffffff" />
+  <circle cx="340" cy="140" r="12" fill="#ffffff" />
+  <circle cx="380" cy="140" r="12" fill="#ffffff" />
+</svg>
