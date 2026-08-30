@@ -1,57 +1,89 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  Bell,
-  BellOff,
-  CheckCheck,
-  Loader2,
-  MessageCircle,
-  UserPlus,
-  Settings as SettingsIcon,
-} from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import {
-  useNotifications,
-  useMarkNotificationRead,
-  useMarkAllRead,
-} from "@/features/notifications/hooks";
+import { usePushNotifications } from "@/features/push-notifications/usePushNotifications";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 
-const ICON_MAP: Record<string, typeof Bell> = {
-  message: MessageCircle,
-  follow: UserPlus,
-  system: SettingsIcon,
+type ToggleOptionProps = {
+  label: string;
+  description?: string;
+  enabled: boolean;
+  disabled?: boolean;
+  onChange?: (enabled: boolean) => void;
 };
 
-function NotificationIcon({ type }: { type: string }) {
-  const Icon = ICON_MAP[type] ?? Bell;
-  return <Icon className="text-muted-foreground h-4 w-4" />;
-}
-
-function formatNotificationTime(iso: string) {
-  const date = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "Just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  return date.toLocaleDateString([], { month: "short", day: "numeric" });
+function ToggleOption({
+  label,
+  description,
+  enabled,
+  disabled,
+  onChange,
+}: ToggleOptionProps) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-3">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">{label}</p>
+        {description && (
+          <p className="text-muted-foreground mt-0.5 text-xs">{description}</p>
+        )}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={enabled}
+        aria-label={label}
+        disabled={disabled}
+        onClick={() => onChange?.(!enabled)}
+        className={cn(
+          "focus-visible:ring-ring focus-visible:ring-offset-background relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+          enabled ? "bg-primary" : "bg-input"
+        )}
+      >
+        <span
+          className={cn(
+            "bg-background pointer-events-none inline-block h-5 w-5 rounded-full shadow-lg ring-0 transition-transform",
+            enabled ? "translate-x-5" : "translate-x-0"
+          )}
+        />
+      </button>
+    </div>
+  );
 }
 
 export default function NotificationsPage() {
   const router = useRouter();
   const isDesktop = useIsDesktop();
-  const { data: notifications, isLoading, isError } = useNotifications();
-  const markRead = useMarkNotificationRead();
-  const markAllRead = useMarkAllRead();
+  const { supported, permission, enabled, isLoading, enable, disable } =
+    usePushNotifications();
 
-  const unreadCount = notifications?.filter((n) => !n.read).length ?? 0;
+  const handlePushChange = async (next: boolean) => {
+    try {
+      if (next) {
+        await enable();
+        toast.success("Push notifications enabled");
+      } else {
+        await disable();
+        toast.success("Push notifications disabled");
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Couldn't update push notifications"
+      );
+    }
+  };
+
+  let pushDescription = "Get notified about new messages when you're offline.";
+  if (!supported) {
+    pushDescription = "Push notifications aren't supported in this browser.";
+  } else if (permission === "denied") {
+    pushDescription = "Notifications are blocked in your browser settings.";
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -67,72 +99,62 @@ export default function NotificationsPage() {
           </button>
         )}
         <span className="text-sm font-medium">Notifications</span>
-        {unreadCount > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="ml-auto text-xs"
-            disabled={markAllRead.isPending}
-            onClick={() => markAllRead.mutate()}
-          >
-            <CheckCheck className="mr-1 h-3 w-3" />
-            Mark all read
-          </Button>
-        )}
       </header>
 
-      <div className="flex-1 overflow-y-auto">
-        {isLoading && (
-          <div className="flex justify-center p-6">
-            <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
-          </div>
-        )}
+      <div className="flex-1 overflow-y-auto px-4">
+        <div className="border-b py-1">
+          <ToggleOption
+            label="Online status"
+            description="Show when you're online to other users"
+            enabled={true}
+            disabled
+          />
+          <ToggleOption
+            label="Read receipts"
+            description="Let others see when you've read their messages"
+            enabled={true}
+            disabled
+          />
+        </div>
 
-        {isError && (
-          <div className="text-destructive p-6 text-center text-sm">
-            Couldn&apos;t load notifications. Check the API.
-          </div>
-        )}
+        <div className="border-b py-1">
+          <ToggleOption
+            label="Profile visibility"
+            description="Allow anyone with your email to find you"
+            enabled={true}
+            disabled
+          />
+          <ToggleOption
+            label="Phone number visibility"
+            description="Show your phone number to contacts"
+            enabled={false}
+            disabled
+          />
+        </div>
 
-        {!isLoading && !isError && notifications?.length === 0 && (
-          <div className="text-muted-foreground flex flex-col items-center justify-center gap-2 p-6 text-center">
-            <BellOff className="h-8 w-8" />
-            <p className="text-sm">No notifications yet</p>
-          </div>
-        )}
+        <div className="py-1">
+          <ToggleOption
+            label="Typing indicators"
+            description="Show when you're typing a message"
+            enabled={true}
+            disabled
+          />
+        </div>
 
-        {notifications?.map((notification) => (
-          <button
-            key={notification.id}
-            type="button"
-            onClick={() => {
-              if (!notification.read) markRead.mutate(notification.id);
-              if (notification.link) router.push(notification.link);
-            }}
-            className={cn(
-              "hover:bg-accent flex w-full items-start gap-3 px-3 py-3 text-left transition-colors",
-              !notification.read && "bg-accent/50"
-            )}
-          >
-            <div className="mt-0.5 shrink-0">
-              <NotificationIcon type={notification.type} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">{notification.title}</p>
-              {notification.body && (
-                <p className="text-muted-foreground mt-0.5 text-xs">
-                  {notification.body}
-                </p>
-              )}
-              <p className="text-muted-foreground mt-1 text-[11px]">
-                {formatNotificationTime(notification.createdAt)}
-              </p>
-            </div>
-            {!notification.read && (
-              <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
-            )}
-          </button>
-        ))}
+        <div className="border-b py-1">
+          <ToggleOption
+            label="Push notifications"
+            description={pushDescription}
+            enabled={enabled}
+            disabled={isLoading || !supported}
+            onChange={handlePushChange}
+          />
+        </div>
+
+        <p className="text-muted-foreground px-0 pt-4 pb-6 text-center text-xs">
+          Toggle controls will be functional once the backend implements these
+          settings.
+        </p>
       </div>
     </div>
   );

@@ -7,7 +7,6 @@ import {
   Bell,
   ChevronRight,
   Loader2,
-  Lock,
   LogOut,
   User,
 } from "lucide-react";
@@ -26,7 +25,6 @@ const ITEMS = [
     to: "/settings/notifications",
     enabled: true,
   },
-  { icon: Lock, label: "Privacy", to: "/settings/privacy", enabled: true },
 ];
 
 export default function SettingsPage() {
