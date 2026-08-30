@@ -1,5 +1,10 @@
 import { api } from "@/lib/api";
-import type { ApiResponse, Conversation, Message } from "@/types/api";
+import type {
+  ApiResponse,
+  Conversation,
+  GroupParticipant,
+  Message,
+} from "@/types/api";
 
 export async function createConversation(
   userId: string
@@ -7,6 +12,38 @@ export async function createConversation(
   const response = await api.post<ApiResponse<Conversation>>(`/conversation`, {
     userId,
   });
+  return response.data;
+}
+
+export async function createGroup(
+  name: string,
+  participantIds: string[]
+): Promise<ApiResponse<Conversation>> {
+  const response = await api.post<ApiResponse<Conversation>>(
+    `/conversation/group`,
+    { name, participantIds }
+  );
+  return response.data;
+}
+
+export async function getGroupParticipants(
+  conversationId: string
+): Promise<ApiResponse<GroupParticipant[]>> {
+  const response = await api.get<ApiResponse<GroupParticipant[]>>(
+    `/conversation/${conversationId}/participants`
+  );
+  return response.data;
+}
+
+export async function addGroupParticipants(
+  conversationId: string,
+  participantIds: string[]
+): Promise<
+  ApiResponse<{ added: string[]; participants: GroupParticipant[] }>
+> {
+  const response = await api.post<
+    ApiResponse<{ added: string[]; participants: GroupParticipant[] }>
+  >(`/conversation/${conversationId}/participants`, { participantIds });
   return response.data;
 }
 

@@ -7,6 +7,7 @@ const participantsWithUser = {
         id: true,
         name: true,
         avatar: true,
+        email: true,
       },
     },
   },
@@ -39,8 +40,7 @@ export const get = (userId1, userId2) => {
 export const getAll = async (userId) => {
   const conversations = await prisma.conversation.findMany({
     where: {
-      isGroup: false,
-      AND: [{ participants: { some: { userId: userId } } }],
+      participants: { some: { userId: userId } },
     },
     include: {
       participants: participantsWithUser,
@@ -85,9 +85,35 @@ export const getAll = async (userId) => {
 export const getById = (conversationId) => {
   return prisma.conversation.findFirst({
     where: {
-      isGroup: false,
       id: conversationId,
     },
     include: { participants: participantsWithUser },
+  });
+};
+
+export const createGroup = (ownerId, name, participantIds) => {
+  return prisma.conversation.create({
+    data: {
+      isGroup: true,
+      name,
+      participants: {
+        create: [
+          { userId: ownerId, role: "admin" },
+          ...participantIds.map((userId) => ({ userId, role: "member" })),
+        ],
+      },
+    },
+    include: { participants: participantsWithUser },
+  });
+};
+
+export const addParticipants = (conversationId, userIds) => {
+  return prisma.conversationParticipant.createMany({
+    data: userIds.map((userId) => ({
+      userId,
+      conversationId,
+      role: "member",
+    })),
+    skipDuplicates: true,
   });
 };

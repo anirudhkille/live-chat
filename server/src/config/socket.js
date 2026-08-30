@@ -11,6 +11,15 @@ export const isUserOnline = (userId) => {
   return Boolean(sockets && sockets.size > 0);
 };
 
+export const emitToUser = (userId, event, payload) => {
+  if (!io) return;
+  const sockets = online.get(userId);
+  if (!sockets || sockets.size === 0) return;
+  for (const socketId of sockets) {
+    io.to(socketId).emit(event, payload);
+  }
+};
+
 export const createSocketServer = (httpServer) => {
   io = new Server(httpServer, {
     cors: {

@@ -2,12 +2,13 @@
 
 import { use, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Info, Loader2 } from "lucide-react";
+import { ArrowLeft, Info, Loader2, Users } from "lucide-react";
 import { socket } from "@/lib/socket";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { MessageList } from "@/features/conversations/components/message-list";
 import { MessageInput } from "@/features/conversations/components/message-input";
+import { GroupMembersDialog } from "@/features/conversations/components/group-members-dialog";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { useGetConversationById } from "@/features/conversations/hooks/useConversationById";
 
@@ -17,6 +18,7 @@ export default function ChatThreadPage({
   params: Promise<{ conversationId: string }>;
 }) {
   const [status, setStatus] = useState<null | "typing..." | "online">(null);
+  const [membersOpen, setMembersOpen] = useState(false);
   const { conversationId } = use(params);
   const router = useRouter();
   const isDesktop = useIsDesktop();
@@ -117,23 +119,50 @@ export default function ChatThreadPage({
             <p className="truncate text-sm font-medium">
               {loadingConversation ? "Loading..." : otherUserName}
             </p>
-            <p className="text-muted-foreground text-xs">{status}</p>
+            <p className="text-muted-foreground text-xs">
+              {conversation?.isGroup
+                ? `${conversation.participants?.length ?? 0} members`
+                : status}
+            </p>
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="ml-auto"
-          aria-label="Chat info"
-          disabled
-        >
-          <Info className="h-4 w-4" />
-        </Button>
+        {conversation?.isGroup ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="ml-auto"
+            aria-label="Group members"
+            onClick={() => setMembersOpen(true)}
+          >
+            <Users className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="ml-auto"
+            aria-label="Chat info"
+            disabled
+          >
+            <Info className="h-4 w-4" />
+          </Button>
+        )}
       </header>
 
-      <MessageList conversationId={conversationId} />
+      <MessageList
+        conversationId={conversationId}
+        isGroup={conversation?.isGroup ?? false}
+      />
 
       <MessageInput conversationId={conversationId} />
+
+      {conversation?.isGroup && (
+        <GroupMembersDialog
+          open={membersOpen}
+          onClose={() => setMembersOpen(false)}
+          conversationId={conversationId}
+        />
+      )}
     </div>
   );
 }

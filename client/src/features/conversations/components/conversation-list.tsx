@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { useConversations } from "@/features/conversations/hooks/useConversations";
 import { useAuthStore } from "@/store/auth-store";
+import { socket } from "@/lib/socket";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import type { Conversation } from "@/types/api";
@@ -35,7 +38,8 @@ function ConversationItem({
   isActive: boolean;
   currentUserId: string | undefined;
 }) {
-  const { name, email, photoUrl, lastMessage, unreadCount } = conversation;
+  const { name, email, photoUrl, lastMessage, unreadCount, isGroup, participants } =
+    conversation;
   const sender = lastMessage?.sender;
   const senderName = sender?.id === currentUserId ? "You" : sender?.name;
 
@@ -62,11 +66,15 @@ function ConversationItem({
             </span>
           )}
         </div>
-        {lastMessage && (
+        {lastMessage ? (
           <p className="text-muted-foreground truncate text-xs">
             {senderName}: {lastMessage.content}
           </p>
-        )}
+        ) : isGroup ? (
+          <p className="text-muted-foreground text-xs">
+            {participants?.length ?? 0} members
+          </p>
+        ) : null}
       </div>
 
       {unreadCount > 0 && (
@@ -82,6 +90,19 @@ export function ConversationList() {
   const pathname = usePathname();
   const currentUserId = useAuthStore((s) => s.user?.id);
   const { data: conversations, isLoading, isError } = useConversations();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const handleConversationChanged = () => {
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    };
+    socket.on("conversation-updated", handleConversationChanged);
+    socket.on("new-conversation", handleConversationChanged);
+    return () => {
+      socket.off("conversation-updated", handleConversationChanged);
+      socket.off("new-conversation", handleConversationChanged);
+    };
+  }, [queryClient]);
 
   if (isLoading) {
     return (

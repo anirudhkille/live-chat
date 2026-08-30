@@ -11,14 +11,23 @@ export type ApiResponse<T = unknown> = {
   data: T;
 };
 
-export type Conversation = {
+export type GroupParticipant = {
   id: string;
   name: string | null;
-  photoUrl: string | null;
+  avatar: string | null;
   email: string;
+};
+
+export type Conversation = {
+  id: string;
+  isGroup: boolean;
+  name: string | null;
+  photoUrl: string | null;
+  email: string | null;
   otherUserId: string | null;
-  lastMessage: Message | null;
   unreadCount: number;
+  participants: GroupParticipant[];
+  lastMessage: Message | null;
   createdAt: string;
 };
 

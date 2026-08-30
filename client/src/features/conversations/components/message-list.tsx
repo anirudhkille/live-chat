@@ -22,6 +22,7 @@ import type { ApiResponse, Message } from "@/types/api";
 
 type MessageListProps = {
   conversationId: string;
+  isGroup?: boolean;
 };
 
 const SCROLL_BOTTOM_THRESHOLD = 80;
@@ -48,7 +49,7 @@ function updateCachedMessages(
   );
 }
 
-export function MessageList({ conversationId }: MessageListProps) {
+export function MessageList({ conversationId, isGroup = false }: MessageListProps) {
   const {
     data,
     isLoading,
@@ -260,7 +261,7 @@ export function MessageList({ conversationId }: MessageListProps) {
         </div>
       )}
       {messages.map((message) => (
-        <MessageBubble key={message.id} message={message} />
+        <MessageBubble key={message.id} message={message} isGroup={isGroup} />
       ))}
       <div ref={bottomRef} />
     </div>

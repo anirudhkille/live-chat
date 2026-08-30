@@ -110,22 +110,28 @@ const notifyOfflineRecipient = async (
     const conversation = await conversationRepository.getById(conversationId);
     if (!conversation) return;
 
-    const recipient = conversation.participants.find(
-      (participant) => participant.userId !== senderId,
-    );
-    if (!recipient || isUserOnline(recipient.userId)) return;
-
     const sender = conversation.participants.find(
       (participant) => participant.userId === senderId,
     );
+    const recipients = conversation.participants.filter(
+      (participant) =>
+        participant.userId !== senderId && !isUserOnline(participant.userId),
+    );
+    if (recipients.length === 0) return;
 
-    await pushService.sendMessageNotification({
-      userId: recipient.userId,
-      senderName: sender?.user?.name ?? null,
-      conversationId,
-      content,
-      attachmentCount: Array.isArray(attachmentIds) ? attachmentIds.length : 0,
-    });
+    await Promise.all(
+      recipients.map((recipient) =>
+        pushService.sendMessageNotification({
+          userId: recipient.userId,
+          senderName: sender?.user?.name ?? null,
+          conversationId,
+          content,
+          attachmentCount: Array.isArray(attachmentIds)
+            ? attachmentIds.length
+            : 0,
+        }),
+      ),
+    );
   } catch (error) {
     logger.error(
       { err: error.message, conversationId, userId: senderId },

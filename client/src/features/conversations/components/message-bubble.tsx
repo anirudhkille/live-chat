@@ -29,7 +29,13 @@ function ReadReceipt({ readAt }: { readAt: string | null }) {
   );
 }
 
-export function MessageBubble({ message }: { message: Message }) {
+export function MessageBubble({
+  message,
+  isGroup = false,
+}: {
+  message: Message;
+  isGroup?: boolean;
+}) {
   const currentUserId = useAuthStore((s) => s.user?.id);
   const isOwn =
     message.senderId === currentUserId ||
@@ -196,6 +202,12 @@ export function MessageBubble({ message }: { message: Message }) {
             </div>
           )}
         </div>
+      )}
+
+      {isGroup && !isOwn && (
+        <span className="text-muted-foreground mb-0.5 text-[10px] font-medium">
+          {message.sender?.name ?? "Unknown"}
+        </span>
       )}
 
       {isDeleted ? (

@@ -12,6 +12,13 @@ export const findById = (id) => {
   return prisma.user.findUnique({ where: { id } });
 };
 
+export const findByIds = (ids) => {
+  return prisma.user.findMany({
+    where: { id: { in: ids } },
+    select: { id: true },
+  });
+};
+
 export const updateById = (id, data) => {
   return prisma.user.update({ where: { id }, data });
 };
