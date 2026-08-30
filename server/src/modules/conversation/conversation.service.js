@@ -6,7 +6,7 @@ import { AppError } from "../../utils/AppError.js";
 
 export const createOrGetConversation = async (userId1, userId2) => {
   if (userId1 === userId2) {
-    throw new AppError("Cannot create a conversation with yourself", 400);
+    throw new AppError(400, "Cannot create a conversation with yourself");
   }
 
   let conversation = await conversationRepository.get(userId1, userId2);
@@ -26,10 +26,10 @@ export const getConversations = async (userId1) => {
 export const getConversationById = async (conversationId, userId) => {
   const conversation = await conversationRepository.getById(conversationId);
   if (!conversation) {
-    throw new AppError("Conversation not found", 404);
+    throw new AppError(404, "Conversation not found");
   }
   if (!conversation.participants.some((p) => p.userId === userId)) {
-    throw new AppError("You are not a participant of this conversation", 403);
+    throw new AppError(403, "You are not a participant of this conversation");
   }
   return toConversationResponse(conversation, userId);
 };
@@ -37,12 +37,12 @@ export const getConversationById = async (conversationId, userId) => {
 export const createGroup = async (userId, { name, participantIds }) => {
   const uniqueIds = [...new Set(participantIds)];
   if (uniqueIds.some((id) => id === userId)) {
-    throw new AppError("You cannot add yourself as a participant", 400);
+    throw new AppError(400, "You cannot add yourself as a participant");
   }
 
   const found = await userRepository.findByIds(uniqueIds);
   if (found.length !== uniqueIds.length) {
-    throw new AppError("One or more users do not exist", 400);
+    throw new AppError(400, "One or more users do not exist");
   }
 
   const conversation = await conversationRepository.createGroup(
@@ -57,10 +57,10 @@ export const createGroup = async (userId, { name, participantIds }) => {
 export const getGroupParticipants = async (conversationId, userId) => {
   const conversation = await conversationRepository.getById(conversationId);
   if (!conversation || !conversation.isGroup) {
-    throw new AppError("Group not found", 404);
+    throw new AppError(404, "Group not found");
   }
   if (!conversation.participants.some((p) => p.userId === userId)) {
-    throw new AppError("You are not a member of this group", 403);
+    throw new AppError(403, "You are not a member of this group");
   }
   return toParticipants(conversation.participants);
 };
@@ -72,20 +72,20 @@ export const addGroupParticipants = async (
 ) => {
   const conversation = await conversationRepository.getById(conversationId);
   if (!conversation || !conversation.isGroup) {
-    throw new AppError("Group not found", 404);
+    throw new AppError(404, "Group not found");
   }
   if (!conversation.participants.some((p) => p.userId === actorId)) {
-    throw new AppError("Only group members can add participants", 403);
+    throw new AppError(403, "Only group members can add participants");
   }
 
   const uniqueIds = [...new Set(participantIds)];
   if (uniqueIds.some((id) => id === actorId)) {
-    throw new AppError("You are already a member of this group", 400);
+    throw new AppError(400, "You are already a member of this group");
   }
 
   const found = await userRepository.findByIds(uniqueIds);
   if (found.length !== uniqueIds.length) {
-    throw new AppError("One or more users do not exist", 400);
+    throw new AppError(400, "One or more users do not exist");
   }
 
   const existingIds = new Set(conversation.participants.map((p) => p.userId));

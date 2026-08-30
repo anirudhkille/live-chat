@@ -171,6 +171,29 @@ export function MessageList({ conversationId, isGroup = false }: MessageListProp
   }, [conversationId, queryClient]);
 
   useEffect(() => {
+    const handleMessageReacted = (payload: {
+      conversationId: string;
+      message: Message;
+    }) => {
+      if (payload.conversationId !== conversationId) return;
+      const reacted = payload.message;
+      setSocketMessages((prev) =>
+        prev.map((message) => (message.id === reacted.id ? reacted : message))
+      );
+      updateCachedMessages(
+        queryClient,
+        conversationId,
+        (message) => (message.id === reacted.id ? reacted : message)
+      );
+    };
+
+    socket.on("message-reacted", handleMessageReacted);
+    return () => {
+      socket.off("message-reacted", handleMessageReacted);
+    };
+  }, [conversationId, queryClient]);
+
+  useEffect(() => {
     if (!conversationId || isLoading) return;
     markConversationRead(conversationId);
   }, [conversationId, isLoading, markConversationRead]);
@@ -261,7 +284,12 @@ export function MessageList({ conversationId, isGroup = false }: MessageListProp
         </div>
       )}
       {messages.map((message) => (
-        <MessageBubble key={message.id} message={message} isGroup={isGroup} />
+        <MessageBubble
+          key={message.id}
+          message={message}
+          isGroup={isGroup}
+          conversationId={conversationId}
+        />
       ))}
       <div ref={bottomRef} />
     </div>

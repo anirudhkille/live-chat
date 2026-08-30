@@ -5,11 +5,17 @@ export type SendMessageInput = {
   conversationId: string;
   content: string;
   attachmentIds?: string[];
+  replyToId?: string;
 };
 
 export function useSendMessage() {
   return useMutation({
-    mutationFn: ({ conversationId, content, attachmentIds }: SendMessageInput) =>
-      sendMessage(conversationId, content, attachmentIds),
+    mutationFn: ({
+      conversationId,
+      content,
+      attachmentIds,
+      replyToId,
+    }: SendMessageInput) =>
+      sendMessage(conversationId, content, attachmentIds, replyToId),
   });
 }

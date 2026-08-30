@@ -4,10 +4,22 @@ type ConversationDraft = {
   [conversationId: string]: string;
 };
 
+export type ReplyTarget = {
+  messageId: string;
+  senderName: string | null;
+  content: string | null;
+  deleted: boolean;
+};
+
+type ReplyState = {
+  [conversationId: string]: ReplyTarget | null;
+};
+
 type ChatState = {
   activeConversationId: string | null;
   typingUserIds: Map<string, number>;
   drafts: ConversationDraft;
+  replies: ReplyState;
   setActiveConversation: (id: string | null) => void;
   setTyping: (
     conversationId: string,
@@ -16,6 +28,7 @@ type ChatState = {
   ) => void;
   setDraft: (conversationId: string, text: string) => void;
   clearDraft: (conversationId: string) => void;
+  setReplyTo: (conversationId: string, target: ReplyTarget | null) => void;
   clearAll: () => void;
 };
 
@@ -23,6 +36,7 @@ export const useChatStore = create<ChatState>((set) => ({
   activeConversationId: null,
   typingUserIds: new Map(),
   drafts: {},
+  replies: {},
 
   setActiveConversation: (id) => set({ activeConversationId: id }),
 
@@ -47,6 +61,14 @@ export const useChatStore = create<ChatState>((set) => ({
       return { drafts: next };
     }),
 
+  setReplyTo: (conversationId, target) =>
+    set((state) => ({ replies: { ...state.replies, [conversationId]: target } })),
+
   clearAll: () =>
-    set({ activeConversationId: null, typingUserIds: new Map(), drafts: {} }),
+    set({
+      activeConversationId: null,
+      typingUserIds: new Map(),
+      drafts: {},
+      replies: {},
+    }),
 }));

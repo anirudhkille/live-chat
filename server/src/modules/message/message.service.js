@@ -18,13 +18,13 @@ export const getMessages = async (conversationId, before, limit) => {
 
 const assertCanModify = (message, userId) => {
   if (!message) {
-    throw new AppError("Message not found", 404);
+    throw new AppError(404, "Message not found");
   }
   if (message.senderId !== userId) {
-    throw new AppError("Not authorized to modify this message", 403);
+    throw new AppError(403, "Not authorized to modify this message");
   }
   if (message.deletedAt) {
-    throw new AppError("Cannot modify a deleted message", 400);
+    throw new AppError(400, "Cannot modify a deleted message");
   }
 };
 
@@ -34,7 +34,7 @@ export const updateMessage = async (userId, messageId, content) => {
 
   const trimmed = content?.trim();
   if (!trimmed) {
-    throw new AppError("Message content cannot be empty", 400);
+    throw new AppError(400, "Message content cannot be empty");
   }
 
   const message = await messageRepository.updateMessage(messageId, trimmed);
@@ -89,7 +89,7 @@ export const sendMessage = async (
   if (replyToId) {
     const parent = await messageRepository.findById(replyToId);
     if (!parent || parent.conversationId !== conversationId) {
-      throw new AppError("The message you're replying to is not valid", 400);
+      throw new AppError(400, "The message you're replying to is not valid");
     }
   }
 
@@ -117,14 +117,14 @@ export const sendMessage = async (
 export const toggleReaction = async (userId, messageId, emoji) => {
   const existing = await messageRepository.findById(messageId);
   if (!existing) {
-    throw new AppError("Message not found", 404);
+    throw new AppError(404, "Message not found");
   }
 
   const conversation = await conversationRepository.getById(
     existing.conversationId,
   );
   if (!conversation.participants.some((p) => p.userId === userId)) {
-    throw new AppError("You are not a participant of this conversation", 403);
+    throw new AppError(403, "You are not a participant of this conversation");
   }
 
   const message = await messageRepository.toggleReaction(

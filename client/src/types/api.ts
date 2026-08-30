@@ -31,6 +31,24 @@ export type Conversation = {
   createdAt: string;
 };
 
+export type MessageReaction = {
+  id: string;
+  emoji: string;
+  userId: string;
+  user: {
+    id: string;
+    name: string | null;
+  };
+};
+
+export type ReplyTo = {
+  id: string;
+  senderId: string;
+  senderName: string | null;
+  content: string | null;
+  deleted: boolean;
+};
+
 export type Message = {
   id: string;
   content: string;
@@ -43,6 +61,8 @@ export type Message = {
   deletedAt: string | null;
   sender?: User;
   attachments?: Attachment[];
+  reactions?: MessageReaction[];
+  replyTo?: ReplyTo | null;
 };
 
 export type Attachment = {

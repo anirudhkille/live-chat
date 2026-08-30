@@ -32,6 +32,8 @@ export function MessageInput({ conversationId }: MessageInputProps) {
   const draft = useChatStore((s) => s.drafts[conversationId] ?? "");
   const setDraft = useChatStore((s) => s.setDraft);
   const clearDraft = useChatStore((s) => s.clearDraft);
+  const replyTo = useChatStore((s) => s.replies[conversationId] ?? null);
+  const setReplyTo = useChatStore((s) => s.setReplyTo);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const revokeOnUnmountRef = useRef<string[]>([]);
@@ -167,8 +169,10 @@ export function MessageInput({ conversationId }: MessageInputProps) {
       conversationId,
       content,
       attachmentIds: readyAttachmentIds,
+      ...(replyTo ? { replyToId: replyTo.messageId } : {}),
     });
     clearDraft(conversationId);
+    if (replyTo) setReplyTo(conversationId, null);
     if (pending.length) {
       pending.forEach((item) => URL.revokeObjectURL(item.previewUrl));
       setPending([]);
@@ -181,6 +185,8 @@ export function MessageInput({ conversationId }: MessageInputProps) {
     sendMessage,
     conversationId,
     clearDraft,
+    replyTo,
+    setReplyTo,
   ]);
 
   const handleKeyDown = useCallback(
@@ -229,6 +235,28 @@ export function MessageInput({ conversationId }: MessageInputProps) {
       )}
       {pickerError && (
         <p className="text-destructive px-3 pt-2 text-[11px]">{pickerError}</p>
+      )}
+      {replyTo && (
+        <div className="border-input/60 mx-3 mt-2 flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-1.5">
+          <button
+            type="button"
+            aria-label="Cancel reply"
+            onClick={() => setReplyTo(conversationId, null)}
+            className="text-muted-foreground hover:text-foreground shrink-0"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+          <div className="min-w-0 flex-1 truncate text-xs">
+            <span className="font-medium">
+              Replying to {replyTo.senderName ?? "Unknown"}
+            </span>
+            <span className="text-muted-foreground ml-1 truncate">
+              {replyTo.deleted
+                ? "This message was deleted"
+                : replyTo.content || "Photo or file"}
+            </span>
+          </div>
+        </div>
       )}
       <form
         onSubmit={(e) => {

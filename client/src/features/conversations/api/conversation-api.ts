@@ -50,14 +50,27 @@ export async function addGroupParticipants(
 export async function sendMessage(
   conversationId: string,
   content: string,
-  attachmentIds?: string[]
+  attachmentIds?: string[],
+  replyToId?: string
 ): Promise<ApiResponse<Message>> {
   const response = await api.post<ApiResponse<Message>>(
     `/message/${conversationId}`,
     {
       content,
       ...(attachmentIds?.length ? { attachmentIds } : {}),
+      ...(replyToId ? { replyToId } : {}),
     }
+  );
+  return response.data;
+}
+
+export async function toggleReaction(
+  messageId: string,
+  emoji: string
+): Promise<ApiResponse<Message>> {
+  const response = await api.post<ApiResponse<Message>>(
+    `/message/${messageId}/reactions`,
+    { emoji }
   );
   return response.data;
 }

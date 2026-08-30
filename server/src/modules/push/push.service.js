@@ -16,7 +16,7 @@ const subscriptionSchema = z.object({
 export const saveSubscription = async (userId, input) => {
   const parsed = subscriptionSchema.safeParse(input);
   if (!parsed.success) {
-    throw new AppError("Invalid push subscription", 400);
+    throw new AppError(400, "Invalid push subscription");
   }
 
   const subscription = await pushRepository.upsertSubscription({
@@ -29,7 +29,7 @@ export const saveSubscription = async (userId, input) => {
 
 export const removeSubscription = async (userId, endpoint) => {
   if (typeof endpoint !== "string" || !endpoint) {
-    throw new AppError("Endpoint is required", 400);
+    throw new AppError(400, "Endpoint is required");
   }
   await pushRepository.deleteSubscription(userId, endpoint);
   return true;
