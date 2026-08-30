@@ -24,6 +24,7 @@ model User {
   messages     Message[]
   reads        MessageRead[]
   pushSubscriptions PushSubscription[]
+  reactions    MessageReaction[]
 }
 
 model Conversation {
@@ -67,6 +68,10 @@ model Message {
   conversationId String
   reads          MessageRead[]
   attachments    Attachment[]
+  replyToId String?
+  replyTo   Message?  @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies   Message[] @relation("MessageReplies")
+  reactions MessageReaction[]
 
   @@index([conversationId, createdAt])
   @@index([senderId])
@@ -117,4 +122,17 @@ model PushSubscription {
 
   user      User     @relation(fields: [userId], references: [id])
   userId    String
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message   Message  @relation(fields: [messageId], references: [id])
+  messageId String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+
+  @@unique([messageId, userId, emoji])
 }

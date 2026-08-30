@@ -4,11 +4,34 @@ const withDetails = {
   include: {
     attachments: true,
     reads: true,
+    reactions: {
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    },
+    replyTo: {
+      include: {
+        sender: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    },
   },
 };
 
 export const findById = (messageId) => {
-  return prisma.message.findUnique({ where: { id: messageId } });
+  return prisma.message.findUnique({
+    where: { id: messageId },
+    ...withDetails,
+  });
 };
 
 export const getMessages = (conversationId, before, limit) => {
@@ -67,6 +90,7 @@ export const sendMessage = async (
   conversationId,
   content,
   attachmentIds,
+  replyToId,
 ) => {
   const now = new Date();
   const [message] = await prisma.$transaction([
@@ -75,12 +99,34 @@ export const sendMessage = async (
         senderId,
         conversationId,
         content,
+        ...(replyToId ? { replyToId } : {}),
         ...(attachmentIds?.length
           ? { attachments: { connect: attachmentIds.map((id) => ({ id })) } }
           : {}),
       },
       include: {
         attachments: true,
+        reads: true,
+        reactions: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        replyTo: {
+          include: {
+            sender: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
       },
     }),
     prisma.conversation.update({
@@ -91,4 +137,21 @@ export const sendMessage = async (
     }),
   ]);
   return message;
+};
+
+export const toggleReaction = async (messageId, userId, emoji) => {
+  const existing = await prisma.messageReaction.findUnique({
+    where: { messageId_userId_emoji: { messageId, userId, emoji } },
+  });
+
+  if (existing) {
+    await prisma.messageReaction.delete({ where: { id: existing.id } });
+  } else {
+    await prisma.messageReaction.create({ data: { messageId, userId, emoji } });
+  }
+
+  return prisma.message.findUnique({
+    where: { id: messageId },
+    ...withDetails,
+  });
 };

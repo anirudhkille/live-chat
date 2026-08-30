@@ -42,13 +42,25 @@ export const deleteMessage = asyncHandler(async (req, res) => {
 
 export const sendMessage = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
-  const { content, attachmentIds } = req.body;
+  const { content, attachmentIds, replyToId } = req.body;
 
   const messages = await messageService.sendMessage(
     req.user.id,
     conversationId,
     content,
     Array.isArray(attachmentIds) ? attachmentIds : undefined,
+    replyToId,
   );
   sendResponse(res, 200, "Messages sent successfully", messages);
+});
+
+export const toggleReaction = asyncHandler(async (req, res) => {
+  const { messageId } = req.params;
+  const { emoji } = req.body;
+  const message = await messageService.toggleReaction(
+    req.user.id,
+    messageId,
+    emoji,
+  );
+  sendResponse(res, 200, "Reaction updated", message);
 });

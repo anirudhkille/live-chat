@@ -6,15 +6,21 @@ import {
   markMessagesRead,
   updateMessage,
   deleteMessage,
+  toggleReaction,
 } from "./message.controller.js";
 import { validate } from "../../middleware/validate.middleware.js";
-import { updateMessageSchema, sendMessageSchema } from "./message.schema.js";
+import {
+  updateMessageSchema,
+  sendMessageSchema,
+  toggleReactionSchema,
+} from "./message.schema.js";
 
 const router = Router();
 
 router.use(authenticate);
 
 router.post("/read/:conversationId", markMessagesRead);
+router.post("/:messageId/reactions", validate(toggleReactionSchema), toggleReaction);
 router.post("/:conversationId", validate(sendMessageSchema), sendMessage);
 router.get("/:conversationId", getMessages);
 router.patch("/:messageId", validate(updateMessageSchema), updateMessage);

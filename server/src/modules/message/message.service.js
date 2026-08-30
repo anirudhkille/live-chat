@@ -84,20 +84,63 @@ export const sendMessage = async (
   conversationId,
   content,
   attachmentIds,
+  replyToId,
 ) => {
+  if (replyToId) {
+    const parent = await messageRepository.findById(replyToId);
+    if (!parent || parent.conversationId !== conversationId) {
+      throw new AppError("The message you're replying to is not valid", 400);
+    }
+  }
+
   const message = await messageRepository.sendMessage(
     senderId,
     conversationId,
     content,
     attachmentIds,
+    replyToId,
   );
 
+  const response = {
+    ...toMessageResponse(message),
+    conversationId,
+  };
+
   const io = getIO();
-  io.to(`conversation:${conversationId}`).emit("new-message", message);
+  io.to(`conversation:${conversationId}`).emit("new-message", response);
 
   notifyOfflineRecipient(senderId, conversationId, content, attachmentIds);
 
-  return message;
+  return response;
+};
+
+export const toggleReaction = async (userId, messageId, emoji) => {
+  const existing = await messageRepository.findById(messageId);
+  if (!existing) {
+    throw new AppError("Message not found", 404);
+  }
+
+  const conversation = await conversationRepository.getById(
+    existing.conversationId,
+  );
+  if (!conversation.participants.some((p) => p.userId === userId)) {
+    throw new AppError("You are not a participant of this conversation", 403);
+  }
+
+  const message = await messageRepository.toggleReaction(
+    messageId,
+    userId,
+    emoji,
+  );
+
+  getIO()
+    .to(`conversation:${existing.conversationId}`)
+    .emit("message-reacted", {
+      conversationId: existing.conversationId,
+      message: toMessageResponse(message),
+    });
+
+  return toMessageResponse(message);
 };
 
 const notifyOfflineRecipient = async (
