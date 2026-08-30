@@ -2,7 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
 
+import { usePushNotifications } from "@/features/push-notifications/usePushNotifications";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +57,33 @@ function ToggleOption({
 export default function PrivacyPage() {
   const router = useRouter();
   const isDesktop = useIsDesktop();
+  const { supported, permission, enabled, isLoading, enable, disable } =
+    usePushNotifications();
+
+  const handlePushChange = async (next: boolean) => {
+    try {
+      if (next) {
+        await enable();
+        toast.success("Push notifications enabled");
+      } else {
+        await disable();
+        toast.success("Push notifications disabled");
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Couldn't update push notifications"
+      );
+    }
+  };
+
+  let pushDescription = "Get notified about new messages when you're offline.";
+  if (!supported) {
+    pushDescription = "Push notifications aren't supported in this browser.";
+  } else if (permission === "denied") {
+    pushDescription = "Notifications are blocked in your browser settings.";
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -109,6 +138,16 @@ export default function PrivacyPage() {
             description="Show when you're typing a message"
             enabled={true}
             disabled
+          />
+        </div>
+
+        <div className="border-b py-1">
+          <ToggleOption
+            label="Push notifications"
+            description={pushDescription}
+            enabled={enabled}
+            disabled={isLoading || !supported}
+            onChange={handlePushChange}
           />
         </div>
 
