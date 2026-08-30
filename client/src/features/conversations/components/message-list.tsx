@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -47,6 +48,31 @@ function updateCachedMessages(
       };
     }
   );
+}
+
+function dayKey(iso: string) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function dayLabel(iso: string) {
+  const d = new Date(iso);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dateOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.round(
+    (today.getTime() - dateOnly.getTime()) / 86400000
+  );
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays > 1 && diffDays < 7) {
+    return d.toLocaleDateString([], { weekday: "long" });
+  }
+  return d.toLocaleDateString([], {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 export function MessageList({ conversationId, isGroup = false }: MessageListProps) {
@@ -283,14 +309,26 @@ export function MessageList({ conversationId, isGroup = false }: MessageListProp
           <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
         </div>
       )}
-      {messages.map((message) => (
-        <MessageBubble
-          key={message.id}
-          message={message}
-          isGroup={isGroup}
-          conversationId={conversationId}
-        />
-      ))}
+      {messages.map((message, index) => {
+        const prev = messages[index - 1];
+        const showDate = !prev || dayKey(message.createdAt) !== dayKey(prev.createdAt);
+        return (
+          <Fragment key={message.id}>
+            {showDate && (
+              <div className="mb-3 mt-1 flex shrink-0 justify-center">
+                <span className="rounded bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground shadow-sm">
+                  {dayLabel(message.createdAt)}
+                </span>
+              </div>
+            )}
+            <MessageBubble
+              message={message}
+              isGroup={isGroup}
+              conversationId={conversationId}
+            />
+          </Fragment>
+        );
+      })}
       <div ref={bottomRef} />
     </div>
   );

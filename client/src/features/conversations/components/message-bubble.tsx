@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CornerUpRight } from "lucide-react";
+import {
+  CornerUpRight,
+  CheckCheck,
+  Pencil,
+  Trash2,
+  MoreHorizontal,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth-store";
 import { useChatStore } from "@/store/chat-store";
@@ -24,15 +30,16 @@ function ReadReceipt({ readAt }: { readAt: string | null }) {
   if (!readAt) return null;
   return (
     <span
-      className="ml-1 text-[10px] text-blue-500 dark:text-blue-400"
+      className="ml-1 inline-flex items-center text-primary-foreground/80"
       title={`Seen ${formatMessageTime(readAt)}`}
     >
-      ✓✓
+      <CheckCheck size={12} strokeWidth={2.5} />
     </span>
   );
 }
 
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+const EDIT_MAX_LENGTH = 2000;
 
 function hasReacted(
   reactions: MessageReaction[] | undefined,
@@ -168,7 +175,7 @@ export function MessageBubble({
 
   return (
     <div
-      className={cn("group relative mb-2 flex w-full", isOwn && "justify-end")}
+      className={cn("group relative mb-2.5 flex w-full", isOwn && "justify-end")}
     >
       <div
         className={cn(
@@ -176,40 +183,22 @@ export function MessageBubble({
           isOwn && "flex-row-reverse"
         )}
       >
-        {!isDeleted && !isEditing && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={handleReply}
-            className={cn(
-              "h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100",
-              !hasImageAttachment && "opacity-30 group-hover:opacity-100"
-            )}
-            aria-label="Reply"
-            title="Reply"
-          >
-            <CornerUpRight className="h-4 w-4" />
-          </Button>
-        )}
-
-        <div className="relative min-w-0 w-fit">
+        <div className="group relative min-w-0 w-fit">
           <div
             className={cn(
-              "flex flex-col gap-0.5 rounded-md px-3 pt-2 text-sm",
-              isOwn ? "bg-primary text-primary-foreground" : "bg-muted",
-              isOptimistic && "opacity-70",
+              "flex flex-col gap-0.5 rounded-md px-3.5 py-2 text-sm shadow-sm",
+              isOwn
+                ? "rounded-br-md bg-primary text-primary-foreground"
+                : "rounded-bl-md bg-muted text-foreground",
+              isOptimistic && "opacity-60",
               allReactions.length > 0 &&
-                cn(
-                  "pb-3",
-                  hasImageAttachment ? "pb-8" : "pb-5"
-                )
+                cn("mb-2.5", hasImageAttachment ? "pb-5" : "pb-3")
             )}
           >
             {isOwn && menuOpen && (
               <div
                 ref={menuRef}
-                className="absolute bottom-full right-0 z-20 mb-1 w-40 rounded-md border bg-background p-1 shadow-lg"
+                className="animate-in fade-in-0 zoom-in-95 absolute bottom-full right-0 z-20 mb-1.5 w-36 origin-bottom-right rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg"
                 role="menu"
               >
                 <Button
@@ -218,21 +207,9 @@ export function MessageBubble({
                   size="sm"
                   role="menuitem"
                   onClick={beginEditing}
-                  className="w-full justify-start"
+                  className="w-full justify-start gap-2 font-normal"
                 >
-                  <svg
-                    className="h-3.5 w-3.5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M12 20h9" />
-                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                  </svg>
+                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                   Edit
                 </Button>
                 <Button
@@ -241,22 +218,9 @@ export function MessageBubble({
                   size="sm"
                   role="menuitem"
                   onClick={confirmDelete}
-                  className="w-full justify-start text-red-500 hover:bg-red-500/10 hover:text-red-500"
+                  className="w-full justify-start gap-2 font-normal text-red-500 hover:bg-red-500/10 hover:text-red-500"
                 >
-                  <svg
-                    className="h-3.5 w-3.5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M3 6h18" />
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                  </svg>
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                   Delete
                 </Button>
               </div>
@@ -271,45 +235,47 @@ export function MessageBubble({
                   setMenuOpen((open) => !open);
                   setQuickReactOpen(false);
                 }}
-                className="absolute -top-3 right-0 z-10 h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
+                className={cn(
+                  "absolute -top-3 right-0 z-10 h-6 w-6 rounded-full border bg-background text-muted-foreground shadow-sm transition-opacity",
+                  menuOpen
+                    ? "opacity-100"
+                    : "opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+                )}
                 aria-label="Message options"
                 title="Message options"
               >
-                <svg
-                  className="h-3.5 w-3.5"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <circle cx="5" cy="12" r="1.5" />
-                  <circle cx="12" cy="12" r="1.5" />
-                  <circle cx="19" cy="12" r="1.5" />
-                </svg>
+                <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
               </Button>
             )}
 
             {message.replyTo && (
-              <div className="mb-0.5 rounded-md border-l-2 border-primary/40 bg-black/5 px-2 py-1 text-xs dark:bg-white/10">
-                <p className="truncate font-medium">
-                  {message.replyTo.senderName ?? "Unknown"}
-                </p>
-                <p className="truncate opacity-80">
-                  {message.replyTo.deleted
-                    ? "This message was deleted"
-                    : message.replyTo.content || "Photo or file"}
-                </p>
+              <div className="mb-0.5 flex items-start gap-1.5 rounded-md border-l-2 border-primary/40 bg-black/5 px-2 py-1 text-xs dark:bg-white/10">
+                <CornerUpRight
+                  className="mt-0.5 h-3 w-3 shrink-0 opacity-60"
+                  aria-hidden="true"
+                />
+                <div className="min-w-0">
+                  <p className="truncate font-medium">
+                    {message.replyTo.senderName ?? "Unknown"}
+                  </p>
+                  <p className="truncate opacity-80">
+                    {message.replyTo.deleted
+                      ? "This message was deleted"
+                      : message.replyTo.content || "Photo or file"}
+                  </p>
+                </div>
               </div>
             )}
 
             {isGroup && !isOwn && (
-              <span className="text-muted-foreground mb-0.5 text-[10px] font-medium">
+              <span className="mb-0.5 text-[10px] font-semibold text-muted-foreground">
                 {message.sender?.name ?? "Unknown"}
               </span>
             )}
 
             {isDeleted ? (
               <p className="text-[13px] italic opacity-60">
-                {"This message was deleted"}
+                This message was deleted
               </p>
             ) : (
               <>
@@ -320,13 +286,13 @@ export function MessageBubble({
                       href={attachment.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block"
+                      className="block overflow-hidden rounded-xl"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={attachment.url}
                         alt={attachment.fileName}
-                        className="max-h-64 w-full max-w-56 rounded-md object-contain"
+                        className="max-h-64 w-full max-w-56 object-contain transition-transform hover:scale-[1.02]"
                       />
                     </a>
                   ) : (
@@ -335,14 +301,14 @@ export function MessageBubble({
                       href={attachment.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs underline"
+                      className="text-xs underline underline-offset-2 opacity-90 hover:opacity-100"
                     >
                       {attachment.fileName}
                     </a>
                   )
                 )}
                 {message.content ? (
-                  <p className="break-words whitespace-pre-wrap">
+                  <p className="break-words whitespace-pre-wrap leading-relaxed">
                     {message.content}
                   </p>
                 ) : null}
@@ -351,15 +317,13 @@ export function MessageBubble({
 
             <span
               className={cn(
-                "text-[10px] leading-tight",
+                "flex items-center gap-0.5 self-end text-[10px] leading-tight",
                 isOwn ? "text-primary-foreground/70" : "text-muted-foreground/70"
               )}
             >
               {formatMessageTime(message.createdAt)}
               {isEdited && !isDeleted && (
-                <span className="ml-1 text-[10px] italic opacity-80">
-                  edited
-                </span>
+                <span className="italic opacity-80">· edited</span>
               )}
               {isOwn && <ReadReceipt readAt={message.readAt} />}
             </span>
@@ -368,9 +332,9 @@ export function MessageBubble({
           {allReactions.length > 0 && (
             <div
               className={cn(
-                "absolute z-10 flex flex-wrap items-center gap-0.5",
-                hasImageAttachment ? "-bottom-2" : "-bottom-2.5",
-                isOwn ? "left-1" : "right-1"
+                "absolute z-10 flex flex-wrap items-center gap-1",
+                "-bottom-1",
+                isOwn ? "right-0" : "left-0"
               )}
             >
               {uniqueEmojis.map((emoji) => {
@@ -387,15 +351,16 @@ export function MessageBubble({
                       toggleReaction.mutate({ messageId: message.id, emoji });
                     }}
                     className={cn(
-                      "flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[11px] shadow-sm transition-colors",
+                      "flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] leading-none shadow-sm transition-colors",
                       mine
-                        ? "border-primary bg-primary/10"
-                        : "border-input bg-background hover:bg-accent"
+                        ? "border-primary/60 bg-primary/10 text-primary"
+                        : "border-border bg-background hover:bg-accent"
                     )}
                     aria-pressed={mine}
+                    aria-label={`${emoji} reaction, ${count} ${count === 1 ? "person" : "people"}`}
                   >
                     <span>{emoji}</span>
-                    <span className="font-medium">{count}</span>
+                    <span className="font-medium tabular-nums">{count}</span>
                   </button>
                 );
               })}
@@ -405,11 +370,11 @@ export function MessageBubble({
           {!isDeleted && !isEditing && (
             <div
               className={cn(
-                "absolute z-20 -top-6 flex items-center gap-0.5 rounded-full border bg-background p-0.5 shadow-sm transition-opacity",
+                "absolute z-20 -top-9 flex items-center gap-0.5 rounded-full border bg-background p-1 shadow-md transition-all",
                 isOwn ? "right-0" : "left-0",
                 quickReactOpen
-                  ? "opacity-100"
-                  : "opacity-0 group-hover:opacity-100"
+                  ? "translate-y-0 opacity-100"
+                  : "pointer-events-none translate-y-1 opacity-0 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100"
               )}
               role="toolbar"
               aria-label="Quick reactions"
@@ -420,7 +385,7 @@ export function MessageBubble({
                   type="button"
                   onClick={() => handleReact(emoji)}
                   className={cn(
-                    "hover:bg-accent flex h-7 w-7 items-center justify-center rounded-full text-base transition-transform hover:scale-110",
+                    "flex h-7 w-7 items-center justify-center rounded-full text-base transition-transform hover:scale-125 hover:bg-accent",
                     hasReacted(allReactions, emoji, currentUserId) &&
                       "bg-accent"
                   )}
@@ -432,6 +397,20 @@ export function MessageBubble({
             </div>
           )}
         </div>
+
+        {!isDeleted && !isEditing && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={handleReply}
+            className="h-7 w-7 shrink-0 rounded-full text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+            aria-label="Reply"
+            title="Reply"
+          >
+            <CornerUpRight className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        )}
       </div>
 
       <Dialog
@@ -445,26 +424,39 @@ export function MessageBubble({
             </Button>
             <Button
               onClick={saveEdit}
-              disabled={!draft.trim() || editMutation.isPending}
+              disabled={
+                !draft.trim() ||
+                draft.trim() === message.content ||
+                editMutation.isPending
+              }
             >
-              Save
+              {editMutation.isPending ? "Saving…" : "Save"}
             </Button>
           </>
         }
       >
-        <textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          rows={4}
-          autoFocus
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              saveEdit();
-            }
-          }}
-          className="w-full resize-none rounded-md border bg-background p-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-        />
+        <div className="space-y-1.5">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value.slice(0, EDIT_MAX_LENGTH))}
+            rows={4}
+            autoFocus
+            maxLength={EDIT_MAX_LENGTH}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                saveEdit();
+              }
+            }}
+            className="w-full resize-none rounded-md border bg-background p-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+          />
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+            <span>Enter to save · Shift + Enter for a new line</span>
+            <span className="tabular-nums">
+              {draft.length}/{EDIT_MAX_LENGTH}
+            </span>
+          </div>
+        </div>
       </Dialog>
     </div>
   );
