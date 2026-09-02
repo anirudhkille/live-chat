@@ -9,8 +9,7 @@ const envSchema = z.object({
   ALLOWED_ORIGNS: z
     .string()
     .transform((value) => value.split(",").map((origin) => origin.trim())),
-  REDIS_HOST: z.string().default("localhost"),
-  REDIS_PORT: z.coerce.number().default(6367),
+  REDIS_URL: z.string().default("redis://localhost:6379"),
   JWT_ACCESS_SECRET: z.string(),
   JWT_REFRESH_SECRET: z.string(),
   GOOGLE_CLIENT_ID: z.string(),
