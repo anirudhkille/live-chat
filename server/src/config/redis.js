@@ -2,10 +2,7 @@ import Redis from "ioredis";
 import { env } from "./env.config.js";
 import { logger } from "./logger.js";
 
-export const redis = new Redis({
-  host: env.REDIS_HOST,
-  port: env.REDIS_PORT,
-});
+export const redis = new Redis(env.REDIS_URL);
 
 redis.on("connect", () => {
   logger.info("Redis connected successfully");
