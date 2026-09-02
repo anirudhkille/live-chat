@@ -75,7 +75,6 @@ model Message {
 
   @@index([conversationId, createdAt])
   @@index([senderId])
-  @@fulltext([content])
 }
 
 model MessageRead {
