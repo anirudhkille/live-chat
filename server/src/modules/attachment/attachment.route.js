@@ -14,10 +14,10 @@ const router = Router();
 
 router.use(authenticate);
 
-router.post("/", validate(attachmentUrlSchema), confirmAttachmentUpload);
+router.post("/", validate(attachmentConfirmSchema), confirmAttachmentUpload);
 router.post(
   "/upload-url",
-  validate(attachmentConfirmSchema),
+  validate(attachmentUrlSchema),
   getAttachmentUploadUrl,
 );
 

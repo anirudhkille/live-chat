@@ -20,7 +20,17 @@ self.addEventListener("push", (event) => {
     data: { url: data.url || "/chats" },
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    (async () => {
+      const windowClients = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      const focused = windowClients.some((client) => client.focused);
+      if (focused) return;
+      await self.registration.showNotification(title, options);
+    })()
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {

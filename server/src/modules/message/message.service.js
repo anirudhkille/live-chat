@@ -1,4 +1,4 @@
-import { getIO, isUserOnline } from "../../config/socket.js";
+import { getIO } from "../../config/socket.js";
 import { logger } from "../../config/logger.js";
 import { AppError } from "../../utils/AppError.js";
 import * as messageRepository from "./message.repository.js";
@@ -109,7 +109,7 @@ export const sendMessage = async (
   const io = getIO();
   io.to(`conversation:${conversationId}`).emit("new-message", response);
 
-  notifyOfflineRecipient(senderId, conversationId, content, attachmentIds);
+  notifyRecipients(senderId, conversationId, content, attachmentIds);
 
   return response;
 };
@@ -143,7 +143,7 @@ export const toggleReaction = async (userId, messageId, emoji) => {
   return toMessageResponse(message);
 };
 
-const notifyOfflineRecipient = async (
+const notifyRecipients = async (
   senderId,
   conversationId,
   content,
@@ -157,8 +157,7 @@ const notifyOfflineRecipient = async (
       (participant) => participant.userId === senderId,
     );
     const recipients = conversation.participants.filter(
-      (participant) =>
-        participant.userId !== senderId && !isUserOnline(participant.userId),
+      (participant) => participant.userId !== senderId,
     );
     if (recipients.length === 0) return;
 
