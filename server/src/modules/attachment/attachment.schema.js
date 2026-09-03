@@ -11,7 +11,7 @@ export const attachmentConfirmSchema = z.object({
   contentType: z.string().min(1, "Content type can't be empty"),
   fileName: z.string().min(1, "File name can't be empty"),
   fileSize: z.number().min(1, "File size can't be empty"),
-  width: z.number(),
-  height: z.number(),
-  duration: z.string(),
+  width: z.number().optional(),
+  height: z.number().optional(),
+  duration: z.string().optional(),
 });
