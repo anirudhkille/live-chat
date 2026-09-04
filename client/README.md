@@ -8,7 +8,7 @@ TanStack React Query, Zustand, and Socket.IO client. Backend lives in `../server
 
 ```bash
 npm install
-cp .env.example .env.local   # adjust URLs to point at your API
+# create client/.env.local with the variables below
 npm run dev                  # http://localhost:3000
 ```
 
@@ -17,7 +17,7 @@ npm run dev                  # http://localhost:3000
 | Variable              | Purpose                                         |
 | --------------------- | ----------------------------------------------- |
 | `NEXT_PUBLIC_API_URL` | REST base URL, e.g. `http://localhost:8080/api` |
-| `NEXT_PUBLIC_WS_URL`  | Socket.IO URL (falls back to the API host)      |
+| `NEXT_PUBLIC_SOCKET_URL` | Socket.IO URL, e.g. `http://localhost:8080`   |
 
 > Add `http://localhost:3000` to `ALLOWED_ORIGNS` and set
 > `CLIENT_URL=http://localhost:3000` in `server/.env`, otherwise CORS and the
@@ -38,8 +38,7 @@ npm run dev                  # http://localhost:3000
 | `/search`                 | People search                         |
 | `/settings`               | Account, theme toggle, logout         |
 | `/settings/profile`       | Edit name + avatar (crop & upload)    |
-| `/settings/notifications` | Notifications                         |
-| `/settings/privacy`       | Privacy toggles (placeholder)         |
+| `/settings/notifications` | Notifications, web push toggle        |
 
 ## Structure
 

@@ -1,6 +1,6 @@
 # Live Chat
 
-A full-stack real-time chat application with OTP and Google authentication, group and direct conversations, typing indicators, read receipts, and avatar uploads via Cloudflare R2.
+A full-stack real-time chat application with OTP and Google authentication, direct and group conversations, typing indicators, read receipts, message reactions and replies, attachments, web push notifications, and avatar/photo uploads via Cloudflare R2.
 
 ## Tech Stack
 
@@ -11,11 +11,14 @@ A full-stack real-time chat application with OTP and Google authentication, grou
 
 ## Features
 
-- 📧 Email OTP login and Google OAuth
+- 📧 Email OTP login and Google OAuth (passwordless)
 - 💬 Real-time messaging via Socket.IO
 - 👥 Direct and group conversations
 - ✍️ Typing indicators and read receipts
-- 🖼️ Avatar and conversation photo uploads (Cloudflare R2, presigned URLs)
+- 😀 Message reactions and inline replies
+- 🖼️ Photo & file sharing (Cloudflare R2, presigned URLs)
+- 🔔 Web push notifications via VAPID
+- 🟢 Online / presence status
 - 🔐 JWT access + refresh token auth with automatic rotation
 
 ## Prerequisites
@@ -23,7 +26,9 @@ A full-stack real-time chat application with OTP and Google authentication, grou
 - Node.js 20+
 - A PostgreSQL database
 - A Redis instance
-- A Cloudflare R2 bucket (for avatar and conversation photo uploads)
+- A Cloudflare R2 bucket (for avatars, conversation photos, and message attachments)
+- An SMTP provider (for sending OTP emails)
+- A VAPID key pair (for web push — generate via `npx web-push generate-vapid-keys`)
 
 ## Getting Started
 
@@ -39,10 +44,10 @@ cd live-chat
 ```bash
 cd server
 npm install
-cp .env.example .env    # fill in the values — see table below
-npx prisma db push      # sync the schema to your database
-npx prisma generate     # generate the Prisma client
-npm run dev             # http://localhost:8080
+# create server/.env with the variables in the table below
+node_modules/.bin/prisma db push   # sync the schema to your database
+node_modules/.bin/prisma generate  # generate the Prisma client
+npm run dev                        # http://localhost:8080
 ```
 
 ### 3. Client setup
@@ -50,11 +55,11 @@ npm run dev             # http://localhost:8080
 ```bash
 cd client
 npm install
-cp .env.example .env.local   # point NEXT_PUBLIC_API_URL at your server
+# create client/.env.local with NEXT_PUBLIC_API_URL pointing at your server
 npm run dev                  # http://localhost:3000
 ```
 
-> **Note:** Make sure `http://localhost:3000` is included in `ALLOWED_ORIGINS` and that `CLIENT_URL=http://localhost:3000` is set in `server/.env` — otherwise CORS and the Google sign-in redirect will fail.
+> **Note:** Make sure `http://localhost:3000` is included in `ALLOWED_ORIGNS` and that `CLIENT_URL=http://localhost:3000` is set in `server/.env` — otherwise CORS and the Google sign-in redirect will fail.
 
 ## Environment Variables
 
@@ -64,8 +69,8 @@ npm run dev                  # http://localhost:3000
 | -------------------------------------------------------- | ---------------------------------------------------- |
 | `PORT`                                                   | API port (default `8080`)                           |
 | `DATABASE_URL`                                           | PostgreSQL connection string                        |
-| `ALLOWED_ORIGINS`                                        | Comma-separated CORS origins (e.g. the client URL)   |
-| `REDIS_HOST`, `REDIS_PORT`                                | Redis connection, used for OTP caching               |
+| `ALLOWED_ORIGNS`                                        | Comma-separated CORS origins (e.g. the client URL)   |
+| `REDIS_URL`                                             | Redis connection string, used for OTP caching        |
 | `JWT_ACCESS_SECRET`                                       | Signs access tokens                                  |
 | `JWT_REFRESH_SECRET`                                      | Signs refresh tokens                                 |
 | `GOOGLE_CLIENT_ID`                                        | Google OAuth client ID                               |
@@ -76,15 +81,18 @@ npm run dev                  # http://localhost:3000
 | `R2_ACCOUNT_ID`                                            | Cloudflare R2 account ID                             |
 | `R2_ACCESS_KEY_ID`                                         | R2 API access key                                    |
 | `R2_SECRET_ACCESS_KEY`                                     | R2 API secret key                                    |
-| `R2_BUCKET`                                                | R2 bucket used for avatars and conversation photos    |
+| `R2_BUCKET`                                                | R2 bucket used for avatars, conversation photos, and message attachments |
 | `R2_PUBLIC_URL`                                            | Public base URL of the bucket (e.g. `https://pub-<id>.r2.dev` or a custom domain) |
+| `VAPID_SUBJECT`                                            | Email/URL for the web-push VAPID key                   |
+| `VAPID_PUBLIC_KEY`                                         | VAPID public key (base64url) for web push              |
+| `VAPID_PRIVATE_KEY`                                        | VAPID private key (base64url) for web push             |
 
 ### Client (`client/.env.local`)
 
 | Variable              | Purpose                                          |
 | ---------------------- | ------------------------------------------------- |
-| `NEXT_PUBLIC_API_URL`  | REST base URL, e.g. `http://localhost:8080/api`   |
-| `NEXT_PUBLIC_WS_URL`   | Socket.IO URL (falls back to the API host if unset) |
+| `NEXT_PUBLIC_API_URL`    | REST base URL, e.g. `http://localhost:8080/api`     |
+| `NEXT_PUBLIC_SOCKET_URL` | Socket.IO URL, e.g. `http://localhost:8080`       |
 
 ## API Overview
 
@@ -112,18 +120,40 @@ All responses use the envelope `{ success, message, data }`. Every route except 
 
 ### Conversations — `/api/conversation`
 
-| Method | Path   | Description                              |
-| ------ | ------- | ------------------------------------------- |
-| POST   | `/`     | Create a conversation — body `{ userId }`   |
-| GET    | `/`     | List the current user's conversations       |
-| GET    | `/:id`  | Get a single conversation                    |
+| Method | Path                     | Description                                    |
+| ------ | ------------------------ | ------------------------------------------------- |
+| POST   | `/`                      | Create/get a direct conversation — body `{ userId }` |
+| GET    | `/`                      | List the current user's conversations           |
+| POST   | `/group`                 | Create a group — body `{ name, participantIds }` |
+| GET    | `/:id`                   | Get a single conversation                         |
+| GET    | `/:id/participants`      | List a group's participants                       |
+| POST   | `/:id/participants`      | Add participants to a group                       |
 
 ### Messages — `/api/message`
 
-| Method | Path                 | Description                                     |
-| ------ | --------------------- | ---------------------------------------------------- |
-| GET    | `/:conversationId`    | List messages for a conversation                     |
-| POST   | `/:conversationId`    | Send a message — body `{ content }`                   |
+| Method | Path                       | Description                                    |
+| ------ | -------------------------- | ------------------------------------------------- |
+| GET    | `/:conversationId`         | List messages for a conversation                 |
+| POST   | `/:conversationId`         | Send a message — body `{ content, attachmentIds, replyToId }` |
+| PATCH  | `/:messageId`              | Edit a message                                   |
+| DELETE | `/:messageId`              | Delete a message                                 |
+| POST   | `/read/:conversationId`    | Mark messages as read                            |
+| POST   | `/:messageId/reactions`    | Toggle an emoji reaction — body `{ emoji }`      |
+
+### Attachments — `/api/attachment`
+
+| Method | Path           | Description                                                        |
+| ------ | -------------- | -------------------------------------------------------------------- |
+| POST   | `/upload-url`  | Returns a presigned R2 upload URL — body `{ contentType, fileName, fileSize }` |
+| POST   | `/`            | Confirms an upload and creates the attachment — body `{ key, … }`    |
+
+### Push — `/api/push`
+
+| Method | Path           | Description                                                |
+| ------ | -------------- | ------------------------------------------------------------ |
+| GET    | `/vapid-key`   | Returns the VAPID public key                                |
+| POST   | `/subscribe`   | Saves a push subscription — body `{ endpoint, keys }`        |
+| POST   | `/unsubscribe` | Removes a push subscription — body `{ endpoint }`            |
 
 ## Client Structure
 
@@ -137,9 +167,10 @@ client/src/
 ├── features/
 │   ├── auth/                # schemas/, api/, hooks/, components/ for login/OTP flow
 │   ├── conversations/       # api/, hooks/, components/ (list, thread, input, typing, bubble)
-│   ├── users/                # api/, hooks/ (search, avatar upload)
-│   ├── notifications/       # api/, hooks/
-│   └── settings/             # api/, hooks/, components/ (profile update, avatar crop dialog)
+│   ├── attachments/         # api/, hooks/ (message photo/file upload)
+│   ├── push-notifications/  # api/, hooks/ (web-push subscribe/unsubscribe)
+│   ├── users/               # api/, hooks/ (search, avatar upload)
+│   └── settings/            # api/, hooks/, components/ (profile update, avatar crop dialog)
 ├── hooks/                   # use-auth, use-logout, use-media-query
 ├── lib/                      # env, api (axios + refresh queue), socket, crop-image, utils
 ├── store/                    # zustand: auth (persisted), chat (drafts, typing, active chat)
@@ -169,15 +200,17 @@ client/src/
 server/src/
 ├── app.js                  # Express app wiring (cors, cookie-parser, routes)
 ├── server.js                # HTTP + Socket.IO bootstrap
-├── generated/prisma/        # Generated Prisma client (run `npx prisma generate`)
+├── generated/prisma/        # Generated Prisma client (run `node_modules/.bin/prisma generate`)
 ├── config/                   # env validation, prisma, redis, r2, mail, logger
 ├── middleware/                # auth (JWT), validate (zod), error handler
 ├── modules/
 │   ├── auth/                 # OTP + Google login, tokens, profile
 │   ├── user/                  # search, avatar presigned-URL flow
 │   ├── conversation/          # conversations (groups/DMs by participants)
-│   ├── message/                # messages
-│   └── storage/                # R2 presigned URL helpers
+│   ├── message/               # messages, reactions, read receipts
+│   ├── attachment/            # message photo/file uploads
+│   ├── push/                  # web-push subscriptions + VAPID
+│   └── storage/               # R2 presigned URL helpers
 ├── templates/                 # OTP email template
 └── utils/                      # jwt, otp, email, response envelope, errors
 ```
