@@ -11,6 +11,12 @@
     "lint": "eslint src/",
     "format": "prettier --write src/"
   },
+  "lint-staged": {
+    "*.js": [
+      "npx eslint --fix",
+      "npx prettier --write"
+    ]
+  },
   "author": "anirudh kille",
   "license": "ISC",
   "dependencies": {

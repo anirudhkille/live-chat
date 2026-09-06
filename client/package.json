@@ -10,6 +10,15 @@
     "format": "prettier --write \"**/*.{ts,tsx,mdx,js,jsx,json,md,css,scss}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,mdx,js,jsx,json,md,css,scss}\""
   },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "npx eslint --fix",
+      "npx prettier --write"
+    ],
+    "*.{json,md,css,scss}": [
+      "npx prettier --write"
+    ]
+  },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",
     "@hookform/resolvers": "^5.9.1",
