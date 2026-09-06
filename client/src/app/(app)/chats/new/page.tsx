@@ -84,9 +84,15 @@ export default function NewChatPage() {
         </div>
       </header>
 
-      <div className="grid grid-cols-2 gap-1 p-3 pb-0">
+      <div
+        role="tablist"
+        aria-label="New chat type"
+        className="grid grid-cols-2 gap-1 p-3 pb-0"
+      >
         <button
           type="button"
+          role="tab"
+          aria-selected={mode === "chat"}
           onClick={() => {
             setMode("chat");
             setQuery("");
@@ -103,6 +109,8 @@ export default function NewChatPage() {
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={mode === "group"}
           onClick={() => {
             setMode("group");
             setQuery("");

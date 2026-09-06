@@ -275,7 +275,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
         />
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           size="icon"
           aria-label="Add image"
           onClick={() => fileInputRef.current?.click()}
@@ -292,6 +292,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
           placeholder="Message"
           rows={1}
           disabled={sendMessage.isPending}
+          aria-label="Message"
           className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex max-h-37.5 min-h-10 flex-1 resize-none rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         />
         <Button

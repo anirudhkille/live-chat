@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import {
   ArrowLeft,
   Bell,
@@ -13,6 +14,8 @@ import {
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { useLogout } from "@/hooks/use-logout";
 import { useIsDesktop } from "@/hooks/use-media-query";
@@ -32,6 +35,7 @@ export default function SettingsPage() {
   const isDesktop = useIsDesktop();
   const { user } = useAuth();
   const logout = useLogout();
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   return (
     <div className="flex h-full flex-col">
@@ -84,7 +88,7 @@ export default function SettingsPage() {
 
         <button
           type="button"
-          onClick={() => logout.mutate()}
+          onClick={() => setConfirmOpen(true)}
           disabled={logout.isPending}
           className="text-destructive hover:bg-accent flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors disabled:opacity-60"
         >
@@ -96,6 +100,34 @@ export default function SettingsPage() {
           Log out
         </button>
       </div>
+
+      <Dialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Log out?"
+        description="You'll need to sign in again to access your chats."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={logout.isPending}
+              onClick={() => {
+                setConfirmOpen(false);
+                logout.mutate();
+              }}
+            >
+              {logout.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Log out"
+              )}
+            </Button>
+          </>
+        }
+      />
     </div>
   );
 }

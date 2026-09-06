@@ -85,7 +85,7 @@ export function GroupMembersDialog({
                     {user.email}
                   </p>
                 </div>
-                <Plus className="h-4 w-4 shrink-0" />
+                <Plus className="h-4 w-4 shrink-0" aria-hidden />
               </button>
             ))
           )

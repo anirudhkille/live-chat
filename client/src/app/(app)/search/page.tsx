@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -47,7 +48,7 @@ export default function SearchPage() {
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search people"
             aria-label="Search people"
-            className="border-none bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+            className="border-none bg-transparent shadow-none"
           />
         </div>
       </header>
@@ -84,10 +85,9 @@ export default function SearchPage() {
               People
             </p>
             {users.map((user) => (
-              <button
+              <Link
                 key={user.id}
-                type="button"
-                onClick={() => router.push(`/chats/new`)}
+                href={"/chats/new"}
                 className="hover:bg-accent flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors"
               >
                 <Avatar
@@ -105,7 +105,7 @@ export default function SearchPage() {
                   </p>
                 </div>
                 <MessageCircle className="text-muted-foreground ml-auto h-4 w-4 shrink-0" />
-              </button>
+              </Link>
             ))}
           </>
         )}
