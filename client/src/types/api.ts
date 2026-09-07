@@ -41,6 +41,14 @@ export type MessageReaction = {
   };
 };
 
+export type CipherMeta = {
+  version: number;
+  iv: string;
+  salt?: string;
+  publicKey?: string;
+  [key: string]: unknown;
+};
+
 export type ReplyTo = {
   id: string;
   senderId: string;
@@ -53,6 +61,7 @@ export type ReplyTo = {
 export type Message = {
   id: string;
   content: string;
+  cipherMeta?: CipherMeta | null;
   senderId: string;
   receiverId: string;
   conversationId: string;
