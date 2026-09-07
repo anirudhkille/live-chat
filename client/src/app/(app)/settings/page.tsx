@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Loader2,
   LogOut,
+  Shield,
   User,
 } from "lucide-react";
 
@@ -26,6 +27,12 @@ const ITEMS = [
     icon: Bell,
     label: "Notifications",
     to: "/settings/notifications",
+    enabled: true,
+  },
+  {
+    icon: Shield,
+    label: "Security",
+    to: "/settings/security",
     enabled: true,
   },
 ];
