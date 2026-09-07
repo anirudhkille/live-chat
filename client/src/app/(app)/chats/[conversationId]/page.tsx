@@ -11,6 +11,10 @@ import { MessageInput } from "@/features/conversations/components/message-input"
 import { GroupMembersDialog } from "@/features/conversations/components/group-members-dialog";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { useGetConversationById } from "@/features/conversations/hooks/useConversationById";
+import { CallButtons } from "@/features/calls/call-buttons";
+import { CallOverlay } from "@/features/calls/call-overlay";
+import { useCalls } from "@/features/calls/use-calls";
+import { useCallStore } from "@/features/calls/call-store";
 
 export default function ChatThreadPage({
   params,
@@ -25,6 +29,9 @@ export default function ChatThreadPage({
 
   const { data: conversation, isLoading: loadingConversation } =
     useGetConversationById(conversationId);
+
+  const calls = useCalls();
+  const callStatus = useCallStore((s) => s.status);
 
   const otherUserName = conversation?.name ?? conversation?.email ?? "Unknown";
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -137,15 +144,22 @@ export default function ChatThreadPage({
             <Users className="h-4 w-4" />
           </Button>
         ) : (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="ml-auto"
-            aria-label="Chat info"
-            disabled
-          >
-            <Info className="h-4 w-4" />
-          </Button>
+          <div className="ml-auto flex items-center gap-1">
+            <CallButtons
+              disabled={callStatus !== "idle"}
+              onStart={(type) =>
+                calls.startCall({
+                  type,
+                  conversationId,
+                  peerId: conversation?.otherUserId ?? "",
+                  peerName: conversation?.name ?? null,
+                })
+              }
+            />
+            <Button variant="ghost" size="icon" aria-label="Chat info" disabled>
+              <Info className="h-4 w-4" />
+            </Button>
+          </div>
         )}
       </header>
 
@@ -163,6 +177,14 @@ export default function ChatThreadPage({
           conversationId={conversationId}
         />
       )}
+
+      <CallOverlay
+        onAccept={calls.acceptCall}
+        onDecline={calls.rejectCall}
+        onCancel={calls.cancelOutgoing}
+        onHangup={calls.hangup}
+        onClose={() => useCallStore.getState().reset()}
+      />
     </div>
   );
 }
