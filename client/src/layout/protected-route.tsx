@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { Spinner } from "@/components/ui/spinner";
+import { E2EKeyGate } from "@/features/e2e/components/e2e-key-gate";
 import { useAuth } from "@/hooks/use-auth";
 import { socket } from "@/lib/socket";
 
@@ -27,7 +28,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     }
   }, [router, token, user, hasHydrated]);
 
-    useEffect(() => {
+  useEffect(() => {
     if (!hasHydrated || !token || !user?.name) return;
 
     socket.auth = { token };
@@ -38,7 +39,6 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     };
   }, [hasHydrated, token, user?.name]);
 
-
   if (!hasHydrated || !token || !user?.name) {
     return (
       <div className="flex h-dvh items-center justify-center">
@@ -47,5 +47,10 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      <E2EKeyGate />
+      {children}
+    </>
+  );
 }
