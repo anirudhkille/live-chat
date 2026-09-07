@@ -6,6 +6,7 @@ export type SendMessageInput = {
   content: string;
   attachmentIds?: string[];
   replyToId?: string;
+  cipherMeta?: Record<string, unknown>;
 };
 
 export function useSendMessage() {
@@ -15,7 +16,14 @@ export function useSendMessage() {
       content,
       attachmentIds,
       replyToId,
+      cipherMeta,
     }: SendMessageInput) =>
-      sendMessage(conversationId, content, attachmentIds, replyToId),
+      sendMessage(
+        conversationId,
+        content,
+        attachmentIds,
+        replyToId,
+        cipherMeta
+      ),
   });
 }

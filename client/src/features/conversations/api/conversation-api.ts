@@ -38,9 +38,7 @@ export async function getGroupParticipants(
 export async function addGroupParticipants(
   conversationId: string,
   participantIds: string[]
-): Promise<
-  ApiResponse<{ added: string[]; participants: GroupParticipant[] }>
-> {
+): Promise<ApiResponse<{ added: string[]; participants: GroupParticipant[] }>> {
   const response = await api.post<
     ApiResponse<{ added: string[]; participants: GroupParticipant[] }>
   >(`/conversation/${conversationId}/participants`, { participantIds });
@@ -51,12 +49,14 @@ export async function sendMessage(
   conversationId: string,
   content: string,
   attachmentIds?: string[],
-  replyToId?: string
+  replyToId?: string,
+  cipherMeta?: Record<string, unknown> | null
 ): Promise<ApiResponse<Message>> {
   const response = await api.post<ApiResponse<Message>>(
     `/message/${conversationId}`,
     {
       content,
+      ...(cipherMeta ? { cipherMeta } : {}),
       ...(attachmentIds?.length ? { attachmentIds } : {}),
       ...(replyToId ? { replyToId } : {}),
     }
@@ -107,9 +107,9 @@ export async function getConversationById(
 export async function markConversationRead(
   conversationId: string
 ): Promise<ApiResponse<{ conversationId: string; updatedCount: number }>> {
-  const response = await api.post<ApiResponse<{ conversationId: string; updatedCount: number }>>(
-    `/message/read/${conversationId}`
-  );
+  const response = await api.post<
+    ApiResponse<{ conversationId: string; updatedCount: number }>
+  >(`/message/read/${conversationId}`);
   return response.data;
 }
 
@@ -117,15 +117,20 @@ export async function editMessage(
   messageId: string,
   content: string
 ): Promise<ApiResponse<Message>> {
-  const response = await api.patch<ApiResponse<Message>>(`/message/${messageId}`, {
-    content,
-  });
+  const response = await api.patch<ApiResponse<Message>>(
+    `/message/${messageId}`,
+    {
+      content,
+    }
+  );
   return response.data;
 }
 
 export async function removeMessage(
   messageId: string
 ): Promise<ApiResponse<Message>> {
-  const response = await api.delete<ApiResponse<Message>>(`/message/${messageId}`);
+  const response = await api.delete<ApiResponse<Message>>(
+    `/message/${messageId}`
+  );
   return response.data;
 }

@@ -7,6 +7,10 @@ import { AlertTriangle, Loader2, Mic, Paperclip, Send, X } from "lucide-react";
 import { socket } from "@/lib/socket";
 import { useChatStore } from "@/store/chat-store";
 import { useSendMessage } from "@/features/conversations/hooks/useSendMessage";
+import { useE2EIdentity } from "@/features/e2e/hooks/useE2EIdentity";
+import { usePeerPublicKey } from "@/features/e2e/hooks/usePeerPublicKey";
+import { deriveConversationKey } from "@/lib/crypto/conversationKey";
+import { encryptMessage } from "@/lib/crypto/messaging";
 import { VoiceRecorder } from "./voice-recorder";
 import {
   uploadAttachment,
@@ -19,6 +23,8 @@ const MAX_PENDING_ATTACHMENTS = 4;
 
 type MessageInputProps = {
   conversationId: string;
+  peerId: string | null;
+  isGroup: boolean;
 };
 
 type PendingAttachment = {
@@ -29,7 +35,11 @@ type PendingAttachment = {
   status: "uploading" | "ready" | "error";
 };
 
-export function MessageInput({ conversationId }: MessageInputProps) {
+export function MessageInput({
+  conversationId,
+  peerId,
+  isGroup,
+}: MessageInputProps) {
   const draft = useChatStore((s) => s.drafts[conversationId] ?? "");
   const setDraft = useChatStore((s) => s.setDraft);
   const clearDraft = useChatStore((s) => s.clearDraft);
@@ -39,6 +49,9 @@ export function MessageInput({ conversationId }: MessageInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const revokeOnUnmountRef = useRef<string[]>([]);
   const sendMessage = useSendMessage();
+  const { keys } = useE2EIdentity();
+  const { data: peerPublicKey } = usePeerPublicKey(isGroup ? null : peerId);
+  const canEncrypt = !isGroup && !!keys && !!peerPublicKey;
   const typingStopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
@@ -159,18 +172,34 @@ export function MessageInput({ conversationId }: MessageInputProps) {
     [pending]
   );
 
-  const handleSend = useCallback(() => {
-    const content = draft.trim();
+  const handleSend = useCallback(async () => {
+    const rawContent = draft.trim();
     if (
-      (!content && readyAttachmentIds.length === 0) ||
+      (!rawContent && readyAttachmentIds.length === 0) ||
       sendMessage.isPending ||
       isUploading
     ) {
       return;
     }
+
+    let content = rawContent;
+    let cipherMeta: Record<string, unknown> | undefined;
+
+    if (canEncrypt && rawContent) {
+      const conversationKey = deriveConversationKey({
+        privateKey: keys.privateKey,
+        peerPublicKey,
+        conversationId,
+      });
+      const encrypted = await encryptMessage(conversationKey, rawContent);
+      content = encrypted.content;
+      cipherMeta = encrypted.cipherMeta;
+    }
+
     sendMessage.mutate({
       conversationId,
       content,
+      cipherMeta,
       attachmentIds: readyAttachmentIds,
       ...(replyTo ? { replyToId: replyTo.messageId } : {}),
     });
@@ -190,6 +219,9 @@ export function MessageInput({ conversationId }: MessageInputProps) {
     clearDraft,
     replyTo,
     setReplyTo,
+    canEncrypt,
+    keys,
+    peerPublicKey,
   ]);
 
   const handleKeyDown = useCallback(

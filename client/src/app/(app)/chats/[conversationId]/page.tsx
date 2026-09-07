@@ -168,7 +168,11 @@ export default function ChatThreadPage({
         isGroup={conversation?.isGroup ?? false}
       />
 
-      <MessageInput conversationId={conversationId} />
+      <MessageInput
+        conversationId={conversationId}
+        peerId={conversation?.otherUserId ?? null}
+        isGroup={conversation?.isGroup ?? false}
+      />
 
       {conversation?.isGroup && (
         <GroupMembersDialog
