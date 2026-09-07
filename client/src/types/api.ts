@@ -47,6 +47,7 @@ export type ReplyTo = {
   senderName: string | null;
   content: string | null;
   deleted: boolean;
+  preview?: string | null;
 };
 
 export type Message = {

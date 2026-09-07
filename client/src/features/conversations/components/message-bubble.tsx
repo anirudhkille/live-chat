@@ -275,7 +275,9 @@ export function MessageBubble({
                   <p className="truncate opacity-80">
                     {message.replyTo.deleted
                       ? "This message was deleted"
-                      : message.replyTo.content || "Photo or file"}
+                      : message.replyTo.preview ||
+                        message.replyTo.content ||
+                        "Photo or file"}
                   </p>
                 </div>
               </div>
