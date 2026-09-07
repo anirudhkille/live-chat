@@ -11,6 +11,7 @@ import { useAuthStore } from "@/store/auth-store";
 import { socket } from "@/lib/socket";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
+import { useDecryptedPreview } from "@/features/e2e/hooks/useDecryptedPreview";
 import type { Conversation } from "@/types/api";
 
 function formatTime(iso: string) {
@@ -49,9 +50,12 @@ function ConversationItem({
   } = conversation;
   const sender = lastMessage?.sender;
   const senderName = sender?.id === currentUserId ? "You" : sender?.name;
+  const peerId = isGroup ? null : conversation.otherUserId;
+  const { data: decryptedPreview } = useDecryptedPreview(lastMessage, peerId);
 
   const lastMessagePreview = (() => {
     if (!lastMessage) return null;
+    if (lastMessage.cipherMeta) return decryptedPreview ?? "Message";
     if (lastMessage.content?.trim()) return lastMessage.content;
     const audioOnly =
       (lastMessage.attachments?.length ?? 0) > 0 &&

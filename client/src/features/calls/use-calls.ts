@@ -44,7 +44,9 @@ export function useCalls() {
       if (type === "voice") {
         stream.getVideoTracks().forEach((track) => track.stop());
       }
-      useCallStore.getState().setLocalStream(stream);
+      const state = useCallStore.getState();
+      state.setLocalStream(stream);
+      state.toActive(stream, state.remoteStream);
     },
     []
   );
@@ -103,7 +105,6 @@ export function useCalls() {
     const state = useCallStore.getState();
     if (state.status !== "incoming" || !state.callId || !state.type) return;
     callIdRef.current = state.callId;
-    socket.emit("call:accept", { callId: state.callId });
 
     const type = state.type;
     try {
@@ -118,6 +119,8 @@ export function useCalls() {
       useCallStore.getState().endCall("error");
       return;
     }
+
+    socket.emit("call:accept", { callId: state.callId });
   }, [applyLocalTracks, setupPeerConnection]);
 
   const setupIncomingOffer = useCallback(

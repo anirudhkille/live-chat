@@ -7,7 +7,7 @@ import {
   Pencil,
   Trash2,
   MoreHorizontal,
-  Lock,
+  Smile,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth-store";
@@ -186,22 +186,17 @@ export function MessageBubble({
   );
 
   return (
-    <div
-      className={cn(
-        "group relative mb-2.5 flex w-full",
-        isOwn && "justify-end"
-      )}
-    >
+    <div className={cn("relative mb-2.5 flex w-full", isOwn && "justify-end")}>
       <div
         className={cn(
           "relative flex max-w-[85%] items-center gap-1",
           isOwn && "flex-row-reverse"
         )}
       >
-        <div className="group relative w-fit min-w-0">
+        <div className="relative w-fit min-w-0">
           <div
             className={cn(
-              "flex flex-col gap-0.5 rounded-md px-3.5 py-2 text-sm shadow-sm",
+              "group relative flex flex-col gap-0.5 rounded-md px-3.5 py-2 text-sm shadow-sm",
               isOwn
                 ? "bg-primary text-primary-foreground rounded-br-md"
                 : "bg-muted text-foreground rounded-bl-md",
@@ -213,7 +208,7 @@ export function MessageBubble({
             {isOwn && menuOpen && (
               <div
                 ref={menuRef}
-                className="animate-in fade-in-0 zoom-in-95 bg-popover text-popover-foreground absolute right-0 bottom-full z-20 mb-1.5 w-36 origin-bottom-right rounded-lg border p-1 shadow-lg"
+                className="animate-in fade-in-0 zoom-in-95 bg-popover text-popover-foreground border-border absolute right-0 bottom-full z-20 mb-1.5 w-36 origin-bottom-right rounded-lg border p-1 shadow-lg"
                 role="menu"
               >
                 <Button
@@ -233,7 +228,7 @@ export function MessageBubble({
                   size="sm"
                   role="menuitem"
                   onClick={confirmDelete}
-                  className="w-full justify-start gap-2 font-normal text-red-500 hover:bg-red-500/10 hover:text-red-500"
+                  className="text-destructive hover:bg-destructive/10 w-full justify-start gap-2 font-normal"
                 >
                   <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                   Delete
@@ -348,84 +343,96 @@ export function MessageBubble({
                   : "text-muted-foreground/70"
               )}
             >
-              {message.cipherMeta && (
-                <Lock className="h-2.5 w-2.5" aria-label="Encrypted" />
-              )}
               {formatMessageTime(message.createdAt)}
               {isEdited && !isDeleted && (
                 <span className="italic opacity-80">· edited</span>
               )}
               {isOwn && <ReadReceipt readAt={message.readAt} />}
             </span>
-          </div>
 
-          {allReactions.length > 0 && (
-            <div
-              className={cn(
-                "absolute z-10 flex flex-wrap items-center gap-1",
-                "-bottom-1",
-                isOwn ? "right-0" : "left-0"
-              )}
-            >
-              {uniqueEmojis.map((emoji) => {
-                const mine = hasReacted(allReactions, emoji, currentUserId);
-                const count = allReactions.filter(
-                  (r) => r.emoji === emoji
-                ).length;
-                return (
+            {allReactions.length > 0 && (
+              <div
+                className={cn(
+                  "absolute z-10 flex flex-wrap items-center gap-1",
+                  "-bottom-1",
+                  isOwn ? "right-0" : "left-0"
+                )}
+              >
+                {uniqueEmojis.map((emoji) => {
+                  const mine = hasReacted(allReactions, emoji, currentUserId);
+                  const count = allReactions.filter(
+                    (r) => r.emoji === emoji
+                  ).length;
+                  return (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => {
+                        if (toggleReaction.isPending) return;
+                        toggleReaction.mutate({ messageId: message.id, emoji });
+                      }}
+                      className={cn(
+                        "flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] leading-none shadow-sm transition-colors",
+                        isOwn
+                          ? "border-primary-foreground/30 bg-primary text-primary-foreground hover:bg-primary/90"
+                          : "border-muted-foreground/20 bg-muted text-foreground hover:bg-muted/80",
+                        mine && "ring-primary/60 ring-1"
+                      )}
+                      aria-pressed={mine}
+                      aria-label={`${emoji} reaction, ${count} ${count === 1 ? "person" : "people"}`}
+                    >
+                      <span>{emoji}</span>
+                      <span className="font-medium tabular-nums">{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {!isDeleted && !isEditing && (
+              <div
+                className={cn(
+                  "absolute -bottom-9 z-20 flex items-center gap-0.5 rounded-full border p-1 shadow-md transition-all",
+                  isOwn ? "right-0" : "left-0",
+                  quickReactOpen
+                    ? "pointer-events-auto translate-y-0 opacity-100"
+                    : "pointer-events-none translate-y-1 opacity-0 md:group-hover:pointer-events-auto md:group-hover:translate-y-0 md:group-hover:opacity-100"
+                )}
+                role="toolbar"
+                aria-label="Quick reactions"
+              >
+                {QUICK_EMOJIS.map((emoji) => (
                   <button
                     key={emoji}
                     type="button"
-                    onClick={() => {
-                      if (toggleReaction.isPending) return;
-                      toggleReaction.mutate({ messageId: message.id, emoji });
-                    }}
+                    onClick={() => handleReact(emoji)}
                     className={cn(
-                      "flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] leading-none shadow-sm transition-colors",
-                      mine
-                        ? "border-primary/60 bg-primary/10 text-primary"
-                        : "border-border bg-background hover:bg-accent"
+                      "hover:bg-accent flex h-7 w-7 items-center justify-center rounded-full text-base transition-transform hover:scale-125",
+                      hasReacted(allReactions, emoji, currentUserId) &&
+                        "bg-accent"
                     )}
-                    aria-pressed={mine}
-                    aria-label={`${emoji} reaction, ${count} ${count === 1 ? "person" : "people"}`}
+                    aria-label={`React with ${emoji}`}
                   >
-                    <span>{emoji}</span>
-                    <span className="font-medium tabular-nums">{count}</span>
+                    {emoji}
                   </button>
-                );
-              })}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
 
-          {!isDeleted && !isEditing && (
-            <div
-              className={cn(
-                "bg-background absolute -top-9 z-20 flex items-center gap-0.5 rounded-full border p-1 shadow-md transition-all",
-                isOwn ? "right-0" : "left-0",
-                quickReactOpen
-                  ? "translate-y-0 opacity-100"
-                  : "pointer-events-none translate-y-1 opacity-0 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100"
-              )}
-              role="toolbar"
-              aria-label="Quick reactions"
-            >
-              {QUICK_EMOJIS.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => handleReact(emoji)}
-                  className={cn(
-                    "hover:bg-accent flex h-7 w-7 items-center justify-center rounded-full text-base transition-transform hover:scale-125",
-                    hasReacted(allReactions, emoji, currentUserId) &&
-                      "bg-accent"
-                  )}
-                  aria-label={`React with ${emoji}`}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          )}
+            {!isDeleted && !isEditing && !quickReactOpen && (
+              <button
+                type="button"
+                onClick={() => setQuickReactOpen(true)}
+                className={cn(
+                  "bg-background text-muted-foreground absolute -bottom-9 z-20 flex h-7 w-7 items-center justify-center rounded-full border p-0 shadow-md md:hidden",
+                  isOwn ? "right-0" : "left-0"
+                )}
+                aria-label="Add reaction"
+              >
+                <Smile className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {!isDeleted && !isEditing && (
@@ -434,7 +441,7 @@ export function MessageBubble({
             variant="ghost"
             size="icon"
             onClick={handleReply}
-            className="text-muted-foreground h-7 w-7 shrink-0 rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+            className="text-muted-foreground h-7 w-7 shrink-0 rounded-full opacity-100"
             aria-label="Reply"
             title="Reply"
           >

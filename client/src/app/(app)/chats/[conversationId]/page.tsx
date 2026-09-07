@@ -2,7 +2,7 @@
 
 import { use, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Info, Loader2, Users } from "lucide-react";
+import { ArrowLeft, Info, Loader2, Lock, Unlock, Users } from "lucide-react";
 import { socket } from "@/lib/socket";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
@@ -15,6 +15,8 @@ import { CallButtons } from "@/features/calls/call-buttons";
 import { CallOverlay } from "@/features/calls/call-overlay";
 import { useCalls } from "@/features/calls/use-calls";
 import { useCallStore } from "@/features/calls/call-store";
+import { useE2EIdentity } from "@/features/e2e/hooks/useE2EIdentity";
+import { usePeerPublicKey } from "@/features/e2e/hooks/usePeerPublicKey";
 
 export default function ChatThreadPage({
   params,
@@ -32,6 +34,11 @@ export default function ChatThreadPage({
 
   const calls = useCalls();
   const callStatus = useCallStore((s) => s.status);
+  const { keys } = useE2EIdentity();
+  const { data: peerPublicKey } = usePeerPublicKey(
+    conversation?.isGroup ? null : (conversation?.otherUserId ?? null)
+  );
+  const isEncrypted = !conversation?.isGroup && !!keys && !!peerPublicKey;
 
   const otherUserName = conversation?.name ?? conversation?.email ?? "Unknown";
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -126,10 +133,19 @@ export default function ChatThreadPage({
             <p className="truncate text-sm font-medium">
               {loadingConversation ? "Loading..." : otherUserName}
             </p>
-            <p className="text-muted-foreground text-xs">
+            <p className="text-muted-foreground flex items-center gap-1 text-xs">
               {conversation?.isGroup
                 ? `${conversation.participants?.length ?? 0} members`
                 : status}
+              {!conversation?.isGroup &&
+                (isEncrypted ? (
+                  <Lock
+                    className="h-3 w-3 text-green-600"
+                    aria-label="Encrypted"
+                  />
+                ) : (
+                  <Unlock className="h-3 w-3" aria-label="Not encrypted" />
+                ))}
             </p>
           </div>
         </div>

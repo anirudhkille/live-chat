@@ -42,7 +42,7 @@ type CallState = {
 
   markConnecting: () => void;
 
-  toActive: (local: MediaStream, remote: MediaStream) => void;
+  toActive: (local: MediaStream, remote?: MediaStream | null) => void;
 
   setLocalStream: (stream: MediaStream) => void;
   setRemoteStream: (stream: MediaStream) => void;
@@ -113,13 +113,12 @@ export const useCallStore = create<CallState>((set, get) => ({
     }),
 
   markConnecting: () => set({ isConnecting: true }),
-
   toActive: (local, remote) =>
     set({
       status: "active",
       startedAt: get().startedAt ?? Date.now(),
       localStream: local,
-      remoteStream: remote,
+      remoteStream: remote ?? get().remoteStream,
       isConnecting: false,
     }),
 
