@@ -16,6 +16,7 @@ const withDetails = {
     },
     replyTo: {
       include: {
+        attachments: true,
         sender: {
           select: {
             id: true,

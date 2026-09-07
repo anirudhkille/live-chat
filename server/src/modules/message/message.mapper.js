@@ -1,3 +1,13 @@
+const replyPreviewLabel = (replyTo) => {
+  if (replyTo.content?.trim()) return replyTo.content;
+  const attachments = replyTo.attachments ?? [];
+  if (attachments.length > 0 && attachments.every((a) => a.type === "AUDIO")) {
+    return "Voice message";
+  }
+  if (attachments.length > 0) return "Photo or file";
+  return "";
+};
+
 export const toMessageResponse = (message) => {
   const { reads, reactions, replyTo, ...rest } = message;
   const readAt =
@@ -18,6 +28,7 @@ export const toMessageResponse = (message) => {
           senderName: replyTo.sender?.name ?? null,
           content: replyTo.deletedAt ? null : replyTo.content,
           deleted: Boolean(replyTo.deletedAt),
+          preview: replyPreviewLabel(replyTo),
         }
       : null,
   };
