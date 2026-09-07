@@ -44,6 +44,7 @@ export const sendMessageNotification = async ({
   content,
   attachmentCount,
   isAudio,
+  isEncrypted = false,
 }) => {
   let subscriptions;
   try {
@@ -58,8 +59,10 @@ export const sendMessageNotification = async ({
 
   if (subscriptions.length === 0) return;
 
-  let body =
-    typeof content === "string" && content.trim() ? content.trim() : "";
+  let body = "";
+  if (!isEncrypted && typeof content === "string" && content.trim()) {
+    body = content.trim();
+  }
   if (!body) {
     body = isAudio
       ? "Voice message"
@@ -67,7 +70,7 @@ export const sendMessageNotification = async ({
         ? attachmentCount === 1
           ? "Shared a photo or file"
           : `Shared ${attachmentCount} items`
-        : "New message";
+        : "Sent a message";
   }
 
   const payload = {

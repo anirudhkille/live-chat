@@ -116,7 +116,14 @@ export const sendMessage = async (
   const io = getIO();
   io.to(`conversation:${conversationId}`).emit("new-message", response);
 
-  notifyRecipients(senderId, conversationId, content, attachmentIds, isAudio);
+  notifyRecipients(
+    senderId,
+    conversationId,
+    content,
+    attachmentIds,
+    isAudio,
+    !!cipherMeta,
+  );
 
   return response;
 };
@@ -156,6 +163,7 @@ const notifyRecipients = async (
   content,
   attachmentIds,
   isAudio,
+  isEncrypted,
 ) => {
   try {
     const conversation = await conversationRepository.getById(conversationId);
@@ -180,6 +188,7 @@ const notifyRecipients = async (
             ? attachmentIds.length
             : 0,
           isAudio,
+          isEncrypted,
         }),
       ),
     );
