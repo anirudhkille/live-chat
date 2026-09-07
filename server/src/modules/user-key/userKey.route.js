@@ -6,8 +6,8 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get("/self", getOwnKey);
-router.put("/self", saveKey);
+router.get("/me", getOwnKey);
+router.post("/", saveKey);
 router.get("/peer/:peerId", getPeerPublicKey);
 
 export default router;
