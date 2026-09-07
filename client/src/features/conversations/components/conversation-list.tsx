@@ -38,10 +38,28 @@ function ConversationItem({
   isActive: boolean;
   currentUserId: string | undefined;
 }) {
-  const { name, email, photoUrl, lastMessage, unreadCount, isGroup, participants } =
-    conversation;
+  const {
+    name,
+    email,
+    photoUrl,
+    lastMessage,
+    unreadCount,
+    isGroup,
+    participants,
+  } = conversation;
   const sender = lastMessage?.sender;
   const senderName = sender?.id === currentUserId ? "You" : sender?.name;
+
+  const lastMessagePreview = (() => {
+    if (!lastMessage) return null;
+    if (lastMessage.content?.trim()) return lastMessage.content;
+    const audioOnly =
+      (lastMessage.attachments?.length ?? 0) > 0 &&
+      (lastMessage.attachments ?? []).every((a) => a.type === "AUDIO");
+    if (audioOnly) return "Voice message";
+    if ((lastMessage.attachments?.length ?? 0) > 0) return "Photo or file";
+    return null;
+  })();
 
   return (
     <Link
@@ -66,9 +84,9 @@ function ConversationItem({
             </span>
           )}
         </div>
-        {lastMessage ? (
+        {lastMessagePreview ? (
           <p className="text-muted-foreground truncate text-xs">
-            {senderName}: {lastMessage.content}
+            {senderName}: {lastMessagePreview}
           </p>
         ) : isGroup ? (
           <p className="text-muted-foreground text-xs">

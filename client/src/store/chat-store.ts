@@ -9,6 +9,7 @@ export type ReplyTarget = {
   senderName: string | null;
   content: string | null;
   deleted: boolean;
+  preview?: string | null;
 };
 
 type ReplyState = {
@@ -62,7 +63,9 @@ export const useChatStore = create<ChatState>((set) => ({
     }),
 
   setReplyTo: (conversationId, target) =>
-    set((state) => ({ replies: { ...state.replies, [conversationId]: target } })),
+    set((state) => ({
+      replies: { ...state.replies, [conversationId]: target },
+    })),
 
   clearAll: () =>
     set({

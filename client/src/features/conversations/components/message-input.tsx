@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Loader2, Paperclip, Send, X } from "lucide-react";
+import { AlertTriangle, Loader2, Mic, Paperclip, Send, X } from "lucide-react";
 import { socket } from "@/lib/socket";
 import { useChatStore } from "@/store/chat-store";
 import { useSendMessage } from "@/features/conversations/hooks/useSendMessage";
+import { VoiceRecorder } from "./voice-recorder";
 import {
   uploadAttachment,
   validateAttachmentFile,
@@ -45,6 +46,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
 
   const [pending, setPending] = useState<PendingAttachment[]>([]);
   const [pickerError, setPickerError] = useState<string | null>(null);
+  const [voiceActive, setVoiceActive] = useState(false);
 
   const isUploading = pending.some((p) => p.status === "uploading");
   const readyAttachmentIds = pending
@@ -95,10 +97,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
 
   const startAttachmentUploads = useCallback(
     (files: File[]) => {
-      const remaining = Math.max(
-        0,
-        MAX_PENDING_ATTACHMENTS - pending.length
-      );
+      const remaining = Math.max(0, MAX_PENDING_ATTACHMENTS - pending.length);
 
       files.slice(0, remaining).forEach((file) => {
         const previewUrl = URL.createObjectURL(file);
@@ -106,7 +105,13 @@ export function MessageInput({ conversationId }: MessageInputProps) {
         const localId = crypto.randomUUID();
         setPending((prev) => [
           ...prev,
-          { localId, file, previewUrl, attachmentId: null, status: "uploading" },
+          {
+            localId,
+            file,
+            previewUrl,
+            attachmentId: null,
+            status: "uploading",
+          },
         ]);
 
         uploadAttachment(file)
@@ -135,9 +140,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
     (files: FileList | null) => {
       if (!files?.length) return;
       const list = Array.from(files);
-      const invalid = list.find(
-        (file) => !!validateAttachmentFile(file)
-      );
+      const invalid = list.find((file) => !!validateAttachmentFile(file));
       setPickerError(invalid ? validateAttachmentFile(invalid) : null);
       startAttachmentUploads(
         list.filter((file) => !validateAttachmentFile(file))
@@ -237,7 +240,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
         <p className="text-destructive px-3 pt-2 text-[11px]">{pickerError}</p>
       )}
       {replyTo && (
-        <div className="border-input/60 mx-3 mt-2 flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-1.5">
+        <div className="border-input/60 bg-muted/40 mx-3 mt-2 flex items-center gap-2 rounded-md border px-3 py-1.5">
           <button
             type="button"
             aria-label="Cancel reply"
@@ -253,7 +256,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
             <span className="text-muted-foreground ml-1 truncate">
               {replyTo.deleted
                 ? "This message was deleted"
-                : replyTo.content || "Photo or file"}
+                : replyTo.preview || replyTo.content || "Photo or file"}
             </span>
           </div>
         </div>
@@ -279,35 +282,56 @@ export function MessageInput({ conversationId }: MessageInputProps) {
           size="icon"
           aria-label="Add image"
           onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
+          disabled={isUploading || voiceActive}
           className="shrink-0"
         >
           <Paperclip className="h-4 w-4" />
         </Button>
-        <textarea
-          ref={textareaRef}
-          value={draft}
-          onChange={(e) => setDraft(conversationId, e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Message"
-          rows={1}
-          disabled={sendMessage.isPending}
-          aria-label="Message"
-          className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex max-h-37.5 min-h-10 flex-1 resize-none rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-        />
         <Button
-          type="submit"
+          type="button"
+          variant="outline"
           size="icon"
-          aria-label="Send message"
-          disabled={
-            (!draft.trim() && readyAttachmentIds.length === 0) ||
-            sendMessage.isPending ||
-            isUploading
-          }
+          aria-label="Record voice message"
+          onClick={() => setVoiceActive(true)}
+          disabled={isUploading || sendMessage.isPending || voiceActive}
           className="shrink-0"
         >
-          <Send className="h-4 w-4" />
+          <Mic className="h-4 w-4" />
         </Button>
+        {voiceActive ? (
+          <VoiceRecorder
+            conversationId={conversationId}
+            replyToId={replyTo?.messageId}
+            onClose={() => setVoiceActive(false)}
+          />
+        ) : (
+          <>
+            <textarea
+              ref={textareaRef}
+              value={draft}
+              onChange={(e) => setDraft(conversationId, e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Message"
+              rows={1}
+              disabled={sendMessage.isPending}
+              aria-label="Message"
+              className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex max-h-37.5 min-h-10 flex-1 resize-none rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <Button
+              type="submit"
+              size="icon"
+              aria-label="Send message"
+              disabled={
+                (!draft.trim() && readyAttachmentIds.length === 0) ||
+                sendMessage.isPending ||
+                isUploading
+              }
+              className="shrink-0"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </>
+        )}
       </form>
     </div>
   );

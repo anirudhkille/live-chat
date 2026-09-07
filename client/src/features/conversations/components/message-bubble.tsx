@@ -14,7 +14,7 @@ import { useChatStore } from "@/store/chat-store";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import type { Message, MessageReaction } from "@/types/api";
+import type { Attachment, Message, MessageReaction } from "@/types/api";
 import { useEditMessage } from "../hooks/useEditMessage";
 import { useDeleteMessage } from "../hooks/useDeleteMessage";
 import { useToggleReaction } from "../hooks/useToggleReaction";
@@ -30,7 +30,7 @@ function ReadReceipt({ readAt }: { readAt: string | null }) {
   if (!readAt) return null;
   return (
     <span
-      className="ml-1 inline-flex items-center text-primary-foreground/80"
+      className="text-primary-foreground/80 ml-1 inline-flex items-center"
       title={`Seen ${formatMessageTime(readAt)}`}
     >
       <CheckCheck size={12} strokeWidth={2.5} />
@@ -40,6 +40,19 @@ function ReadReceipt({ readAt }: { readAt: string | null }) {
 
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 const EDIT_MAX_LENGTH = 2000;
+
+function attachmentPreviewLabel(
+  content: string | null,
+  attachments: Attachment[] | undefined
+): string {
+  if (content?.trim()) return content;
+  const audioOnly =
+    (attachments?.length ?? 0) > 0 &&
+    (attachments ?? []).every((a) => a.type === "AUDIO");
+  if (audioOnly) return "Voice message";
+  if ((attachments?.length ?? 0) > 0) return "Photo or file";
+  return "";
+}
 
 function hasReacted(
   reactions: MessageReaction[] | undefined,
@@ -90,10 +103,7 @@ export function MessageBubble({
   useEffect(() => {
     if (!menuOpen && !quickReactOpen) return;
     const onPointerDown = (event: MouseEvent | TouchEvent) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(event.target as Node)
-      ) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setMenuOpen(false);
         setQuickReactOpen(false);
       }
@@ -157,6 +167,7 @@ export function MessageBubble({
       senderName: message.sender?.name ?? null,
       content: message.content,
       deleted: isDeleted,
+      preview: attachmentPreviewLabel(message.content, message.attachments),
     });
   };
 
@@ -175,7 +186,10 @@ export function MessageBubble({
 
   return (
     <div
-      className={cn("group relative mb-2.5 flex w-full", isOwn && "justify-end")}
+      className={cn(
+        "group relative mb-2.5 flex w-full",
+        isOwn && "justify-end"
+      )}
     >
       <div
         className={cn(
@@ -183,13 +197,13 @@ export function MessageBubble({
           isOwn && "flex-row-reverse"
         )}
       >
-        <div className="group relative min-w-0 w-fit">
+        <div className="group relative w-fit min-w-0">
           <div
             className={cn(
               "flex flex-col gap-0.5 rounded-md px-3.5 py-2 text-sm shadow-sm",
               isOwn
-                ? "rounded-br-md bg-primary text-primary-foreground"
-                : "rounded-bl-md bg-muted text-foreground",
+                ? "bg-primary text-primary-foreground rounded-br-md"
+                : "bg-muted text-foreground rounded-bl-md",
               isOptimistic && "opacity-60",
               allReactions.length > 0 &&
                 cn("mb-2.5", hasImageAttachment ? "pb-5" : "pb-3")
@@ -198,7 +212,7 @@ export function MessageBubble({
             {isOwn && menuOpen && (
               <div
                 ref={menuRef}
-                className="animate-in fade-in-0 zoom-in-95 absolute bottom-full right-0 z-20 mb-1.5 w-36 origin-bottom-right rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg"
+                className="animate-in fade-in-0 zoom-in-95 bg-popover text-popover-foreground absolute right-0 bottom-full z-20 mb-1.5 w-36 origin-bottom-right rounded-lg border p-1 shadow-lg"
                 role="menu"
               >
                 <Button
@@ -236,10 +250,10 @@ export function MessageBubble({
                   setQuickReactOpen(false);
                 }}
                 className={cn(
-                  "absolute -top-3 right-0 z-10 h-6 w-6 rounded-full border bg-background text-muted-foreground shadow-sm transition-opacity",
+                  "bg-background text-muted-foreground absolute -top-3 right-0 z-10 h-6 w-6 rounded-full border shadow-sm transition-opacity",
                   menuOpen
                     ? "opacity-100"
-                    : "opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+                    : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                 )}
                 aria-label="Message options"
                 title="Message options"
@@ -249,7 +263,7 @@ export function MessageBubble({
             )}
 
             {message.replyTo && (
-              <div className="mb-0.5 flex items-start gap-1.5 rounded-md border-l-2 border-primary/40 bg-black/5 px-2 py-1 text-xs dark:bg-white/10">
+              <div className="border-primary/40 mb-0.5 flex items-start gap-1.5 rounded-md border-l-2 bg-black/5 px-2 py-1 text-xs dark:bg-white/10">
                 <CornerUpRight
                   className="mt-0.5 h-3 w-3 shrink-0 opacity-60"
                   aria-hidden="true"
@@ -268,7 +282,7 @@ export function MessageBubble({
             )}
 
             {isGroup && !isOwn && (
-              <span className="mb-0.5 text-[10px] font-semibold text-muted-foreground">
+              <span className="text-muted-foreground mb-0.5 text-[10px] font-semibold">
                 {message.sender?.name ?? "Unknown"}
               </span>
             )}
@@ -295,6 +309,14 @@ export function MessageBubble({
                         className="max-h-64 w-full max-w-56 object-contain transition-transform hover:scale-[1.02]"
                       />
                     </a>
+                  ) : attachment.type === "AUDIO" ? (
+                    <audio
+                      key={attachment.id}
+                      controls
+                      preload="metadata"
+                      src={attachment.url}
+                      className="my-0.5 h-10 w-56 max-w-full"
+                    />
                   ) : (
                     <a
                       key={attachment.id}
@@ -308,7 +330,7 @@ export function MessageBubble({
                   )
                 )}
                 {message.content ? (
-                  <p className="break-words whitespace-pre-wrap leading-relaxed">
+                  <p className="leading-relaxed break-words whitespace-pre-wrap">
                     {message.content}
                   </p>
                 ) : null}
@@ -318,7 +340,9 @@ export function MessageBubble({
             <span
               className={cn(
                 "flex items-center gap-0.5 self-end text-[10px] leading-tight",
-                isOwn ? "text-primary-foreground/70" : "text-muted-foreground/70"
+                isOwn
+                  ? "text-primary-foreground/70"
+                  : "text-muted-foreground/70"
               )}
             >
               {formatMessageTime(message.createdAt)}
@@ -370,7 +394,7 @@ export function MessageBubble({
           {!isDeleted && !isEditing && (
             <div
               className={cn(
-                "absolute z-20 -top-9 flex items-center gap-0.5 rounded-full border bg-background p-1 shadow-md transition-all",
+                "bg-background absolute -top-9 z-20 flex items-center gap-0.5 rounded-full border p-1 shadow-md transition-all",
                 isOwn ? "right-0" : "left-0",
                 quickReactOpen
                   ? "translate-y-0 opacity-100"
@@ -385,7 +409,7 @@ export function MessageBubble({
                   type="button"
                   onClick={() => handleReact(emoji)}
                   className={cn(
-                    "flex h-7 w-7 items-center justify-center rounded-full text-base transition-transform hover:scale-125 hover:bg-accent",
+                    "hover:bg-accent flex h-7 w-7 items-center justify-center rounded-full text-base transition-transform hover:scale-125",
                     hasReacted(allReactions, emoji, currentUserId) &&
                       "bg-accent"
                   )}
@@ -404,7 +428,7 @@ export function MessageBubble({
             variant="ghost"
             size="icon"
             onClick={handleReply}
-            className="h-7 w-7 shrink-0 rounded-full text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+            className="text-muted-foreground h-7 w-7 shrink-0 rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
             aria-label="Reply"
             title="Reply"
           >
@@ -448,9 +472,9 @@ export function MessageBubble({
                 saveEdit();
               }
             }}
-            className="w-full resize-none rounded-md border bg-background p-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+            className="bg-background text-foreground focus:border-primary focus:ring-primary w-full resize-none rounded-md border p-2.5 text-sm transition-colors outline-none focus:ring-1"
           />
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+          <div className="text-muted-foreground flex items-center justify-between text-[11px]">
             <span>Enter to save · Shift + Enter for a new line</span>
             <span className="tabular-nums">
               {draft.length}/{EDIT_MAX_LENGTH}
