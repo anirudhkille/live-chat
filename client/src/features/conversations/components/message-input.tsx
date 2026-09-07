@@ -3,7 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Loader2, Mic, Paperclip, Send, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Loader2,
+  Lock,
+  Mic,
+  Paperclip,
+  Send,
+  Unlock,
+  X,
+} from "lucide-react";
 import { socket } from "@/lib/socket";
 import { useChatStore } from "@/store/chat-store";
 import { useSendMessage } from "@/features/conversations/hooks/useSendMessage";
@@ -349,6 +358,26 @@ export function MessageInput({
               aria-label="Message"
               className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex max-h-37.5 min-h-10 flex-1 resize-none rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             />
+            {!isGroup && (
+              <span
+                className={`flex h-10 items-center justify-center ${
+                  canEncrypt ? "text-green-600" : "text-muted-foreground"
+                }`}
+                title={
+                  canEncrypt
+                    ? "Messages are end-to-end encrypted"
+                    : keys
+                      ? "The other user hasn't enabled encryption yet"
+                      : "Encryption not set up"
+                }
+              >
+                {canEncrypt ? (
+                  <Lock className="h-4 w-4" />
+                ) : (
+                  <Unlock className="h-4 w-4" />
+                )}
+              </span>
+            )}
             <Button
               type="submit"
               size="icon"

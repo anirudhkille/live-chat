@@ -7,6 +7,7 @@ import {
   Pencil,
   Trash2,
   MoreHorizontal,
+  Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth-store";
@@ -347,6 +348,9 @@ export function MessageBubble({
                   : "text-muted-foreground/70"
               )}
             >
+              {message.cipherMeta && (
+                <Lock className="h-2.5 w-2.5" aria-label="Encrypted" />
+              )}
               {formatMessageTime(message.createdAt)}
               {isEdited && !isDeleted && (
                 <span className="italic opacity-80">· edited</span>
