@@ -43,6 +43,7 @@ export const sendMessageNotification = async ({
   conversationId,
   content,
   attachmentCount,
+  isAudio,
 }) => {
   let subscriptions;
   try {
@@ -57,10 +58,12 @@ export const sendMessageNotification = async ({
 
   if (subscriptions.length === 0) return;
 
-  let body = typeof content === "string" && content.trim() ? content.trim() : "";
+  let body =
+    typeof content === "string" && content.trim() ? content.trim() : "";
   if (!body) {
-    body =
-      attachmentCount > 0
+    body = isAudio
+      ? "Voice message"
+      : attachmentCount > 0
         ? attachmentCount === 1
           ? "Shared a photo or file"
           : `Shared ${attachmentCount} items`
@@ -88,7 +91,10 @@ export const sendMessageNotification = async ({
             { userId, endpoint: subscription.endpoint },
             "Expired push subscription removed",
           );
-          await pushRepository.deleteSubscription(userId, subscription.endpoint);
+          await pushRepository.deleteSubscription(
+            userId,
+            subscription.endpoint,
+          );
         } else {
           logger.error(
             { err: error.message, statusCode, userId },

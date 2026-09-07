@@ -106,10 +106,15 @@ export const sendMessage = async (
     conversationId,
   };
 
+  const isAudio =
+    (message.attachments?.length ?? 0) > 0 &&
+    (message.attachments ?? []).every((a) => a.type === "AUDIO") &&
+    !content?.trim();
+
   const io = getIO();
   io.to(`conversation:${conversationId}`).emit("new-message", response);
 
-  notifyRecipients(senderId, conversationId, content, attachmentIds);
+  notifyRecipients(senderId, conversationId, content, attachmentIds, isAudio);
 
   return response;
 };
@@ -148,6 +153,7 @@ const notifyRecipients = async (
   conversationId,
   content,
   attachmentIds,
+  isAudio,
 ) => {
   try {
     const conversation = await conversationRepository.getById(conversationId);
@@ -171,6 +177,7 @@ const notifyRecipients = async (
           attachmentCount: Array.isArray(attachmentIds)
             ? attachmentIds.length
             : 0,
+          isAudio,
         }),
       ),
     );

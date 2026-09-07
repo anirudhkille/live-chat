@@ -3,13 +3,29 @@ import { env } from "../../config/env.config.js";
 import { generatePresignedUploadUrl } from "../storage/storage.service.js";
 import * as attachmentRepository from "./attachment.repository.js";
 
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "audio/webm",
+  "audio/ogg",
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/wav",
+  "audio/aac",
+];
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
 const CONTENT_TYPE_TO_ENUM = {
   "image/jpeg": "IMAGE",
   "image/png": "IMAGE",
   "image/webp": "IMAGE",
+  "audio/webm": "AUDIO",
+  "audio/ogg": "AUDIO",
+  "audio/mpeg": "AUDIO",
+  "audio/mp4": "AUDIO",
+  "audio/wav": "AUDIO",
+  "audio/aac": "AUDIO",
 };
 
 export async function getAttachmentUploadUrl(
