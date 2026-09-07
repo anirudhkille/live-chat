@@ -2,6 +2,10 @@ import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import { env } from "./env.config.js";
 import { logger } from "./logger.js";
+import {
+  registerCallHandlers,
+  handleCallDisconnect,
+} from "../modules/call/call.socket.js";
 
 let io;
 const online = new Map(); // userId -> Set<socketId>
@@ -69,7 +73,15 @@ export const createSocketServer = (httpServer) => {
           socket.broadcast.emit("user-offline", { userId });
         }
       }
+      handleCallDisconnect(userId);
       logger.info("User disconnected");
+    });
+
+    registerCallHandlers({
+      io,
+      socket,
+      getOnline: (targetUserId) => online.get(targetUserId),
+      emitToUser,
     });
 
     socket.on("typing-conversation", (payload) => {
