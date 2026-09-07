@@ -165,6 +165,7 @@ export default function ChatThreadPage({
 
       <MessageList
         conversationId={conversationId}
+        peerId={conversation?.otherUserId ?? null}
         isGroup={conversation?.isGroup ?? false}
       />
 

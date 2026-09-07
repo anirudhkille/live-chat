@@ -10,19 +10,18 @@ import {
   useState,
 } from "react";
 import { Loader2 } from "lucide-react";
-import {
-  useQueryClient,
-  type InfiniteData,
-} from "@tanstack/react-query";
+import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { socket } from "@/lib/socket";
 import { useGetMessages } from "@/features/conversations/hooks/useGetMessages";
 import { useMarkConversationRead } from "@/features/conversations/hooks/useMarkConversationRead";
+import { useDecryptedMessages } from "@/features/e2e/hooks/useDecryptedMessages";
 import { MessageBubble } from "./message-bubble";
 import { useAuthStore } from "@/store/auth-store";
 import type { ApiResponse, Message } from "@/types/api";
 
 type MessageListProps = {
   conversationId: string;
+  peerId?: string | null;
   isGroup?: boolean;
 };
 
@@ -75,7 +74,11 @@ function dayLabel(iso: string) {
   });
 }
 
-export function MessageList({ conversationId, isGroup = false }: MessageListProps) {
+export function MessageList({
+  conversationId,
+  peerId = null,
+  isGroup = false,
+}: MessageListProps) {
   const {
     data,
     isLoading,
@@ -111,7 +114,13 @@ export function MessageList({ conversationId, isGroup = false }: MessageListProp
     [historyMessages, socketMessages]
   );
 
-  const hasMessages = messages.length > 0;
+  const displayMessages = useDecryptedMessages(
+    conversationId,
+    isGroup ? null : peerId,
+    messages
+  );
+
+  const hasMessages = displayMessages.length > 0;
 
   useEffect(() => {
     const handleNewMessage = (newMessage: Message) => {
@@ -140,13 +149,10 @@ export function MessageList({ conversationId, isGroup = false }: MessageListProp
             : message
         )
       );
-      updateCachedMessages(
-        queryClient,
-        conversationId,
-        (message) =>
-          message.senderId === currentUserId
-            ? { ...message, readAt: payload.readAt }
-            : message
+      updateCachedMessages(queryClient, conversationId, (message) =>
+        message.senderId === currentUserId
+          ? { ...message, readAt: payload.readAt }
+          : message
       );
     };
     socket.on("messages-read", handleMessagesRead);
@@ -165,10 +171,8 @@ export function MessageList({ conversationId, isGroup = false }: MessageListProp
       setSocketMessages((prev) =>
         prev.map((message) => (message.id === updated.id ? updated : message))
       );
-      updateCachedMessages(
-        queryClient,
-        conversationId,
-        (message) => (message.id === updated.id ? updated : message)
+      updateCachedMessages(queryClient, conversationId, (message) =>
+        message.id === updated.id ? updated : message
       );
     };
 
@@ -181,10 +185,8 @@ export function MessageList({ conversationId, isGroup = false }: MessageListProp
       setSocketMessages((prev) =>
         prev.map((message) => (message.id === deleted.id ? deleted : message))
       );
-      updateCachedMessages(
-        queryClient,
-        conversationId,
-        (message) => (message.id === deleted.id ? deleted : message)
+      updateCachedMessages(queryClient, conversationId, (message) =>
+        message.id === deleted.id ? deleted : message
       );
     };
 
@@ -206,10 +208,8 @@ export function MessageList({ conversationId, isGroup = false }: MessageListProp
       setSocketMessages((prev) =>
         prev.map((message) => (message.id === reacted.id ? reacted : message))
       );
-      updateCachedMessages(
-        queryClient,
-        conversationId,
-        (message) => (message.id === reacted.id ? reacted : message)
+      updateCachedMessages(queryClient, conversationId, (message) =>
+        message.id === reacted.id ? reacted : message
       );
     };
 
@@ -288,7 +288,7 @@ export function MessageList({ conversationId, isGroup = false }: MessageListProp
     );
   }
 
-  if (!messages.length) {
+  if (!displayMessages.length) {
     return (
       <div className="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-1 p-6 text-center">
         <p className="text-xs">No messages yet.</p>
@@ -309,14 +309,15 @@ export function MessageList({ conversationId, isGroup = false }: MessageListProp
           <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
         </div>
       )}
-      {messages.map((message, index) => {
-        const prev = messages[index - 1];
-        const showDate = !prev || dayKey(message.createdAt) !== dayKey(prev.createdAt);
+      {displayMessages.map((message, index) => {
+        const prev = displayMessages[index - 1];
+        const showDate =
+          !prev || dayKey(message.createdAt) !== dayKey(prev.createdAt);
         return (
           <Fragment key={message.id}>
             {showDate && (
-              <div className="mb-3 mt-1 flex shrink-0 justify-center">
-                <span className="rounded bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground shadow-sm">
+              <div className="mt-1 mb-3 flex shrink-0 justify-center">
+                <span className="bg-muted text-muted-foreground rounded px-2.5 py-1 text-[11px] font-medium shadow-sm">
                   {dayLabel(message.createdAt)}
                 </span>
               </div>
