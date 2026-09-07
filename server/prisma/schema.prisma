@@ -25,6 +25,8 @@ model User {
   reads        MessageRead[]
   pushSubscriptions PushSubscription[]
   reactions    MessageReaction[]
+  key          UserKey?
+  conversationKeys ConversationKey[]
 }
 
 model Conversation {
@@ -38,6 +40,7 @@ model Conversation {
 
   participants ConversationParticipant[]
   messages     Message[]
+  keys         ConversationKey[]
 }
 
 model ConversationParticipant {
@@ -56,11 +59,12 @@ model ConversationParticipant {
 }
 
 model Message {
-  id        String    @id @default(cuid())
-  content   String?
-  deletedAt DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id         String    @id @default(cuid())
+  content    String?
+  cipherMeta Json?
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   sender         User          @relation(fields: [senderId], references: [id])
   senderId       String
@@ -135,4 +139,31 @@ model MessageReaction {
   userId    String
 
   @@unique([messageId, userId, emoji])
+}
+
+model UserKey {
+  id           String   @id @default(cuid())
+  publicKey    String
+  recoveryBlob Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+
+  @@index([userId])
+}
+
+model ConversationKey {
+  id             String   @id @default(cuid())
+  sealedKey      Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+
+  @@unique([conversationId, userId])
 }

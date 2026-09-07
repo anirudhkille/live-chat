@@ -90,6 +90,7 @@ export const sendMessage = async (
   senderId,
   conversationId,
   content,
+  cipherMeta,
   attachmentIds,
   replyToId,
 ) => {
@@ -100,6 +101,7 @@ export const sendMessage = async (
         senderId,
         conversationId,
         content,
+        ...(cipherMeta ? { cipherMeta } : {}),
         ...(replyToId ? { replyToId } : {}),
         ...(attachmentIds?.length
           ? { attachments: { connect: attachmentIds.map((id) => ({ id })) } }

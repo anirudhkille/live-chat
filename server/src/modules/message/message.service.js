@@ -83,6 +83,7 @@ export const sendMessage = async (
   senderId,
   conversationId,
   content,
+  cipherMeta,
   attachmentIds,
   replyToId,
 ) => {
@@ -97,6 +98,7 @@ export const sendMessage = async (
     senderId,
     conversationId,
     content,
+    cipherMeta,
     attachmentIds,
     replyToId,
   );

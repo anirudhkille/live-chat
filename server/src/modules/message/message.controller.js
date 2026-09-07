@@ -42,12 +42,13 @@ export const deleteMessage = asyncHandler(async (req, res) => {
 
 export const sendMessage = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
-  const { content, attachmentIds, replyToId } = req.body;
+  const { content, cipherMeta, attachmentIds, replyToId } = req.body;
 
   const messages = await messageService.sendMessage(
     req.user.id,
     conversationId,
     content,
+    cipherMeta,
     Array.isArray(attachmentIds) ? attachmentIds : undefined,
     replyToId,
   );
