@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -8,20 +7,30 @@ import {
   Search as SearchIcon,
   SearchX,
   Loader2,
-  MessageCircle,
 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/avatar";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { useSearchUsers } from "@/features/users/hooks/useSearch";
+import { useCreateConversation } from "@/features/conversations/hooks/useCreateConversation";
 
 export default function SearchPage() {
   const router = useRouter();
   const isDesktop = useIsDesktop();
   const [query, setQuery] = useState("");
+  const [creatingId, setCreatingId] = useState<string | null>(null);
+  const createConversation = useCreateConversation();
 
   const { data: users, isLoading, isError } = useSearchUsers(query, 1, 10);
+
+  const handleStartChat = (userId: string) => {
+    if (createConversation.isPending) return;
+    setCreatingId(userId);
+    createConversation.mutate(userId, {
+      onSettled: () => setCreatingId(null),
+    });
+  };
 
   const showResults = query.trim().length >= 2;
   const isEmpty =
@@ -84,29 +93,36 @@ export default function SearchPage() {
             <p className="text-muted-foreground mb-1 px-3 pt-3 text-[11px] tracking-wide uppercase">
               People
             </p>
-            {users.map((user) => (
-              <Link
-                key={user.id}
-                href={"/chats/new"}
-                className="hover:bg-accent flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors"
-              >
-                <Avatar
-                  name={user.name}
-                  email={user.email}
-                  src={user.avatar}
-                  size="sm"
-                />
-                <div className="min-w-0">
-                  <p className="truncate font-medium">
-                    {user.name ?? "Unnamed"}
-                  </p>
-                  <p className="text-muted-foreground truncate text-xs">
-                    {user.email}
-                  </p>
-                </div>
-                <MessageCircle className="text-muted-foreground ml-auto h-4 w-4 shrink-0" />
-              </Link>
-            ))}
+            {users.map((user) => {
+              const pending = creatingId === user.id || createConversation.isPending;
+              return (
+                <button
+                  key={user.id}
+                  type="button"
+                  disabled={pending}
+                  onClick={() => handleStartChat(user.id)}
+                  className="hover:bg-accent flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-foreground transition-colors disabled:opacity-50"
+                >
+                  <Avatar
+                    name={user.name}
+                    email={user.email}
+                    src={user.avatar}
+                    size="sm"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-foreground">
+                      {user.name ?? "Unnamed"}
+                    </p>
+                    <p className="text-muted-foreground truncate text-xs">
+                      {user.email}
+                    </p>
+                  </div>
+                  {pending && (
+                    <Loader2 className="text-muted-foreground h-4 w-4 shrink-0 animate-spin" />
+                  )}
+                </button>
+              );
+            })}
           </>
         )}
       </div>

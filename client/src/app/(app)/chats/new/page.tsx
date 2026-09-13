@@ -231,7 +231,7 @@ export default function NewChatPage() {
               disabled={createConversation.isPending || createGroup.isPending}
               onClick={() => handleClickUser(user)}
               className={cn(
-                "hover:bg-accent flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors disabled:opacity-50",
+                "hover:bg-accent flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-foreground transition-colors disabled:opacity-50",
                 isSelected && "bg-accent"
               )}
             >
@@ -242,7 +242,7 @@ export default function NewChatPage() {
                 size="sm"
               />
               <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">{user.name ?? "Unnamed"}</p>
+                <p className="truncate font-medium text-foreground">{user.name ?? "Unnamed"}</p>
                 <p className="text-muted-foreground truncate text-xs">
                   {user.email}
                 </p>

@@ -104,6 +104,25 @@ export async function getConversationById(
   return response.data;
 }
 
+export async function getConversationWithMessages(
+  conversationId: string
+): Promise<
+  ApiResponse<{
+    conversation: Conversation;
+    messages: Message[];
+    nextCursor: string | null;
+  }>
+> {
+  const response = await api.get<
+    ApiResponse<{
+      conversation: Conversation;
+      messages: Message[];
+      nextCursor: string | null;
+    }>
+  >(`/conversation/${conversationId}/with-messages`);
+  return response.data;
+}
+
 export async function markConversationRead(
   conversationId: string
 ): Promise<ApiResponse<{ conversationId: string; updatedCount: number }>> {

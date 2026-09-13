@@ -1,20 +1,32 @@
 "use client";
 
 import { use, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ArrowLeft, Info, Loader2, Users } from "lucide-react";
 import { socket } from "@/lib/socket";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { MessageList } from "@/features/conversations/components/message-list";
 import { MessageInput } from "@/features/conversations/components/message-input";
-import { GroupMembersDialog } from "@/features/conversations/components/group-members-dialog";
 import { useIsDesktop } from "@/hooks/use-media-query";
-import { useGetConversationById } from "@/features/conversations/hooks/useConversationById";
+import { useConversationWithMessages } from "@/features/conversations/hooks/useConversationWithMessages";
 import { CallButtons } from "@/features/calls/call-buttons";
-import { CallOverlay } from "@/features/calls/call-overlay";
 import { useCalls } from "@/features/calls/use-calls";
 import { useCallStore } from "@/features/calls/call-store";
+import dynamic from "next/dynamic";
+
+const CallOverlay = dynamic(
+  () => import("@/features/calls/call-overlay").then((m) => m.CallOverlay),
+  { ssr: false }
+);
+
+const GroupMembersDialog = dynamic(
+  () =>
+    import("@/features/conversations/components/group-members-dialog").then(
+      (m) => m.GroupMembersDialog
+    ),
+  { ssr: false }
+);
 
 export default function ChatThreadPage({
   params,
@@ -24,11 +36,11 @@ export default function ChatThreadPage({
   const [status, setStatus] = useState<null | "typing..." | "online">(null);
   const [membersOpen, setMembersOpen] = useState(false);
   const { conversationId } = use(params);
-  const router = useRouter();
   const isDesktop = useIsDesktop();
 
-  const { data: conversation, isLoading: loadingConversation } =
-    useGetConversationById(conversationId);
+  const { data: conversationData, isLoading: loadingConversation } =
+    useConversationWithMessages(conversationId);
+  const conversation = conversationData?.conversation;
 
   const calls = useCalls();
   const callStatus = useCallStore((s) => s.status);
@@ -100,14 +112,13 @@ export default function ChatThreadPage({
     <div className="flex h-full min-w-0 flex-1 flex-col">
       <header className="flex items-center gap-2 border-b p-3">
         {!isDesktop && (
-          <button
-            type="button"
+          <Link
+            href="/chats"
             aria-label="Back"
-            onClick={() => router.push("/chats")}
-            className="p-1"
+            className="inline-flex items-center justify-center p-1"
           >
             <ArrowLeft className="h-4 w-4" />
-          </button>
+          </Link>
         )}
         <div className="flex min-w-0 items-center gap-2">
           {conversation ? (
@@ -118,7 +129,7 @@ export default function ChatThreadPage({
               size="xs"
             />
           ) : (
-            <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
+            <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-md">
               <Loader2 className="text-muted-foreground h-3 w-3 animate-spin" />
             </div>
           )}
@@ -167,6 +178,7 @@ export default function ChatThreadPage({
         conversationId={conversationId}
         peerId={conversation?.otherUserId ?? null}
         isGroup={conversation?.isGroup ?? false}
+        initialMessages={conversationData?.messages}
       />
 
       <MessageInput

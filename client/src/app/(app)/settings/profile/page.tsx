@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -119,14 +120,13 @@ export default function EditProfilePage() {
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-2 border-b p-3">
         {!isDesktop && (
-          <button
-            type="button"
+          <Link
+            href="/settings"
             aria-label="Back"
-            onClick={() => router.push("/settings")}
-            className="p-1"
+            className="inline-flex items-center justify-center p-1"
           >
             <ArrowLeft className="h-4 w-4" />
-          </button>
+          </Link>
         )}
         <span className="text-sm font-medium">Edit profile</span>
       </header>

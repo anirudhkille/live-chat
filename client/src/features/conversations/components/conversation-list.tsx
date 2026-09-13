@@ -70,7 +70,7 @@ function ConversationItem({
       href={`/chats/${conversation.id}`}
       aria-current={isActive ? "page" : undefined}
       className={cn(
-        "hover:bg-accent flex items-center gap-3 px-3 py-2.5 text-sm transition-colors",
+        "hover:bg-accent flex items-center gap-3 px-3 py-2.5 text-sm transition-colors duration-150 ease-out",
         isActive && "bg-accent"
       )}
     >
@@ -81,7 +81,7 @@ function ConversationItem({
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <p className="truncate font-medium">{name}</p>
+          <p className="truncate font-medium text-foreground">{name}</p>
           {lastMessage && (
             <span className="text-muted-foreground shrink-0 text-[11px]">
               {formatTime(lastMessage?.createdAt)}
@@ -100,7 +100,7 @@ function ConversationItem({
       </div>
 
       {unreadCount > 0 && (
-        <span className="bg-primary text-primary-foreground flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-[11px] font-medium">
+        <span className="bg-primary text-primary-foreground flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md px-1 text-[11px] font-medium">
           {unreadCount > 99 ? "99+" : unreadCount}
         </span>
       )}

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   ArrowLeft,
@@ -38,7 +37,6 @@ const ITEMS = [
 ];
 
 export default function SettingsPage() {
-  const router = useRouter();
   const isDesktop = useIsDesktop();
   const { user } = useAuth();
   const logout = useLogout();
@@ -48,14 +46,13 @@ export default function SettingsPage() {
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-2 border-b p-3">
         {!isDesktop && (
-          <button
-            type="button"
+          <Link
+            href="/chats"
             aria-label="Back"
-            onClick={() => router.push("/chats")}
-            className="p-1"
+            className="inline-flex items-center justify-center p-1"
           >
             <ArrowLeft className="h-4 w-4" />
-          </button>
+          </Link>
         )}
         <span className="text-sm font-medium">Settings</span>
         <div className="ml-auto">

@@ -23,6 +23,7 @@ type MessageListProps = {
   conversationId: string;
   peerId?: string | null;
   isGroup?: boolean;
+  initialMessages?: Message[];
 };
 
 const SCROLL_BOTTOM_THRESHOLD = 80;
@@ -78,6 +79,7 @@ export function MessageList({
   conversationId,
   peerId = null,
   isGroup = false,
+  initialMessages,
 }: MessageListProps) {
   const {
     data,
@@ -86,7 +88,7 @@ export function MessageList({
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
-  } = useGetMessages(conversationId);
+  } = useGetMessages(conversationId, initialMessages);
 
   const [socketMessages, setSocketMessages] = useState<Message[]>([]);
   const [atBottom, setAtBottom] = useState(true);
@@ -301,7 +303,7 @@ export function MessageList({
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="flex flex-1 flex-col overflow-y-auto p-4"
+      className="flex flex-1 flex-col overflow-x-hidden overflow-y-auto p-4"
     >
       <div className="flex-1" />
       {isFetchingNextPage && (

@@ -83,7 +83,6 @@ export function MessageBubble({
 
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
-  const [toolbarOpen, setToolbarOpen] = useState(false); // one flag drives the whole hover toolbar
   const [activePopover, setActivePopover] = useState<"react" | "menu" | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -163,93 +162,49 @@ export function MessageBubble({
   const uniqueEmojis = [...new Set(allReactions.map((r) => r.emoji))];
   const showToolbar = !isDeleted && !isEditing;
 
+  const myReaction = allReactions.find((r) => r.userId === currentUserId)?.emoji;
+
   return (
     <div
       ref={rootRef}
       className={cn(
-        "group/row relative mb-3 flex w-full",
-        isOwn && "justify-end"
+        "group/row relative mb-3 flex w-full items-end gap-1",
+        isOwn ? "flex-row-reverse justify-start" : "justify-start"
       )}
-      onMouseEnter={() => setToolbarOpen(true)}
-      onMouseLeave={() => {
-        setToolbarOpen(false);
-        setActivePopover(null);
-      }}
     >
       <div className={cn("relative flex max-w-[80%] flex-col sm:max-w-[75%]", isOwn && "items-end")}>
-        {/* Single consolidated hover toolbar — replaces the 4 separate floating controls */}
-        {showToolbar && (
+        {activePopover === "react" && (
+          <div className="absolute bottom-full z-20 mb-1 flex items-center gap-0.5 rounded-md border bg-background p-1 text-foreground shadow-lg">
+            {QUICK_EMOJIS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => handleReact(emoji)}
+                className={cn(
+                  "flex h-7 w-7 items-center justify-center rounded-md text-base transition-transform duration-150 ease-out hover:scale-110 hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]",
+                  myReaction === emoji && "bg-accent"
+                )}
+                aria-label={`React with ${emoji}`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {activePopover === "menu" && isOwn && (
           <div
-            className={cn(
-              "mb-1 flex items-center gap-0.5 rounded-md border bg-background p-0.5 shadow-sm transition-opacity",
-              toolbarOpen || activePopover
-                ? "opacity-100"
-                : "pointer-events-none opacity-0 group-focus-within/row:pointer-events-auto group-focus-within/row:opacity-100"
-            )}
-            role="toolbar"
-            aria-label="Message actions"
+            className="absolute bottom-full right-0 z-20 mb-1 w-36 origin-bottom-right rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg"
+            role="menu"
           >
-              <button
-                type="button"
-                onClick={() => setActivePopover((p) => (p === "react" ? null : "react"))}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
-                aria-label="React"
-              >
-                <Smile className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={handleReply}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
-                aria-label="Reply"
-              >
-                <CornerUpRight className="h-4 w-4" />
-              </button>
-              {isOwn && (
-                <button
-                  type="button"
-                  onClick={() => setActivePopover((p) => (p === "menu" ? null : "menu"))}
-                  className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
-                  aria-label="More options"
-                >
-                <MoreHorizontal className="h-4 w-4" />
-              </button>
-            )}
-
-            {activePopover === "react" && (
-              <div className="absolute top-full left-1/2 z-20 mt-1 flex -translate-x-1/2 items-center gap-0.5 rounded-md border bg-background p-1 shadow-lg">
-                {QUICK_EMOJIS.map((emoji) => (
-                  <button
-                    key={emoji}
-                    type="button"
-                    onClick={() => handleReact(emoji)}
-                    className={cn(
-                      "flex h-7 w-7 items-center justify-center rounded-md text-base transition-transform hover:scale-110 hover:bg-accent",
-                      hasReacted(allReactions, emoji, currentUserId) && "bg-accent"
-                    )}
-                    aria-label={`React with ${emoji}`}
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {activePopover === "menu" && isOwn && (
-              <div
-                className="absolute top-full right-0 z-20 mt-1 w-36 origin-top-right rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg"
-                role="menu"
-              >
-                <Button variant="ghost" size="sm" role="menuitem" onClick={beginEditing} className="w-full justify-start gap-2 font-normal">
-                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                  Edit
-                </Button>
-                <Button variant="ghost" size="sm" role="menuitem" onClick={confirmDelete} className="w-full justify-start gap-2 font-normal text-destructive hover:bg-destructive/10">
-                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  Delete
-                </Button>
-              </div>
-            )}
+            <Button variant="ghost" size="sm" role="menuitem" onClick={beginEditing} className="w-full justify-start gap-2 font-normal">
+              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+              Edit
+            </Button>
+            <Button variant="ghost" size="sm" role="menuitem" onClick={confirmDelete} className="w-full justify-start gap-2 font-normal text-destructive hover:bg-destructive/10">
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+              Delete
+            </Button>
           </div>
         )}
 
@@ -287,14 +242,14 @@ export function MessageBubble({
             <>
               {(message.attachments ?? []).map((attachment) =>
                 attachment.type === "IMAGE" ? (
-                  <a key={attachment.id} href={attachment.url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-lg">
+                  <a key={attachment.id} href={attachment.url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-lg" onClick={(e) => e.stopPropagation()}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={attachment.url} alt={attachment.fileName} className="max-h-64 w-full max-w-56 object-contain transition-transform hover:scale-[1.02]" />
                   </a>
                 ) : attachment.type === "AUDIO" ? (
-                  <audio key={attachment.id} controls preload="metadata" src={attachment.url} className="my-0.5 h-10 w-56 max-w-full" />
+                  <audio key={attachment.id} controls preload="metadata" src={attachment.url} className="my-0.5 h-10 w-56 max-w-full" onClick={(e) => e.stopPropagation()} />
                 ) : (
-                  <a key={attachment.id} href={attachment.url} target="_blank" rel="noopener noreferrer" className="text-xs underline underline-offset-2 opacity-90 hover:opacity-100">
+                  <a key={attachment.id} href={attachment.url} target="_blank" rel="noopener noreferrer" className="text-xs underline underline-offset-2 opacity-90 hover:opacity-100" onClick={(e) => e.stopPropagation()}>
                     {attachment.fileName}
                   </a>
                 )
@@ -318,17 +273,20 @@ export function MessageBubble({
               const mine = hasReacted(allReactions, emoji, currentUserId);
               const count = allReactions.filter((r) => r.emoji === emoji).length;
               return (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => handleReact(emoji)}
-                  className={cn(
-                    "flex items-center gap-1 rounded-md border bg-background px-1.5 py-0.5 text-[11px] leading-none shadow transition-colors",
-                    mine ? "border-primary/40 text-foreground ring-1 ring-primary/50" : "border-border text-foreground hover:bg-accent"
-                  )}
-                  aria-pressed={mine}
-                  aria-label={`${emoji} reaction, ${count} ${count === 1 ? "person" : "people"}`}
-                >
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleReact(emoji);
+                    }}
+                    className={cn(
+                      "flex items-center gap-1 rounded-md border bg-background px-1.5 py-0.5 text-[11px] leading-none shadow transition-colors duration-150 ease-out hover:bg-accent",
+                      mine ? "border-primary/40 text-foreground ring-1 ring-primary/50" : "border-border text-foreground"
+                    )}
+                    aria-pressed={mine}
+                    aria-label={`${emoji} reaction, ${count} ${count === 1 ? "person" : "people"}`}
+                  >
                   <span>{emoji}</span>
                   {count > 1 && <span className="font-medium tabular-nums">{count}</span>}
                 </button>
@@ -337,6 +295,48 @@ export function MessageBubble({
           </div>
         )}
       </div>
+
+      {showToolbar && (
+        <div
+          className={cn(
+            "flex items-center gap-0.5",
+            isOwn ? "flex-row-reverse" : "flex-row"
+          )}
+        >
+          <button
+            type="button"
+            onClick={handleReply}
+            className="text-muted-foreground flex h-7 w-7 items-center justify-center rounded-md transition-transform duration-150 ease-out hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]"
+            aria-label="Reply"
+          >
+            <CornerUpRight className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setActivePopover((p) => (p === "react" ? null : "react"));
+            }}
+            className="text-muted-foreground flex h-7 w-7 items-center justify-center rounded-md opacity-100 transition-opacity duration-150 ease-out hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] md:opacity-0 md:group-hover/row:opacity-100"
+            aria-label="React"
+          >
+            <Smile className="h-4 w-4" />
+          </button>
+          {isOwn && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActivePopover((p) => (p === "menu" ? null : "menu"));
+              }}
+              className="text-muted-foreground flex h-7 w-7 items-center justify-center rounded-md opacity-100 transition-opacity duration-150 ease-out hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] md:opacity-0 md:group-hover/row:opacity-100"
+              aria-label="More options"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      )}
 
       <Dialog
         open={isEditing}

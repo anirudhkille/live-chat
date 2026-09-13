@@ -18,11 +18,16 @@ import { useE2EIdentity } from "@/features/e2e/hooks/useE2EIdentity";
 import { usePeerPublicKey } from "@/features/e2e/hooks/usePeerPublicKey";
 import { deriveConversationKey } from "@/lib/crypto/conversationKey";
 import { encryptMessage } from "@/lib/crypto/messaging";
-import { VoiceRecorder } from "./voice-recorder";
+import dynamic from "next/dynamic";
 import {
   uploadAttachment,
   validateAttachmentFile,
 } from "@/features/attachments/api/attachment-api";
+
+const VoiceRecorder = dynamic(
+  () => import("./voice-recorder").then((m) => m.VoiceRecorder),
+  { ssr: false }
+);
 
 const TYPING_THROTTLE_MS = 2000;
 const TYPING_STOP_DELAY_MS = 1500;
@@ -267,7 +272,7 @@ export function MessageInput({
                 type="button"
                 aria-label={`Remove ${item.file.name}`}
                 onClick={() => removePending(item.localId)}
-                className="bg-background border-muted-foreground/30 text-muted-foreground absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full border"
+                className="bg-background border-muted-foreground/30 text-muted-foreground absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-md border transition-transform duration-150 ease-out active:scale-[0.98]"
               >
                 <X className="h-2.5 w-2.5" />
               </button>
@@ -332,7 +337,7 @@ export function MessageInput({
               aria-label="Add image"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              className="text-muted-foreground h-10 w-10 shrink-0 rounded-md"
+              className="text-muted-foreground h-10 w-10 shrink-0 rounded-md transition-transform duration-150 ease-out active:scale-[0.98]"
             >
               <Paperclip className="h-5 w-5" />
             </Button>
@@ -346,7 +351,7 @@ export function MessageInput({
                 rows={1}
                 disabled={sendMessage.isPending}
                 aria-label="Message"
-                className="placeholder:text-muted-foreground min-w-0 flex-1 resize-none bg-transparent px-3 py-1 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                className="placeholder:text-muted-foreground min-w-0 flex-1 resize-none bg-transparent px-3 py-1 text-sm text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
             {draft.trim() || readyAttachmentIds.length > 0 ? (
@@ -355,7 +360,7 @@ export function MessageInput({
                 size="icon"
                 aria-label="Send message"
                 disabled={sendMessage.isPending || isUploading}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 w-10 shrink-0 rounded-md disabled:opacity-50"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 w-10 shrink-0 rounded-md transition-transform duration-150 ease-out disabled:opacity-50 active:scale-[0.98]"
               >
                 {sendMessage.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -371,7 +376,7 @@ export function MessageInput({
                 aria-label="Record voice message"
                 onClick={() => setVoiceActive(true)}
                 disabled={isUploading || sendMessage.isPending}
-                className="text-primary-foreground hover:bg-primary/90 border-none h-10 w-10 shrink-0 rounded-md bg-primary"
+                className="text-primary-foreground hover:bg-primary/90 border-none h-10 w-10 shrink-0 rounded-md bg-primary transition-transform duration-150 ease-out active:scale-[0.98]"
               >
                 <Mic className="h-5 w-5" />
               </Button>
