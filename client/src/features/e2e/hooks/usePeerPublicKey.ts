@@ -15,5 +15,6 @@ export function usePeerPublicKey(peerId: string | null) {
     },
     enabled: !!peerId,
     staleTime: Infinity,
+    gcTime: 1000 * 60 * 60,
   });
 }

@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/avatar";
 import { useIsDesktop } from "@/hooks/use-media-query";
+import { useDebounce } from "@/hooks/use-debounce";
 import { useSearchUsers } from "@/features/users/hooks/useSearch";
 import { useCreateConversation } from "@/features/conversations/hooks/useCreateConversation";
 
@@ -19,10 +20,15 @@ export default function SearchPage() {
   const router = useRouter();
   const isDesktop = useIsDesktop();
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounce(query, 250);
   const [creatingId, setCreatingId] = useState<string | null>(null);
   const createConversation = useCreateConversation();
 
-  const { data: users, isLoading, isError } = useSearchUsers(query, 1, 10);
+  const { data: users, isLoading, isError } = useSearchUsers(
+    debouncedQuery,
+    1,
+    10
+  );
 
   const handleStartChat = (userId: string) => {
     if (createConversation.isPending) return;
@@ -32,7 +38,7 @@ export default function SearchPage() {
     });
   };
 
-  const showResults = query.trim().length >= 2;
+  const showResults = debouncedQuery.trim().length >= 2;
   const isEmpty =
     showResults && !isLoading && !isError && (!users || users.length === 0);
 

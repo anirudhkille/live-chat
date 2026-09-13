@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useIsDesktop } from "@/hooks/use-media-query";
+import { useDebounce } from "@/hooks/use-debounce";
 import { useSearchUsers } from "@/features/users/hooks/useSearch";
 import { useCreateConversation } from "@/features/conversations/hooks/useCreateConversation";
 import { useCreateGroup } from "@/features/conversations/hooks/useCreateGroup";
@@ -22,6 +23,7 @@ export default function NewChatPage() {
   const isDesktop = useIsDesktop();
   const [mode, setMode] = useState<Mode>("chat");
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounce(query, 250);
   const [groupName, setGroupName] = useState("");
   const [selected, setSelected] = useState<User[]>([]);
 
@@ -30,7 +32,7 @@ export default function NewChatPage() {
     isLoading,
     isError,
     error,
-  } = useSearchUsers(query, 1, 10);
+  } = useSearchUsers(debouncedQuery, 1, 10);
   const createConversation = useCreateConversation();
   const createGroup = useCreateGroup();
 
@@ -175,7 +177,7 @@ export default function NewChatPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {query.trim().length < 2 && (
+        {debouncedQuery.trim().length < 2 && (
           <div className="text-muted-foreground flex flex-col items-center justify-center gap-2 p-6 text-center">
             <MessageSquarePlus className="h-8 w-8" />
             <p className="text-sm">
@@ -186,19 +188,19 @@ export default function NewChatPage() {
           </div>
         )}
 
-        {query.trim().length >= 2 && isLoading && (
+        {debouncedQuery.trim().length >= 2 && isLoading && (
           <div className="flex justify-center p-6">
             <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
           </div>
         )}
 
-        {query.trim().length >= 2 && isError && (
+        {debouncedQuery.trim().length >= 2 && isError && (
           <div className="text-destructive px-3 text-center text-sm">
             {getApiErrorMessage(error)}
           </div>
         )}
 
-        {query.trim().length >= 2 &&
+        {debouncedQuery.trim().length >= 2 &&
           !isLoading &&
           !isError &&
           users?.length === 0 && (
@@ -208,7 +210,7 @@ export default function NewChatPage() {
           )}
 
         {mode === "group" &&
-          query.trim().length >= 2 &&
+          debouncedQuery.trim().length >= 2 &&
           !isLoading &&
           !isError &&
           users &&

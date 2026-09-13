@@ -5,6 +5,7 @@ export function useConversations() {
   return useQuery({
     queryKey: ["conversations"],
     queryFn: getConversations,
+    staleTime: 30 * 1000,
     select: (data) => data.data,
   });
 }

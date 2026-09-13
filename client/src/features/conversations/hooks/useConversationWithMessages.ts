@@ -6,6 +6,7 @@ export function useConversationWithMessages(conversationId: string) {
     queryKey: ["conversation-with-messages", conversationId],
     queryFn: () => getConversationWithMessages(conversationId),
     enabled: !!conversationId,
+    staleTime: 30 * 1000,
     select: (data) => data.data,
   });
 }
