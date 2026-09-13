@@ -24,6 +24,16 @@ export const getConversationById = asyncHandler(async (req, res) => {
   sendResponse(res, 200, "Conversation fetched successfully", conversation);
 });
 
+export const getConversationWithMessages = asyncHandler(async (req, res) => {
+  const limit = Number(req.query.limit) || 30;
+  const result = await conversationService.getConversationWithMessages(
+    req.params.id,
+    req.user.id,
+    limit,
+  );
+  sendResponse(res, 200, "Conversation and messages fetched", result);
+});
+
 export const createGroup = asyncHandler(async (req, res) => {
   const group = await conversationService.createGroup(req.user.id, req.body);
   sendResponse(res, 201, "Group created successfully", group);

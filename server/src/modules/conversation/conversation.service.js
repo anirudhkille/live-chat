@@ -1,5 +1,6 @@
 import * as conversationRepository from "./conversation.repository.js";
 import * as userRepository from "../user/user.repository.js";
+import * as messageRepository from "../message/message.repository.js";
 import { toConversationResponse, toParticipants } from "./conversation.mapper.js";
 import { getIO, isUserOnline, emitToUser } from "../../config/socket.js";
 import { AppError } from "../../utils/AppError.js";
@@ -32,6 +33,22 @@ export const getConversationById = async (conversationId, userId) => {
     throw new AppError(403, "You are not a participant of this conversation");
   }
   return toConversationResponse(conversation, userId);
+};
+
+export const getConversationWithMessages = async (
+  conversationId,
+  userId,
+  limit = 30,
+) => {
+  const conversation = await getConversationById(conversationId, userId);
+  const messages = await messageRepository.getMessages(
+    conversationId,
+    null,
+    limit,
+  );
+  const nextCursor =
+    messages.length === limit ? messages[messages.length - 1].createdAt : null;
+  return { conversation, messages, nextCursor };
 };
 
 export const createGroup = async (userId, { name, participantIds }) => {

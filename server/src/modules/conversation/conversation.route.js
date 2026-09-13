@@ -4,6 +4,7 @@ import {
   createOrGetConversation,
   getConversations,
   getConversationById,
+  getConversationWithMessages,
   createGroup,
   getGroupParticipants,
   addGroupParticipants,
@@ -24,6 +25,7 @@ router.post("/", validate(createConversationSchema), createOrGetConversation);
 router.get("/", getConversations);
 router.get("/:id/participants", getGroupParticipants);
 router.post("/:id/participants", validate(addGroupParticipantsSchema), addGroupParticipants);
+router.get("/:id/with-messages", getConversationWithMessages);
 router.get("/:id", getConversationById);
 
 export default router;

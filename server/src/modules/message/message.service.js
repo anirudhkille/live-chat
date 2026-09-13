@@ -115,6 +115,9 @@ export const sendMessage = async (
 
   const io = getIO();
   io.to(`conversation:${conversationId}`).emit("new-message", response);
+  io.to(`conversation:${conversationId}`).emit("conversation-updated", {
+    conversationId,
+  });
 
   notifyRecipients(
     senderId,
@@ -129,32 +132,38 @@ export const sendMessage = async (
 };
 
 export const toggleReaction = async (userId, messageId, emoji) => {
-  const existing = await messageRepository.findById(messageId);
-  if (!existing) {
+  const message = await messageRepository.findById(messageId);
+  if (!message) {
     throw new AppError(404, "Message not found");
   }
 
   const conversation = await conversationRepository.getById(
-    existing.conversationId,
+    message.conversationId,
   );
   if (!conversation.participants.some((p) => p.userId === userId)) {
     throw new AppError(403, "You are not a participant of this conversation");
   }
 
-  const message = await messageRepository.toggleReaction(
-    messageId,
-    userId,
-    emoji,
-  );
+  const existing = await messageRepository.findUserReaction(messageId, userId);
+  if (existing) {
+    await messageRepository.deleteUserReactions(messageId, userId);
+    if (existing.emoji !== emoji) {
+      await messageRepository.createReaction(messageId, userId, emoji);
+    }
+  } else {
+    await messageRepository.createReaction(messageId, userId, emoji);
+  }
+
+  const updated = await messageRepository.findById(messageId);
 
   getIO()
-    .to(`conversation:${existing.conversationId}`)
+    .to(`conversation:${message.conversationId}`)
     .emit("message-reacted", {
-      conversationId: existing.conversationId,
-      message: toMessageResponse(message),
+      conversationId: message.conversationId,
+      message: toMessageResponse(updated),
     });
 
-  return toMessageResponse(message);
+  return toMessageResponse(updated);
 };
 
 const notifyRecipients = async (

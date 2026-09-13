@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useSendMessage } from "../hooks/useSendMessage";
 import {
   formatDuration,
@@ -43,12 +44,14 @@ type VoiceRecorderProps = {
   conversationId: string;
   replyToId?: string;
   onClose: () => void;
+  className?: string;
 };
 
 export function VoiceRecorder({
   conversationId,
   replyToId,
   onClose,
+  className,
 }: VoiceRecorderProps) {
   const sendMessage = useSendMessage();
 
@@ -238,7 +241,7 @@ export function VoiceRecorder({
 
   if (!supported && !isPreview) {
     return (
-      <div className="flex w-full items-center gap-2 p-3">
+      <div className={cn("flex w-full items-center gap-2", className)}>
         <span className="text-muted-foreground flex-1 text-xs">
           Voice messages aren&apos;t supported in this browser.
         </span>
@@ -250,7 +253,7 @@ export function VoiceRecorder({
   }
 
   return (
-    <div className="flex w-full items-center gap-2 p-3">
+    <div className={cn("flex w-full items-center gap-2", className)}>
       {isRecording && (
         <>
           <span

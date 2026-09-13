@@ -53,9 +53,11 @@ export function useDecryptedMessages(
 
   return messages.map((message) => {
     if (!message.cipherMeta) return message;
-    if (!keys || !peerPublicKey) return message;
+    if (!keys || !peerPublicKey) {
+      return { ...message, content: "Message" };
+    }
     if (decrypted[message.id] === undefined) {
-      return { ...message, content: "Decrypting..." };
+      return { ...message, content: "Message" };
     }
     return { ...message, content: decrypted[message.id] };
   });

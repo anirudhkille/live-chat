@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Loader2, Mic, Paperclip, Send, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Loader2,
+  Mic,
+  Paperclip,
+  Send,
+  X,
+} from "lucide-react";
 import { socket } from "@/lib/socket";
 import { useChatStore } from "@/store/chat-store";
 import { useSendMessage } from "@/features/conversations/hooks/useSendMessage";
@@ -298,7 +305,7 @@ export function MessageInput({
           e.preventDefault();
           handleSend();
         }}
-        className="flex flex-wrap items-end gap-2 p-3 sm:flex-nowrap"
+        className="flex items-end gap-2 p-3"
       >
         <input
           ref={fileInputRef}
@@ -308,61 +315,67 @@ export function MessageInput({
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          aria-label="Add image"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading || voiceActive}
-          className="shrink-0"
-        >
-          <Paperclip className="h-4 w-4" />
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          aria-label="Record voice message"
-          onClick={() => setVoiceActive(true)}
-          disabled={isUploading || sendMessage.isPending || voiceActive}
-          className="shrink-0"
-        >
-          <Mic className="h-4 w-4" />
-        </Button>
+
         {voiceActive ? (
           <VoiceRecorder
             conversationId={conversationId}
             replyToId={replyTo?.messageId}
             onClose={() => setVoiceActive(false)}
+            className="bg-muted flex-1 rounded-lg p-1.5"
           />
         ) : (
           <>
-            <textarea
-              ref={textareaRef}
-              value={draft}
-              onChange={(e) => setDraft(conversationId, e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Message"
-              rows={1}
-              disabled={sendMessage.isPending}
-              aria-label="Message"
-              className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex max-h-37.5 min-h-10 min-w-0 flex-1 resize-none rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-            />
-
             <Button
-              type="submit"
+              type="button"
+              variant="ghost"
               size="icon"
-              aria-label="Send message"
-              disabled={
-                (!draft.trim() && readyAttachmentIds.length === 0) ||
-                sendMessage.isPending ||
-                isUploading
-              }
-              className="shrink-0"
+              aria-label="Add image"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="text-muted-foreground h-10 w-10 shrink-0 rounded-md"
             >
-              <Send className="h-4 w-4" />
+              <Paperclip className="h-5 w-5" />
             </Button>
+            <div className="bg-muted flex flex-1 items-end gap-1 rounded-lg p-1.5 transition-shadow focus-within:ring-2 focus-within:ring-primary/20">
+              <textarea
+                ref={textareaRef}
+                value={draft}
+                onChange={(e) => setDraft(conversationId, e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Message"
+                rows={1}
+                disabled={sendMessage.isPending}
+                aria-label="Message"
+                className="placeholder:text-muted-foreground min-w-0 flex-1 resize-none bg-transparent px-3 py-1 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+            {draft.trim() || readyAttachmentIds.length > 0 ? (
+              <Button
+                type="submit"
+                size="icon"
+                aria-label="Send message"
+                disabled={sendMessage.isPending || isUploading}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 w-10 shrink-0 rounded-md disabled:opacity-50"
+              >
+                {sendMessage.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label="Record voice message"
+                onClick={() => setVoiceActive(true)}
+                disabled={isUploading || sendMessage.isPending}
+                className="text-primary-foreground hover:bg-primary/90 border-none h-10 w-10 shrink-0 rounded-md bg-primary"
+              >
+                <Mic className="h-5 w-5" />
+              </Button>
+            )}
           </>
         )}
       </form>

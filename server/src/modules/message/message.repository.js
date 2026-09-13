@@ -142,6 +142,24 @@ export const sendMessage = async (
   return message;
 };
 
+export const findUserReaction = (messageId, userId) => {
+  return prisma.messageReaction.findFirst({
+    where: { messageId, userId },
+  });
+};
+
+export const createReaction = (messageId, userId, emoji) => {
+  return prisma.messageReaction.create({
+    data: { messageId, userId, emoji },
+  });
+};
+
+export const deleteUserReactions = (messageId, userId) => {
+  return prisma.messageReaction.deleteMany({
+    where: { messageId, userId },
+  });
+};
+
 export const toggleReaction = async (messageId, userId, emoji) => {
   const existing = await prisma.messageReaction.findUnique({
     where: { messageId_userId_emoji: { messageId, userId, emoji } },

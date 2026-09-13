@@ -31,7 +31,7 @@ function ReadReceipt({ readAt }: { readAt: string | null }) {
   if (!readAt) return null;
   return (
     <span
-      className="text-primary-foreground/80 ml-1 inline-flex items-center"
+      className="ml-1 inline-flex items-center text-primary-foreground/80"
       title={`Seen ${formatMessageTime(readAt)}`}
     >
       <CheckCheck size={12} strokeWidth={2.5} />
@@ -61,9 +61,7 @@ function hasReacted(
   userId: string | undefined
 ) {
   if (!userId) return false;
-  return (reactions ?? []).some(
-    (r) => r.userId === userId && r.emoji === emoji
-  );
+  return (reactions ?? []).some((r) => r.userId === userId && r.emoji === emoji);
 }
 
 export function MessageBubble({
@@ -77,9 +75,7 @@ export function MessageBubble({
 }) {
   const currentUserId = useAuthStore((s) => s.user?.id);
   const setReplyTo = useChatStore((s) => s.setReplyTo);
-  const isOwn =
-    message.senderId === currentUserId ||
-    message.senderId === "__current_user__";
+  const isOwn = message.senderId === currentUserId;
   const isOptimistic = message.id.startsWith("temp-");
   const isDeleted = Boolean(message.deletedAt);
   const isEdited =
@@ -87,48 +83,39 @@ export function MessageBubble({
 
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
-  const [draftSource, setDraftSource] = useState(message.content);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [quickReactOpen, setQuickReactOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  if (!isEditing && message.content !== draftSource) {
-    setDraftSource(message.content);
-    setDraft(message.content);
-  }
+  const [toolbarOpen, setToolbarOpen] = useState(false); // one flag drives the whole hover toolbar
+  const [activePopover, setActivePopover] = useState<"react" | "menu" | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const editMutation = useEditMessage();
   const deleteMutation = useDeleteMessage();
   const toggleReaction = useToggleReaction();
 
   useEffect(() => {
-    if (!menuOpen && !quickReactOpen) return;
-    const onPointerDown = (event: MouseEvent | TouchEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-        setQuickReactOpen(false);
+    if (!activePopover) return;
+    const close = (event: MouseEvent | TouchEvent | KeyboardEvent) => {
+      if ("key" in event) {
+        if (event.key === "Escape") setActivePopover(null);
+        return;
+      }
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setActivePopover(null);
       }
     };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setMenuOpen(false);
-        setQuickReactOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("touchstart", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("mousedown", close);
+    document.addEventListener("touchstart", close);
+    document.addEventListener("keydown", close);
     return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("touchstart", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("touchstart", close);
+      document.removeEventListener("keydown", close);
     };
-  }, [menuOpen, quickReactOpen]);
+  }, [activePopover]);
 
   const beginEditing = () => {
-    setMenuOpen(false);
-    setIsEditing(true);
+    setActivePopover(null);
     setDraft(message.content);
+    setIsEditing(true);
   };
 
   const cancelEdit = () => {
@@ -146,23 +133,17 @@ export function MessageBubble({
   };
 
   const confirmDelete = () => {
-    setMenuOpen(false);
+    setActivePopover(null);
     if (deleteMutation.isPending) return;
     toast("Delete this message?", {
       description: "This can't be undone.",
-      cancel: {
-        label: "Cancel",
-        onClick: () => toast.dismiss(),
-      },
-      action: {
-        label: "Delete",
-        onClick: () => deleteMutation.mutate(message.id),
-      },
+      cancel: { label: "Cancel", onClick: () => toast.dismiss() },
+      action: { label: "Delete", onClick: () => deleteMutation.mutate(message.id) },
     });
   };
 
   const handleReply = () => {
-    setMenuOpen(false);
+    setActivePopover(null);
     setReplyTo(conversationId, {
       messageId: message.id,
       senderName: message.sender?.name ?? null,
@@ -173,243 +154,78 @@ export function MessageBubble({
   };
 
   const handleReact = (emoji: string) => {
-    setQuickReactOpen(false);
-    setMenuOpen(false);
+    setActivePopover(null);
     if (toggleReaction.isPending) return;
     toggleReaction.mutate({ messageId: message.id, emoji });
   };
 
   const allReactions = message.reactions ?? [];
   const uniqueEmojis = [...new Set(allReactions.map((r) => r.emoji))];
-  const hasImageAttachment = (message.attachments ?? []).some(
-    (a) => a.type === "IMAGE"
-  );
+  const showToolbar = !isDeleted && !isEditing;
 
   return (
-    <div className={cn("relative mb-2.5 flex w-full", isOwn && "justify-end")}>
-      <div
-        className={cn(
-          "relative flex max-w-[85%] items-center gap-1",
-          isOwn && "flex-row-reverse"
-        )}
-      >
-        <div className="relative w-fit min-w-0">
+    <div
+      ref={rootRef}
+      className={cn(
+        "group/row relative mb-3 flex w-full",
+        isOwn && "justify-end"
+      )}
+      onMouseEnter={() => setToolbarOpen(true)}
+      onMouseLeave={() => {
+        setToolbarOpen(false);
+        setActivePopover(null);
+      }}
+    >
+      <div className={cn("relative flex max-w-[80%] flex-col sm:max-w-[75%]", isOwn && "items-end")}>
+        {/* Single consolidated hover toolbar — replaces the 4 separate floating controls */}
+        {showToolbar && (
           <div
             className={cn(
-              "group relative flex flex-col gap-0.5 rounded-md px-3.5 py-2 text-sm shadow-sm",
-              isOwn
-                ? "bg-primary text-primary-foreground rounded-br-md"
-                : "bg-muted text-foreground rounded-bl-md",
-              isOptimistic && "opacity-60",
-              allReactions.length > 0 &&
-                cn("mb-2.5", hasImageAttachment ? "pb-5" : "pb-3")
+              "mb-1 flex items-center gap-0.5 rounded-md border bg-background p-0.5 shadow-sm transition-opacity",
+              toolbarOpen || activePopover
+                ? "opacity-100"
+                : "pointer-events-none opacity-0 group-focus-within/row:pointer-events-auto group-focus-within/row:opacity-100"
             )}
+            role="toolbar"
+            aria-label="Message actions"
           >
-            {isOwn && menuOpen && (
-              <div
-                ref={menuRef}
-                className="animate-in fade-in-0 zoom-in-95 bg-popover text-popover-foreground border-border absolute right-0 bottom-full z-20 mb-1.5 w-36 origin-bottom-right rounded-lg border p-1 shadow-lg"
-                role="menu"
-              >
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  role="menuitem"
-                  onClick={beginEditing}
-                  className="w-full justify-start gap-2 font-normal"
-                >
-                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                  Edit
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  role="menuitem"
-                  onClick={confirmDelete}
-                  className="text-destructive hover:bg-destructive/10 w-full justify-start gap-2 font-normal"
-                >
-                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  Delete
-                </Button>
-              </div>
-            )}
-
-            {isOwn && !isDeleted && !isEditing && (
-              <Button
+              <button
                 type="button"
-                variant={menuOpen ? "secondary" : "ghost"}
-                size="icon"
-                onClick={() => {
-                  setMenuOpen((open) => !open);
-                  setQuickReactOpen(false);
-                }}
-                className={cn(
-                  "bg-background text-muted-foreground absolute -top-3 right-0 z-10 h-6 w-6 rounded-full border shadow-sm transition-opacity",
-                  menuOpen
-                    ? "opacity-100"
-                    : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                )}
-                aria-label="Message options"
-                title="Message options"
+                onClick={() => setActivePopover((p) => (p === "react" ? null : "react"))}
+                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
+                aria-label="React"
               >
-                <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
-              </Button>
-            )}
-
-            {message.replyTo && (
-              <div className="border-primary/40 mb-0.5 flex items-start gap-1.5 rounded-md border-l-2 bg-black/5 px-2 py-1 text-xs dark:bg-white/10">
-                <CornerUpRight
-                  className="mt-0.5 h-3 w-3 shrink-0 opacity-60"
-                  aria-hidden="true"
-                />
-                <div className="min-w-0">
-                  <p className="truncate font-medium">
-                    {message.replyTo.senderName ?? "Unknown"}
-                  </p>
-                  <p className="truncate opacity-80">
-                    {message.replyTo.deleted
-                      ? "This message was deleted"
-                      : message.replyTo.preview ||
-                        message.replyTo.content ||
-                        "Photo or file"}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {isGroup && !isOwn && (
-              <span className="text-muted-foreground mb-0.5 text-[10px] font-semibold">
-                {message.sender?.name ?? "Unknown"}
-              </span>
-            )}
-
-            {isDeleted ? (
-              <p className="text-[13px] italic opacity-60">
-                This message was deleted
-              </p>
-            ) : (
-              <>
-                {(message.attachments ?? []).map((attachment) =>
-                  attachment.type === "IMAGE" ? (
-                    <a
-                      key={attachment.id}
-                      href={attachment.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block overflow-hidden rounded-xl"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={attachment.url}
-                        alt={attachment.fileName}
-                        className="max-h-64 w-full max-w-56 object-contain transition-transform hover:scale-[1.02]"
-                      />
-                    </a>
-                  ) : attachment.type === "AUDIO" ? (
-                    <audio
-                      key={attachment.id}
-                      controls
-                      preload="metadata"
-                      src={attachment.url}
-                      className="my-0.5 h-10 w-56 max-w-full"
-                    />
-                  ) : (
-                    <a
-                      key={attachment.id}
-                      href={attachment.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs underline underline-offset-2 opacity-90 hover:opacity-100"
-                    >
-                      {attachment.fileName}
-                    </a>
-                  )
-                )}
-                {message.content ? (
-                  <p className="leading-relaxed break-words whitespace-pre-wrap">
-                    {message.content}
-                  </p>
-                ) : null}
-              </>
-            )}
-
-            <span
-              className={cn(
-                "flex items-center gap-0.5 self-end text-[10px] leading-tight",
-                isOwn
-                  ? "text-primary-foreground/70"
-                  : "text-muted-foreground/70"
-              )}
-            >
-              {formatMessageTime(message.createdAt)}
-              {isEdited && !isDeleted && (
-                <span className="italic opacity-80">· edited</span>
-              )}
-              {isOwn && <ReadReceipt readAt={message.readAt} />}
-            </span>
-
-            {allReactions.length > 0 && (
-              <div
-                className={cn(
-                  "absolute z-10 flex flex-wrap items-center gap-1",
-                  "-bottom-1",
-                  isOwn ? "right-0" : "left-0"
-                )}
+                <Smile className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleReply}
+                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
+                aria-label="Reply"
               >
-                {uniqueEmojis.map((emoji) => {
-                  const mine = hasReacted(allReactions, emoji, currentUserId);
-                  const count = allReactions.filter(
-                    (r) => r.emoji === emoji
-                  ).length;
-                  return (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => {
-                        if (toggleReaction.isPending) return;
-                        toggleReaction.mutate({ messageId: message.id, emoji });
-                      }}
-                      className={cn(
-                        "flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] leading-none shadow-sm transition-colors",
-                        isOwn
-                          ? "border-primary-foreground/30 bg-primary text-primary-foreground hover:bg-primary/90"
-                          : "border-muted-foreground/20 bg-muted text-foreground hover:bg-muted/80",
-                        mine && "ring-primary/60 ring-1"
-                      )}
-                      aria-pressed={mine}
-                      aria-label={`${emoji} reaction, ${count} ${count === 1 ? "person" : "people"}`}
-                    >
-                      <span>{emoji}</span>
-                      <span className="font-medium tabular-nums">{count}</span>
-                    </button>
-                  );
-                })}
-              </div>
+                <CornerUpRight className="h-4 w-4" />
+              </button>
+              {isOwn && (
+                <button
+                  type="button"
+                  onClick={() => setActivePopover((p) => (p === "menu" ? null : "menu"))}
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
+                  aria-label="More options"
+                >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
             )}
 
-            {!isDeleted && !isEditing && (
-              <div
-                className={cn(
-                  "absolute -bottom-9 z-20 flex items-center gap-0.5 rounded-full border p-1 shadow-md transition-all",
-                  isOwn ? "right-0" : "left-0",
-                  quickReactOpen
-                    ? "pointer-events-auto translate-y-0 opacity-100"
-                    : "pointer-events-none translate-y-1 opacity-0 md:group-hover:pointer-events-auto md:group-hover:translate-y-0 md:group-hover:opacity-100"
-                )}
-                role="toolbar"
-                aria-label="Quick reactions"
-              >
+            {activePopover === "react" && (
+              <div className="absolute top-full left-1/2 z-20 mt-1 flex -translate-x-1/2 items-center gap-0.5 rounded-md border bg-background p-1 shadow-lg">
                 {QUICK_EMOJIS.map((emoji) => (
                   <button
                     key={emoji}
                     type="button"
                     onClick={() => handleReact(emoji)}
                     className={cn(
-                      "hover:bg-accent flex h-7 w-7 items-center justify-center rounded-full text-base transition-transform hover:scale-125",
-                      hasReacted(allReactions, emoji, currentUserId) &&
-                        "bg-accent"
+                      "flex h-7 w-7 items-center justify-center rounded-md text-base transition-transform hover:scale-110 hover:bg-accent",
+                      hasReacted(allReactions, emoji, currentUserId) && "bg-accent"
                     )}
                     aria-label={`React with ${emoji}`}
                   >
@@ -419,34 +235,106 @@ export function MessageBubble({
               </div>
             )}
 
-            {!isDeleted && !isEditing && !quickReactOpen && (
-              <button
-                type="button"
-                onClick={() => setQuickReactOpen(true)}
-                className={cn(
-                  "bg-background text-muted-foreground absolute -bottom-9 z-20 flex h-7 w-7 items-center justify-center rounded-full border p-0 shadow-md md:hidden",
-                  isOwn ? "right-0" : "left-0"
-                )}
-                aria-label="Add reaction"
+            {activePopover === "menu" && isOwn && (
+              <div
+                className="absolute top-full right-0 z-20 mt-1 w-36 origin-top-right rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg"
+                role="menu"
               >
-                <Smile className="h-4 w-4" />
-              </button>
+                <Button variant="ghost" size="sm" role="menuitem" onClick={beginEditing} className="w-full justify-start gap-2 font-normal">
+                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                  Edit
+                </Button>
+                <Button variant="ghost" size="sm" role="menuitem" onClick={confirmDelete} className="w-full justify-start gap-2 font-normal text-destructive hover:bg-destructive/10">
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  Delete
+                </Button>
+              </div>
             )}
           </div>
+        )}
+
+        <div
+          className={cn(
+            "relative flex w-fit flex-col gap-1 rounded-lg px-3.5 py-2 text-sm shadow-sm",
+            isOwn ? "rounded-br-sm bg-primary text-primary-foreground" : "rounded-bl-sm bg-muted text-foreground",
+            isOptimistic && "opacity-60",
+            allReactions.length > 0 && "mb-3"
+          )}
+        >
+          {message.replyTo && (
+            <div className="mb-0.5 flex items-start gap-1.5 rounded-md border-l-2 border-primary/40 bg-black/5 px-2 py-1 text-xs dark:bg-white/10">
+              <CornerUpRight className="mt-0.5 h-3 w-3 shrink-0 opacity-60" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="truncate font-medium">{message.replyTo.senderName ?? "Unknown"}</p>
+                <p className="truncate opacity-80">
+                  {message.replyTo.deleted
+                    ? "This message was deleted"
+                    : message.replyTo.preview || message.replyTo.content || "Photo or file"}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {isGroup && !isOwn && (
+            <span className="mb-0.5 text-[10px] font-semibold text-muted-foreground">
+              {message.sender?.name ?? "Unknown"}
+            </span>
+          )}
+
+          {isDeleted ? (
+            <p className="text-[13px] italic opacity-60">This message was deleted</p>
+          ) : (
+            <>
+              {(message.attachments ?? []).map((attachment) =>
+                attachment.type === "IMAGE" ? (
+                  <a key={attachment.id} href={attachment.url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-lg">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={attachment.url} alt={attachment.fileName} className="max-h-64 w-full max-w-56 object-contain transition-transform hover:scale-[1.02]" />
+                  </a>
+                ) : attachment.type === "AUDIO" ? (
+                  <audio key={attachment.id} controls preload="metadata" src={attachment.url} className="my-0.5 h-10 w-56 max-w-full" />
+                ) : (
+                  <a key={attachment.id} href={attachment.url} target="_blank" rel="noopener noreferrer" className="text-xs underline underline-offset-2 opacity-90 hover:opacity-100">
+                    {attachment.fileName}
+                  </a>
+                )
+              )}
+              {message.content ? (
+                <p className="leading-relaxed break-words whitespace-pre-wrap">{message.content}</p>
+              ) : null}
+            </>
+          )}
+
+          <span className={cn("flex items-center gap-0.5 self-end text-[10px] leading-tight", isOwn ? "text-primary-foreground/70" : "text-muted-foreground/70")}>
+            {formatMessageTime(message.createdAt)}
+            {isEdited && !isDeleted && <span className="italic opacity-80">· edited</span>}
+            {isOwn && <ReadReceipt readAt={message.readAt} />}
+          </span>
         </div>
 
-        {!isDeleted && !isEditing && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={handleReply}
-            className="text-muted-foreground h-7 w-7 shrink-0 rounded-full opacity-100"
-            aria-label="Reply"
-            title="Reply"
-          >
-            <CornerUpRight className="h-4 w-4" aria-hidden="true" />
-          </Button>
+        {allReactions.length > 0 && (
+          <div className={cn("-mt-2 flex flex-wrap items-center gap-1", isOwn ? "self-end pr-1" : "self-start pl-1")}>
+            {uniqueEmojis.map((emoji) => {
+              const mine = hasReacted(allReactions, emoji, currentUserId);
+              const count = allReactions.filter((r) => r.emoji === emoji).length;
+              return (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => handleReact(emoji)}
+                  className={cn(
+                    "flex items-center gap-1 rounded-md border bg-background px-1.5 py-0.5 text-[11px] leading-none shadow transition-colors",
+                    mine ? "border-primary/40 text-foreground ring-1 ring-primary/50" : "border-border text-foreground hover:bg-accent"
+                  )}
+                  aria-pressed={mine}
+                  aria-label={`${emoji} reaction, ${count} ${count === 1 ? "person" : "people"}`}
+                >
+                  <span>{emoji}</span>
+                  {count > 1 && <span className="font-medium tabular-nums">{count}</span>}
+                </button>
+              );
+            })}
+          </div>
         )}
       </div>
 
@@ -456,17 +344,8 @@ export function MessageBubble({
         title="Edit message"
         footer={
           <>
-            <Button variant="ghost" onClick={cancelEdit}>
-              Cancel
-            </Button>
-            <Button
-              onClick={saveEdit}
-              disabled={
-                !draft.trim() ||
-                draft.trim() === message.content ||
-                editMutation.isPending
-              }
-            >
+            <Button variant="ghost" onClick={cancelEdit}>Cancel</Button>
+            <Button onClick={saveEdit} disabled={!draft.trim() || draft.trim() === message.content || editMutation.isPending}>
               {editMutation.isPending ? "Saving…" : "Save"}
             </Button>
           </>
@@ -480,18 +359,16 @@ export function MessageBubble({
             autoFocus
             maxLength={EDIT_MAX_LENGTH}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 saveEdit();
               }
             }}
-            className="bg-background text-foreground focus:border-primary focus:ring-primary w-full resize-none rounded-md border p-2.5 text-sm transition-colors outline-none focus:ring-1"
+            className="w-full resize-none rounded-md border bg-background p-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
           />
-          <div className="text-muted-foreground flex items-center justify-between text-[11px]">
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
             <span>Enter to save · Shift + Enter for a new line</span>
-            <span className="tabular-nums">
-              {draft.length}/{EDIT_MAX_LENGTH}
-            </span>
+            <span className="tabular-nums">{draft.length}/{EDIT_MAX_LENGTH}</span>
           </div>
         </div>
       </Dialog>
