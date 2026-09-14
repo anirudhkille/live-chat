@@ -59,3 +59,39 @@ export const updateAvatar = (userId, avatarUrl) => {
     data: { avatar: avatarUrl },
   });
 };
+
+export const findPreferencesById = (id) => {
+  return prisma.user.findUnique({
+    where: { id },
+    select: {
+      showOnline: true,
+      readReceipts: true,
+      profileVisible: true,
+      phoneVisible: true,
+      typingIndicators: true,
+      pushNotifications: true,
+    },
+  });
+};
+
+export const updatePreferences = (id, data) => {
+  return prisma.user.update({
+    where: { id },
+    data,
+    select: {
+      showOnline: true,
+      readReceipts: true,
+      profileVisible: true,
+      phoneVisible: true,
+      typingIndicators: true,
+      pushNotifications: true,
+    },
+  });
+};
+
+export const updatePresence = (id, isOnline, lastOnlineAt) => {
+  return prisma.user.update({
+    where: { id },
+    data: { isOnline, lastOnlineAt },
+  });
+};

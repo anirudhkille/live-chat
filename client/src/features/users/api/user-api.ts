@@ -1,5 +1,5 @@
 import { api, putPresignedObject } from "@/lib/api";
-import type { ApiResponse, User } from "@/types/api";
+import type { ApiResponse, User, UserPreferences } from "@/types/api";
 
 export async function searchUser(
   search: string,
@@ -43,4 +43,19 @@ export async function uploadAvatar(
   const { data: urlData } = await getAvatarUploadUrl(contentType);
   await putPresignedObject(urlData.uploadUrl, blob, contentType);
   return confirmAvatarUpload(urlData.key);
+}
+
+export async function getUserPreferences(): Promise<ApiResponse<UserPreferences>> {
+  const response = await api.get<ApiResponse<UserPreferences>>("/user/me/preferences");
+  return response.data;
+}
+
+export async function updateUserPreferences(
+  preferences: Partial<UserPreferences>
+): Promise<ApiResponse<UserPreferences>> {
+  const response = await api.patch<ApiResponse<UserPreferences>>(
+    "/user/me/preferences",
+    preferences
+  );
+  return response.data;
 }

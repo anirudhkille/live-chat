@@ -6,6 +6,7 @@ import {
   registerCallHandlers,
   handleCallDisconnect,
 } from "../modules/call/call.socket.js";
+import * as userService from "../modules/user/user.service.js";
 
 let io;
 const online = new Map(); // userId -> Set<socketId>
@@ -48,14 +49,28 @@ export const createSocketServer = (httpServer) => {
     }
   });
 
-  io.on("connection", (socket) => {
+  io.on("connection", async (socket) => {
     const userId = socket.userId;
 
     if (!online.has(userId)) {
       online.set(userId, new Set());
     }
     online.get(userId).add(socket.id);
-    socket.broadcast.emit("user-online", { userId });
+
+    let preferences;
+    try {
+      preferences = await userService.getUserPreferences(userId);
+    } catch (error) {
+      logger.error({ err: error.message, userId }, "Failed to load preferences");
+    }
+
+    const canShowOnline = preferences?.showOnline ?? true;
+    socket.showOnline = canShowOnline;
+
+    if (canShowOnline) {
+      await userService.setUserPresence(userId, true);
+      socket.broadcast.emit("user-online", { userId });
+    }
     logger.info(`User connected: ${userId}`);
 
     socket.on("join-conversation", (conversationId) => {
@@ -64,13 +79,16 @@ export const createSocketServer = (httpServer) => {
       logger.info(`User joined conversationId: ${conversationId}`);
     });
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", async () => {
       const sockets = online.get(userId);
       if (sockets) {
         sockets.delete(socket.id);
         if (sockets.size === 0) {
           online.delete(userId);
-          socket.broadcast.emit("user-offline", { userId });
+          if (socket.showOnline) {
+            await userService.setUserPresence(userId, false);
+            socket.broadcast.emit("user-offline", { userId });
+          }
         }
       }
       handleCallDisconnect(userId);

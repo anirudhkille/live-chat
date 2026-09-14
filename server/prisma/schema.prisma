@@ -17,6 +17,17 @@ model User {
   name      String?
   avatar    String?
   email     String   @unique
+  phone     String?
+  isOnline  Boolean  @default(false)
+  lastOnlineAt DateTime?
+
+  showOnline       Boolean @default(true)
+  readReceipts     Boolean @default(true)
+  profileVisible   Boolean @default(true)
+  phoneVisible     Boolean @default(false)
+  typingIndicators Boolean @default(true)
+  pushNotifications Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

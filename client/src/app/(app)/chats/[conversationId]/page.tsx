@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Info, Loader2, Users } from "lucide-react";
 import { socket } from "@/lib/socket";
@@ -8,12 +8,35 @@ import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { MessageList } from "@/features/conversations/components/message-list";
 import { MessageInput } from "@/features/conversations/components/message-input";
-import { useIsDesktop } from "@/hooks/use-media-query";
 import { useConversationWithMessages } from "@/features/conversations/hooks/useConversationWithMessages";
 import { CallButtons } from "@/features/calls/call-buttons";
 import { useCalls } from "@/features/calls/use-calls";
 import { useCallStore } from "@/features/calls/call-store";
 import dynamic from "next/dynamic";
+import type { Conversation } from "@/types/api";
+
+function formatLastSeen(iso: string) {
+  const date = new Date(iso);
+  const now = new Date();
+  const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (diffSec < 60) return "just now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}h ago`;
+  const diffDay = Math.floor(diffHour / 24);
+  if (diffDay < 7) return `${diffDay}d ago`;
+  return date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+function initialStatus(conversation: Conversation | undefined) {
+  if (!conversation || conversation.isGroup) return null;
+  if (conversation.isOnline) return "online";
+  if (conversation.lastOnlineAt) {
+    return `last seen ${formatLastSeen(conversation.lastOnlineAt)}`;
+  }
+  return null;
+}
 
 const CallOverlay = dynamic(
   () => import("@/features/calls/call-overlay").then((m) => m.CallOverlay),
@@ -33,26 +56,34 @@ export default function ChatThreadPage({
 }: {
   params: Promise<{ conversationId: string }>;
 }) {
-  const [status, setStatus] = useState<null | "typing..." | "online">(null);
   const [membersOpen, setMembersOpen] = useState(false);
   const { conversationId } = use(params);
-  const isDesktop = useIsDesktop();
 
   const { data: conversationData, isLoading: loadingConversation } =
     useConversationWithMessages(conversationId);
   const conversation = conversationData?.conversation;
+
+  const baseStatus = useMemo(() => initialStatus(conversation), [conversation]);
+  const [liveStatusByConversation, setLiveStatusByConversation] = useState<
+    Record<string, string>
+  >({});
+  const status = liveStatusByConversation[conversationId] ?? baseStatus;
+
+  const setLiveStatus = useCallback(
+    (next: string) => {
+      setLiveStatusByConversation((prev) => ({
+        ...prev,
+        [conversationId]: next,
+      }));
+    },
+    [conversationId]
+  );
 
   const calls = useCalls();
   const callStatus = useCallStore((s) => s.status);
 
   const otherUserName = conversation?.name ?? conversation?.email ?? "Unknown";
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [prevConversationId, setPrevConversationId] = useState(conversationId);
-
-  if (conversationId !== prevConversationId) {
-    setPrevConversationId(conversationId);
-    setStatus(null);
-  }
 
   useEffect(() => {
     socket.connect();
@@ -69,29 +100,29 @@ export default function ChatThreadPage({
     }) => {
       if (payload.conversationId !== conversationId) return;
       if (payload.isTyping === false) {
-        setStatus("online");
+        setLiveStatus("online");
         return;
       }
-      setStatus("typing...");
+      setLiveStatus("typing...");
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
-        setStatus("online");
+        setLiveStatus("online");
       }, 3000);
     };
 
     const handleUserOnline = (payload: { userId: string }) => {
       if (!otherUserId || payload.userId !== otherUserId) return;
-      setStatus("online");
+      setLiveStatus("online");
     };
 
     const handleUserOffline = (payload: { userId: string }) => {
       if (!otherUserId || payload.userId !== otherUserId) return;
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      setStatus(null);
+      setLiveStatus("last seen just now");
     };
 
     const handleOnlineUsers = (userIds: string[]) => {
-      if (otherUserId && userIds.includes(otherUserId)) setStatus("online");
+      if (otherUserId && userIds.includes(otherUserId)) setLiveStatus("online");
     };
 
     socket.on("user-typing", handleUserTyping);
@@ -106,20 +137,18 @@ export default function ChatThreadPage({
       socket.off("user-offline", handleUserOffline);
       socket.off("online-users", handleOnlineUsers);
     };
-  }, [conversationId, conversation?.otherUserId]);
+  }, [conversationId, conversation?.otherUserId, setLiveStatus]);
 
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col">
       <header className="flex items-center gap-2 border-b p-3">
-        {!isDesktop && (
-          <Link
-            href="/chats"
-            aria-label="Back"
-            className="inline-flex items-center justify-center p-1"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        )}
+        <Link
+          href="/chats"
+          aria-label="Back"
+          className="inline-flex items-center justify-center p-1 md:hidden"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Link>
         <div className="flex min-w-0 items-center gap-2">
           {conversation ? (
             <Avatar

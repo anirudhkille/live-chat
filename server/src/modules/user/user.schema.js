@@ -13,3 +13,12 @@ export const avatarConfirmSchema = z.object({
   height: z.number(),
   duration: z.string(),
 });
+
+export const updatePreferencesSchema = z.object({
+  showOnline: z.boolean().optional(),
+  readReceipts: z.boolean().optional(),
+  profileVisible: z.boolean().optional(),
+  phoneVisible: z.boolean().optional(),
+  typingIndicators: z.boolean().optional(),
+  pushNotifications: z.boolean().optional(),
+});

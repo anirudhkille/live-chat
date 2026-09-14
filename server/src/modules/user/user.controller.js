@@ -23,3 +23,13 @@ export const confirmAvatarUpload = asyncHandler(async (req, res) => {
   const user = await userService.confirmAvatarUpload(req.user.id, key);
   sendResponse(res, 200, "Avatar saved successfully", user);
 });
+
+export const getPreferences = asyncHandler(async (req, res) => {
+  const preferences = await userService.getUserPreferences(req.user.id);
+  sendResponse(res, 200, "Preferences fetched successfully", preferences);
+});
+
+export const updatePreferences = asyncHandler(async (req, res) => {
+  const preferences = await userService.updateUserPreferences(req.user.id, req.body);
+  sendResponse(res, 200, "Preferences updated successfully", preferences);
+});

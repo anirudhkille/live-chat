@@ -10,6 +10,7 @@ export const toConversationResponse = (conversation, userId) => {
   const lastMessage = conversation.messages?.[0] ?? null;
   const isGroup = conversation.isGroup;
   const otherUser = conversation.participants.find((p) => p.userId !== userId);
+  const peerVisible = !!otherUser?.user?.showOnline;
   return {
     id: conversation.id,
     isGroup,
@@ -17,6 +18,8 @@ export const toConversationResponse = (conversation, userId) => {
     photoUrl: isGroup ? conversation.photoUrl : otherUser?.user?.avatar,
     email: isGroup ? null : (otherUser?.user?.email ?? null),
     otherUserId: otherUser?.userId ?? null,
+    isOnline: isGroup ? null : peerVisible ? otherUser?.user?.isOnline ?? false : false,
+    lastOnlineAt: isGroup ? null : peerVisible ? otherUser?.user?.lastOnlineAt ?? null : null,
     unreadCount: conversation._unreadCount ?? 0,
     participants: isGroup ? toParticipants(conversation.participants) : [],
     lastMessage: lastMessage

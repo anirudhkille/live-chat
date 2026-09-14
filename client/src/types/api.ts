@@ -25,6 +25,8 @@ export type Conversation = {
   photoUrl: string | null;
   email: string | null;
   otherUserId: string | null;
+  isOnline: boolean | null;
+  lastOnlineAt: string | null;
   unreadCount: number;
   participants: GroupParticipant[];
   lastMessage: Message | null;
@@ -91,6 +93,15 @@ export type Attachment = {
 export type MessagePage = {
   messages: Message[];
   nextCursor: string | null;
+};
+
+export type UserPreferences = {
+  showOnline: boolean;
+  readReceipts: boolean;
+  profileVisible: boolean;
+  phoneVisible: boolean;
+  typingIndicators: boolean;
+  pushNotifications: boolean;
 };
 
 export type Notification = {

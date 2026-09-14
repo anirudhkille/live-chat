@@ -42,3 +42,23 @@ export async function confirmAvatarUpload(userId, key) {
   const avatarUrl = `${env.R2_PUBLIC_URL}/${key}`;
   return userRepository.updateAvatar(userId, avatarUrl);
 }
+
+export const getUserPreferences = async (userId) => {
+  const preferences = await userRepository.findPreferencesById(userId);
+  if (!preferences) {
+    throw new AppError(404, "User not found");
+  }
+  return preferences;
+};
+
+export const updateUserPreferences = async (userId, data) => {
+  return userRepository.updatePreferences(userId, data);
+};
+
+export const setUserPresence = async (userId, isOnline) => {
+  return userRepository.updatePresence(
+    userId,
+    isOnline,
+    isOnline ? null : new Date()
+  );
+};

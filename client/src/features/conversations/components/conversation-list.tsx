@@ -30,6 +30,31 @@ function formatTime(iso: string) {
   return date.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
+function formatLastSeen(iso: string) {
+  const date = new Date(iso);
+  const now = new Date();
+  const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (diffSec < 60) return "just now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}h ago`;
+  const diffDay = Math.floor(diffHour / 24);
+  if (diffDay < 7) return `${diffDay}d ago`;
+  return formatTime(iso);
+}
+
+function presenceLabel(conversation: Conversation) {
+  if (conversation.isGroup) {
+    return `${conversation.participants?.length ?? 0} members`;
+  }
+  if (conversation.isOnline) return "online";
+  if (conversation.lastOnlineAt) {
+    return `last seen ${formatLastSeen(conversation.lastOnlineAt)}`;
+  }
+  return null;
+}
+
 const ConversationItem = memo(function ConversationItem({
   conversation,
   isActive,
@@ -46,7 +71,6 @@ const ConversationItem = memo(function ConversationItem({
     lastMessage,
     unreadCount,
     isGroup,
-    participants,
   } = conversation;
   const sender = lastMessage?.sender;
   const senderName = sender?.id === currentUserId ? "You" : sender?.name;
@@ -76,7 +100,9 @@ const ConversationItem = memo(function ConversationItem({
     >
       <div className="relative shrink-0">
         <Avatar name={name} email={email} src={photoUrl} size="sm" />
-        {/* Online status dot — placeholder for presence event wiring */}
+        {!isGroup && conversation.isOnline && (
+          <span className="absolute right-0 bottom-0 h-2.5 w-2.5 rounded-full border-2 border-background bg-green-500" />
+        )}
       </div>
 
       <div className="min-w-0 flex-1">
@@ -92,11 +118,11 @@ const ConversationItem = memo(function ConversationItem({
           <p className="text-muted-foreground truncate text-xs">
             {senderName}: {lastMessagePreview}
           </p>
-        ) : isGroup ? (
+        ) : (
           <p className="text-muted-foreground text-xs">
-            {participants?.length ?? 0} members
+            {presenceLabel(conversation)}
           </p>
-        ) : null}
+        )}
       </div>
 
       {unreadCount > 0 && (
