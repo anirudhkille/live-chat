@@ -1,5 +1,3 @@
-"use client";
-
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { SecuritySettings } from "@/features/e2e/components/security-settings";
@@ -11,7 +9,7 @@ export default function SecurityPage() {
         <Link
           href="/settings"
           aria-label="Back"
-          className="inline-flex items-center justify-center p-1"
+          className="inline-flex items-center justify-center p-1 md:hidden"
         >
           <ArrowLeft className="h-4 w-4" />
         </Link>
