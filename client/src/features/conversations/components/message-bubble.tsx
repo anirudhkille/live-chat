@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import {
   CornerUpRight,
   CheckCheck,
@@ -64,7 +64,7 @@ function hasReacted(
   return (reactions ?? []).some((r) => r.userId === userId && r.emoji === emoji);
 }
 
-export function MessageBubble({
+export const MessageBubble = memo(function MessageBubble({
   message,
   conversationId,
   isGroup = false,
@@ -242,9 +242,9 @@ export function MessageBubble({
             <>
               {(message.attachments ?? []).map((attachment) =>
                 attachment.type === "IMAGE" ? (
-                  <a key={attachment.id} href={attachment.url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-lg" onClick={(e) => e.stopPropagation()}>
+                  <a key={attachment.id} href={attachment.url} target="_blank" rel="noopener noreferrer" className="bg-muted block overflow-hidden rounded-lg" style={{ aspectRatio: attachment.width && attachment.height ? `${attachment.width}/${attachment.height}` : "1/1" }} onClick={(e) => e.stopPropagation()}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={attachment.url} alt={attachment.fileName} className="max-h-64 w-full max-w-56 object-contain transition-transform hover:scale-[1.02]" />
+                    <img src={attachment.url} alt={attachment.fileName} width={attachment.width ?? 224} height={attachment.height ?? 224} className="max-h-64 w-full max-w-56 object-contain transition-transform hover:scale-[1.02]" />
                   </a>
                 ) : attachment.type === "AUDIO" ? (
                   <audio key={attachment.id} controls preload="metadata" src={attachment.url} className="my-0.5 h-10 w-56 max-w-full" onClick={(e) => e.stopPropagation()} />
@@ -374,4 +374,4 @@ export function MessageBubble({
       </Dialog>
     </div>
   );
-}
+});

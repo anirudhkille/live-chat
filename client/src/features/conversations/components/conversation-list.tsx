@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { useEffect } from "react";
+import { memo, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useConversations } from "@/features/conversations/hooks/useConversations";
@@ -30,7 +30,7 @@ function formatTime(iso: string) {
   return date.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
-function ConversationItem({
+const ConversationItem = memo(function ConversationItem({
   conversation,
   isActive,
   currentUserId,
@@ -106,7 +106,7 @@ function ConversationItem({
       )}
     </Link>
   );
-}
+});
 
 export function ConversationList() {
   const pathname = usePathname();

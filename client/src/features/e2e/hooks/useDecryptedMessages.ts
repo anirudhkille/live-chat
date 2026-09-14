@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { deriveConversationKey } from "@/lib/crypto/conversationKey";
 import { decryptMessage } from "@/lib/crypto/messaging";
 import type { Message } from "@/types/api";
@@ -27,22 +27,25 @@ export function useDecryptedMessages(
 
     let cancelled = false;
 
+    const pending = messages.filter(
+      (m) => m.cipherMeta && decrypted[m.id] === undefined
+    );
+
+    if (pending.length === 0) return;
+
     (async () => {
       const results: Record<string, string> = {};
-      for (const message of messages) {
-        if (!message.cipherMeta) continue;
-        if (decrypted[message.id] !== undefined) {
-          results[message.id] = decrypted[message.id];
-          continue;
-        }
+      for (const message of pending) {
         const plain = await decryptMessage(
           conversationKey,
           message.content,
-          message.cipherMeta
+          message.cipherMeta!
         );
         results[message.id] = plain ?? "Unable to decrypt message.";
       }
-      if (!cancelled) setDecrypted(results);
+      if (!cancelled) {
+        setDecrypted((prev) => ({ ...prev, ...results }));
+      }
     })();
 
     return () => {
@@ -51,14 +54,18 @@ export function useDecryptedMessages(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, keys, peerPublicKey, conversationId]);
 
-  return messages.map((message) => {
-    if (!message.cipherMeta) return message;
-    if (!keys || !peerPublicKey) {
-      return { ...message, content: "Message" };
-    }
-    if (decrypted[message.id] === undefined) {
-      return { ...message, content: "Message" };
-    }
-    return { ...message, content: decrypted[message.id] };
-  });
+  return useMemo(
+    () =>
+      messages.map((message) => {
+        if (!message.cipherMeta) return message;
+        if (!keys || !peerPublicKey) {
+          return { ...message, content: "Message" };
+        }
+        if (decrypted[message.id] === undefined) {
+          return { ...message, content: "Message" };
+        }
+        return { ...message, content: decrypted[message.id] };
+      }),
+    [messages, keys, peerPublicKey, decrypted]
+  );
 }
