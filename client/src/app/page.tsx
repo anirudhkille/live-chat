@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
   Bell,
@@ -78,11 +79,12 @@ export default function LandingPage() {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between p-4">
-        <img
+        <Image
           src="/logo.svg"
           alt="Live Chat"
           width={102}
           height={48}
+          priority
           className="h-12 w-auto"
         />
         <ThemeToggle />

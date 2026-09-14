@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   CornerUpRight,
   CheckCheck,
@@ -158,11 +158,16 @@ export const MessageBubble = memo(function MessageBubble({
     toggleReaction.mutate({ messageId: message.id, emoji });
   };
 
-  const allReactions = message.reactions ?? [];
-  const uniqueEmojis = [...new Set(allReactions.map((r) => r.emoji))];
-  const showToolbar = !isDeleted && !isEditing;
+  const { allReactions, uniqueEmojis, myReaction } = useMemo(() => {
+    const list = message.reactions ?? [];
+    return {
+      allReactions: list,
+      uniqueEmojis: [...new Set(list.map((r) => r.emoji))],
+      myReaction: list.find((r) => r.userId === currentUserId)?.emoji,
+    };
+  }, [message.reactions, currentUserId]);
 
-  const myReaction = allReactions.find((r) => r.userId === currentUserId)?.emoji;
+  const showToolbar = !isDeleted && !isEditing;
 
   return (
     <div
