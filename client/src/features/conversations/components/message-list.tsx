@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -11,6 +10,7 @@ import {
 } from "react";
 import { Loader2 } from "lucide-react";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { socket } from "@/lib/socket";
 import { useGetMessages } from "@/features/conversations/hooks/useGetMessages";
 import { useMarkConversationRead } from "@/features/conversations/hooks/useMarkConversationRead";
@@ -29,6 +29,10 @@ type MessageListProps = {
 const SCROLL_BOTTOM_THRESHOLD = 80;
 const SCROLL_TOP_THRESHOLD = 40;
 const LOAD_OLDER_COOLDOWN_MS = 600;
+
+type ListItem =
+  | { type: "date"; id: string; label: string }
+  | { type: "message"; id: string; message: Message };
 
 function updateCachedMessages(
   queryClient: ReturnType<typeof useQueryClient>,
@@ -95,7 +99,6 @@ export function MessageList({
   const [prevConversationId, setPrevConversationId] = useState(conversationId);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
   const prevScrollHeightRef = useRef(0);
   const lastLoadOlderAtRef = useRef(0);
 
@@ -122,7 +125,43 @@ export function MessageList({
     messages
   );
 
-  const hasMessages = displayMessages.length > 0;
+  const items = useMemo<ListItem[]>(() => {
+    const list: ListItem[] = [];
+    displayMessages.forEach((message, index) => {
+      if (
+        index === 0 ||
+        dayKey(message.createdAt) !==
+          dayKey(displayMessages[index - 1].createdAt)
+      ) {
+        list.push({
+          type: "date",
+          id: `date-${dayKey(message.createdAt)}`,
+          label: dayLabel(message.createdAt),
+        });
+      }
+      list.push({ type: "message", id: message.id, message });
+    });
+    return list;
+  }, [displayMessages]);
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => containerRef.current,
+    estimateSize: (index) => (items[index].type === "date" ? 32 : 72),
+    overscan: 6,
+  });
+
+  const scrollToBottom = useCallback(
+    (behavior?: ScrollBehavior) => {
+      if (items.length === 0) return;
+      virtualizer.scrollToIndex(items.length - 1, {
+        align: "end",
+        behavior,
+      });
+    },
+    [items.length, virtualizer]
+  );
 
   useEffect(() => {
     const handleNewMessage = (newMessage: Message) => {
@@ -226,14 +265,11 @@ export function MessageList({
     markConversationRead(conversationId);
   }, [conversationId, isLoading, markConversationRead]);
 
-  const scrollToBottom = useCallback((behavior?: ScrollBehavior) => {
-    bottomRef.current?.scrollIntoView({ behavior });
-  }, []);
-
   useEffect(() => {
-    if (isLoading || !hasMessages) return;
+    if (isLoading || displayMessages.length === 0) return;
     scrollToBottom();
-  }, [conversationId, isLoading, hasMessages, scrollToBottom]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, isLoading]);
 
   useEffect(() => {
     if (!socketMessages.length || !atBottom) return;
@@ -303,36 +339,47 @@ export function MessageList({
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="flex flex-1 flex-col overflow-x-hidden overflow-y-auto p-4"
+      className="relative flex flex-1 flex-col overflow-x-hidden overflow-y-auto p-4"
     >
-      <div className="flex-1" />
       {isFetchingNextPage && (
-        <div className="flex justify-center py-2">
+        <div className="pointer-events-none absolute top-0 right-0 left-0 z-10 flex justify-center py-2">
           <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
         </div>
       )}
-      {displayMessages.map((message, index) => {
-        const prev = displayMessages[index - 1];
-        const showDate =
-          !prev || dayKey(message.createdAt) !== dayKey(prev.createdAt);
-        return (
-          <Fragment key={message.id}>
-            {showDate && (
-              <div className="mt-1 mb-3 flex shrink-0 justify-center">
-                <span className="bg-muted text-muted-foreground rounded px-2.5 py-1 text-[11px] font-medium shadow-sm">
-                  {dayLabel(message.createdAt)}
-                </span>
-              </div>
-            )}
-            <MessageBubble
-              message={message}
-              isGroup={isGroup}
-              conversationId={conversationId}
-            />
-          </Fragment>
-        );
-      })}
-      <div ref={bottomRef} />
+
+      <div style={{ height: `${virtualizer.getTotalSize()}px` }} className="relative w-full flex-1">
+        {virtualizer.getVirtualItems().map((virtualRow) => {
+          const item = items[virtualRow.index];
+          return (
+            <div
+              key={item.id}
+              data-index={virtualRow.index}
+              ref={virtualizer.measureElement}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
+              {item.type === "date" ? (
+                <div className="mt-1 mb-3 flex shrink-0 justify-center">
+                  <span className="bg-muted text-muted-foreground rounded px-2.5 py-1 text-[11px] font-medium shadow-sm">
+                    {item.label}
+                  </span>
+                </div>
+              ) : (
+                <MessageBubble
+                  message={item.message}
+                  isGroup={isGroup}
+                  conversationId={conversationId}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
