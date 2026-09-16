@@ -294,7 +294,7 @@ export function MessageInput({
             <X className="h-3.5 w-3.5" />
           </button>
           <div className="min-w-0 flex-1 truncate text-xs">
-            <span className="font-medium">
+            <span className="font-medium text-foreground">
               Replying to {replyTo.senderName ?? "Unknown"}
             </span>
             <span className="text-muted-foreground ml-1 truncate">

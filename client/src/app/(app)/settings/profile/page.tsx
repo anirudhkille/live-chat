@@ -13,7 +13,7 @@ export default function EditProfilePage() {
         >
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <span className="text-sm font-medium">Edit profile</span>
+        <span className="text-sm font-medium text-foreground">Edit profile</span>
       </header>
 
       <EditProfileForm />

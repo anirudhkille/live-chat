@@ -128,7 +128,7 @@ export default function LandingPage() {
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
             Real-time chat, built modern
           </div>
-          <h1 className="text-balance text-4xl font-medium tracking-tight sm:text-6xl">
+          <h1 className="text-balance text-4xl font-medium tracking-tight text-foreground sm:text-6xl">
             Message people you{" "}
             <span className="text-primary">actually talk to</span>
           </h1>
@@ -160,7 +160,7 @@ export default function LandingPage() {
           className="mx-auto max-w-5xl px-6 py-16 sm:py-24"
         >
           <div className="mb-10 text-center">
-            <h2 className="text-balance text-2xl font-medium tracking-tight sm:text-3xl">
+            <h2 className="text-balance text-2xl font-medium tracking-tight text-foreground sm:text-3xl">
               Everything you need to stay in touch
             </h2>
             <p className="text-muted-foreground text-pretty mx-auto mt-2 max-w-xl text-sm">
@@ -178,7 +178,7 @@ export default function LandingPage() {
                 <div className="bg-primary/10 text-primary mb-3 flex h-10 w-10 items-center justify-center rounded-lg">
                   <feature.icon className="h-5 w-5" aria-hidden="true" />
                 </div>
-                <h3 className="text-balance text-base font-medium">
+                <h3 className="text-balance text-base font-medium text-foreground">
                   {feature.title}
                 </h3>
                 <p className="text-muted-foreground mt-1 text-sm">
@@ -194,7 +194,7 @@ export default function LandingPage() {
             <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-lg">
               <KeyRound className="h-5 w-5" aria-hidden="true" />
             </div>
-            <h2 className="text-balance text-2xl font-medium tracking-tight sm:text-3xl">
+            <h2 className="text-balance text-2xl font-medium tracking-tight text-foreground sm:text-3xl">
               Sign in with your email or Google
             </h2>
             <p className="text-muted-foreground text-pretty max-w-xl text-sm">

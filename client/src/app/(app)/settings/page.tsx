@@ -49,12 +49,12 @@ export default function SettingsPage() {
           <Link
             href="/chats"
             aria-label="Back"
-            className="inline-flex items-center justify-center p-1"
+            className="inline-flex items-center justify-center p-1 text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
         )}
-        <span className="text-sm font-medium">Settings</span>
+        <span className="text-sm font-medium text-foreground">Settings</span>
         <div className="ml-auto">
           <ThemeToggle />
         </div>
@@ -68,7 +68,7 @@ export default function SettingsPage() {
           size="md"
           variant="primary"
         />
-        <p className="mt-2 text-sm font-medium">{user?.name}</p>
+        <p className="mt-2 text-sm font-medium text-foreground">{user?.name}</p>
         <p className="text-muted-foreground text-xs">{user?.email}</p>
       </div>
 
@@ -83,7 +83,7 @@ export default function SettingsPage() {
             }`}
           >
             <Icon className="text-muted-foreground h-4 w-4" />
-            <span className="flex-1">{label}</span>
+            <span className="flex-1 text-foreground">{label}</span>
             {enabled && (
               <ChevronRight className="text-muted-foreground h-4 w-4" />
             )}

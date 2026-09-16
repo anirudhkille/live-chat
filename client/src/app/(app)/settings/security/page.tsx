@@ -13,7 +13,7 @@ export default function SecurityPage() {
         >
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <span className="text-sm font-medium">Security</span>
+        <span className="text-sm font-medium text-foreground">Security</span>
       </header>
 
       <div className="flex-1 p-4">

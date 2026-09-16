@@ -13,7 +13,7 @@ export default function NotificationsPage() {
         >
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <span className="text-sm font-medium">Notifications</span>
+        <span className="text-sm font-medium text-foreground">Notifications</span>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4">

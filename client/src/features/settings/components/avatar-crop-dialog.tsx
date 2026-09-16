@@ -54,7 +54,7 @@ export function AvatarCropDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b p-4">
-          <h2 className="text-sm font-medium">Crop your photo</h2>
+          <h2 className="text-sm font-medium text-card-foreground">Crop your photo</h2>
         </div>
 
         <div className="relative h-72 w-full">

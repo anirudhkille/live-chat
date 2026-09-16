@@ -50,7 +50,7 @@ export default function SearchPage() {
             type="button"
             aria-label="Back"
             onClick={() => router.back()}
-            className="p-1"
+            className="p-1 text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>

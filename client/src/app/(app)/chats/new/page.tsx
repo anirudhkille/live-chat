@@ -80,7 +80,7 @@ export default function NewChatPage() {
           {mode === "group" && (
             <Users className="text-muted-foreground h-4 w-4" />
           )}
-          <span className="text-sm font-medium">
+          <span className="text-sm font-medium text-foreground">
             {mode === "group" ? "New group" : "New chat"}
           </span>
         </div>
@@ -103,7 +103,7 @@ export default function NewChatPage() {
           className={cn(
             "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
             mode === "chat"
-              ? "bg-accent"
+              ? "bg-accent text-foreground"
               : "text-muted-foreground hover:bg-accent/50"
           )}
         >
@@ -121,7 +121,7 @@ export default function NewChatPage() {
           className={cn(
             "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
             mode === "group"
-              ? "bg-accent"
+              ? "bg-accent text-foreground"
               : "text-muted-foreground hover:bg-accent/50"
           )}
         >

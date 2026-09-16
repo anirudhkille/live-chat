@@ -45,7 +45,7 @@ export function GroupMembersDialog({
       title="Group info"
       description={`${members?.length ?? 0} ${(members?.length ?? 0) === 1 ? "member" : "members"}`}
     >
-      <p className="mb-2 text-sm font-medium">Add members</p>
+      <p className="mb-2 text-sm font-medium text-foreground">Add members</p>
       <Input
         value={query}
         onChange={(event) => setQuery(event.target.value)}
@@ -78,7 +78,7 @@ export function GroupMembersDialog({
                   size="xs"
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">
+                  <p className="truncate font-medium text-foreground">
                     {user.name ?? "Unnamed"}
                   </p>
                   <p className="text-muted-foreground truncate text-xs">
@@ -96,7 +96,7 @@ export function GroupMembersDialog({
         )}
       </div>
 
-      <p className="mb-2 text-sm font-medium">Members</p>
+      <p className="mb-2 text-sm font-medium text-foreground">Members</p>
       <div className="max-h-48 space-y-0.5 overflow-y-auto">
         {isLoading ? (
           <div className="flex justify-center py-4">
@@ -115,7 +115,7 @@ export function GroupMembersDialog({
                 size="xs"
               />
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
+                <p className="truncate text-sm font-medium text-foreground">
                   {member.name ?? "Unnamed"}
                   {member.id === currentUserId ? " (you)" : ""}
                 </p>

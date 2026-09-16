@@ -26,7 +26,7 @@ export function Sidebar({ className }: { className?: string }) {
           size="xs"
           variant="primary"
         />
-        <span className="truncate text-sm font-medium">
+        <span className="truncate text-sm font-medium text-card-foreground">
           {user?.name ?? "Account"}
         </span>
         <Link
@@ -54,7 +54,7 @@ export function Sidebar({ className }: { className?: string }) {
           aria-current={pathname.startsWith("/settings") ? "page" : undefined}
           className={cn(
             "text-muted-foreground hover:bg-accent flex flex-1 items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors",
-            pathname.startsWith("/settings") && "bg-accent"
+            pathname.startsWith("/settings") && "bg-accent text-foreground"
           )}
         >
           <Settings className="h-4 w-4" />

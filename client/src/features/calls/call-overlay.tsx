@@ -103,7 +103,7 @@ export function CallOverlay({
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-4">
           <Avatar name={peerName ?? peerId ?? ""} size="lg" />
-          <h2 className="text-xl font-semibold">{peerName ?? "..."}</h2>
+          <h2 className="text-xl font-semibold text-foreground">{peerName ?? "..."}</h2>
           <p className="text-muted-foreground text-sm">
             {status === "outgoing" && "Calling..."}
             {status === "incoming" &&
@@ -129,7 +129,7 @@ export function CallOverlay({
             </Button>
             <Button
               size="icon"
-              className="h-14 w-14 rounded-full bg-green-600 hover:bg-green-700"
+              className="h-14 w-14 rounded-full bg-green-600 text-white hover:bg-green-700"
               aria-label="Accept call"
               onClick={onAccept}
             >

@@ -163,7 +163,7 @@ export default function ChatThreadPage({
             </div>
           )}
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium">
+            <p className="truncate text-sm font-medium text-foreground">
               {loadingConversation ? "Loading..." : otherUserName}
             </p>
             <p className="text-muted-foreground text-xs">
