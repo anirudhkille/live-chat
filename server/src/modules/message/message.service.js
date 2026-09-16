@@ -1,8 +1,9 @@
-import { getIO } from "../../config/socket.js";
+import { getIO, isUserInRoom } from "../../config/socket.js";
 import { logger } from "../../config/logger.js";
 import { AppError } from "../../utils/AppError.js";
 import * as messageRepository from "./message.repository.js";
 import * as conversationRepository from "../conversation/conversation.repository.js";
+import * as userRepository from "../user/user.repository.js";
 import * as pushService from "../push/push.service.js";
 import { toMessageResponse } from "./message.mapper.js";
 
@@ -187,8 +188,17 @@ const notifyRecipients = async (
     if (recipients.length === 0) return;
 
     await Promise.all(
-      recipients.map((recipient) =>
-        pushService.sendMessageNotification({
+      recipients.map(async (recipient) => {
+        const inActiveRoom = isUserInRoom(
+          recipient.userId,
+          `conversation:${conversationId}`,
+        );
+        if (inActiveRoom) return;
+
+        const recipientUser = await userRepository.findById(recipient.userId);
+        if (!recipientUser?.pushNotifications) return;
+
+        await pushService.sendMessageNotification({
           userId: recipient.userId,
           senderName: sender?.user?.name ?? null,
           conversationId,
@@ -198,8 +208,8 @@ const notifyRecipients = async (
             : 0,
           isAudio,
           isEncrypted,
-        }),
-      ),
+        });
+      }),
     );
   } catch (error) {
     logger.error(

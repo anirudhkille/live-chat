@@ -16,6 +16,18 @@ export const isUserOnline = (userId) => {
   return Boolean(sockets && sockets.size > 0);
 };
 
+export const isUserInRoom = (userId, room) => {
+  if (!io) return false;
+  const sockets = online.get(userId);
+  if (!sockets || sockets.size === 0) return false;
+  const roomSet = io.sockets.adapter.rooms.get(room);
+  if (!roomSet) return false;
+  for (const socketId of sockets) {
+    if (roomSet.has(socketId)) return true;
+  }
+  return false;
+};
+
 export const emitToUser = (userId, event, payload) => {
   if (!io) return;
   const sockets = online.get(userId);
