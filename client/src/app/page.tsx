@@ -4,18 +4,22 @@ import {
   Bell,
   CheckCheck,
   KeyRound,
+  Lock,
   Mail,
   MessageSquare,
   PenLine,
+  Phone,
   ShieldCheck,
   Smile,
   Sparkles,
   Users,
+  Video,
   Zap,
 } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AuthRedirect } from "@/components/auth-redirect";
 import { cn } from "@/lib/utils";
 
 const features = [
@@ -51,9 +55,27 @@ const features = [
   },
   {
     icon: MessageSquare,
-    title: "Photo & file sharing",
+    title: "Photo, audio & files",
     description:
-      "Send photos and files with fast, reliable uploads via Cloudflare R2.",
+      "Send photos, voice notes and files with fast uploads via Cloudflare R2.",
+  },
+  {
+    icon: Video,
+    title: "Voice & video calls",
+    description:
+      "Start secure 1:1 calls with WebRTC signalling over Socket.IO.",
+  },
+  {
+    icon: Lock,
+    title: "End-to-end encryption",
+    description:
+      "Direct messages are encrypted on the client using X25519 key exchange.",
+  },
+  {
+    icon: Phone,
+    title: "Online & last seen",
+    description:
+      "See who's online and when they were last active, with privacy controls.",
   },
   {
     icon: Bell,
@@ -78,6 +100,8 @@ const features = [
 export default function LandingPage() {
   return (
     <div className="flex min-h-dvh flex-col">
+      <AuthRedirect />
+
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between p-4">
         <Image
           src="/logo.svg"
@@ -87,35 +111,53 @@ export default function LandingPage() {
           priority
           className="h-12 w-auto"
         />
-        <ThemeToggle />
+        <div className="flex items-center gap-2">
+          <Link
+            href="/login"
+            className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+          >
+            Sign in
+          </Link>
+          <ThemeToggle />
+        </div>
       </header>
 
       <main className="flex-1">
-        <section className="mx-auto flex max-w-3xl flex-col items-center gap-4 px-6 pt-16 pb-4 text-center sm:pt-24">
-          <h1 className="text-balance text-3xl font-medium tracking-tight sm:text-5xl">
-            Message people you actually talk to
+        <section className="mx-auto flex max-w-3xl flex-col items-center gap-5 px-6 pt-16 pb-4 text-center sm:pt-24">
+          <div className="bg-primary/10 text-primary flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium">
+            <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+            Real-time chat, built modern
+          </div>
+          <h1 className="text-balance text-4xl font-medium tracking-tight sm:text-6xl">
+            Message people you{" "}
+            <span className="text-primary">actually talk to</span>
           </h1>
-          <p className="text-muted-foreground text-pretty max-w-xl text-sm sm:text-base">
-            Fast, private messaging with real-time delivery, read receipts, group
-            chats, and push notifications — from a full-stack app built with
+          <p className="text-muted-foreground text-pretty max-w-xl text-base sm:text-lg">
+            Fast, private messaging with real-time delivery, read receipts,
+            group chats, voice/video calls and push notifications — powered by
             Next.js and Express.
           </p>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/login" className={cn(buttonVariants({ size: "lg" }))}>
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href="/login"
+              className={cn(buttonVariants({ size: "lg" }))}
+            >
               Get started
             </Link>
             <Link
-              href="/login"
-              className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
+              href="#features"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" })
+              )}
             >
-              Sign in
+              Explore features
             </Link>
           </div>
         </section>
 
         <section
           id="features"
-          className="mx-auto max-w-5xl px-6 py-16 sm:py-20"
+          className="mx-auto max-w-5xl px-6 py-16 sm:py-24"
         >
           <div className="mb-10 text-center">
             <h2 className="text-balance text-2xl font-medium tracking-tight sm:text-3xl">
@@ -127,7 +169,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {features.map((feature) => (
               <li
                 key={feature.title}
@@ -147,10 +189,10 @@ export default function LandingPage() {
           </ul>
         </section>
 
-        <section className="bg-accent/50 py-16 sm:py-20">
+        <section className="bg-accent/50 py-16 sm:py-24">
           <div className="mx-auto flex max-w-3xl flex-col items-center gap-4 px-6 text-center">
             <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-lg">
-              <Sparkles className="h-5 w-5" aria-hidden="true" />
+              <KeyRound className="h-5 w-5" aria-hidden="true" />
             </div>
             <h2 className="text-balance text-2xl font-medium tracking-tight sm:text-3xl">
               Sign in with your email or Google
@@ -159,9 +201,15 @@ export default function LandingPage() {
               No passwords to create. Verify your email with a one-time code and
               start chatting in seconds.
             </p>
-            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-              <KeyRound className="h-4 w-4" aria-hidden="true" />
-              Secure JWT auth with automatic token refresh
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-3 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+                Secure JWT auth with automatic token refresh
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Lock className="h-4 w-4" aria-hidden="true" />
+                Optional end-to-end encryption
+              </span>
             </div>
             <Link
               href="/login"
@@ -174,7 +222,15 @@ export default function LandingPage() {
       </main>
 
       <footer className="text-muted-foreground border-t p-4 text-center text-xs">
-        Built by Anirudh Kille
+        Built by{" "}
+        <Link
+          href="https://github.com/anirudhkille"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-foreground underline underline-offset-2 transition-colors"
+        >
+          Anirudh Kille
+        </Link>
       </footer>
     </div>
   );

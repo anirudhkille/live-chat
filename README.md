@@ -1,6 +1,6 @@
 # Live Chat
 
-A full-stack real-time chat application with OTP and Google authentication, direct and group conversations, typing indicators, read receipts, message reactions and replies, attachments, web push notifications, and avatar/photo uploads via Cloudflare R2.
+A full-stack real-time chat application with OTP and Google authentication, direct and group conversations, typing indicators, read receipts, message reactions and replies, attachments, web push notifications, voice/video calls, end-to-end encryption for direct messages, online/presence status, user preferences, and avatar/photo uploads via Cloudflare R2.
 
 ## Tech Stack
 
@@ -16,10 +16,14 @@ A full-stack real-time chat application with OTP and Google authentication, dire
 - 👥 Direct and group conversations
 - ✍️ Typing indicators and read receipts
 - 😀 Message reactions and inline replies
-- 🖼️ Photo & file sharing (Cloudflare R2, presigned URLs)
+- 🖼️ Photo, audio, video & file sharing (Cloudflare R2, presigned URLs)
 - 🔔 Web push notifications via VAPID
-- 🟢 Online / presence status
+- 🟢 Online / presence status with last seen
+- ⚙️ Per-user preferences (online status, read receipts, profile/phone visibility, typing indicators, push notifications)
+- 🔒 End-to-end encryption for direct messages
+- 📹 Voice and video calls (WebRTC + Socket.IO signalling)
 - 🔐 JWT access + refresh token auth with automatic rotation
+- ⚡ Virtualized message lists, bundle analyzer, and performance-optimized data fetching
 
 ## Prerequisites
 
@@ -112,22 +116,25 @@ All responses use the envelope `{ success, message, data }`. Every route except 
 
 ### Users — `/api/user`
 
-| Method | Path              | Description                                                          |
-| ------ | ------------------ | ------------------------------------------------------------------------ |
-| GET    | `/search`          | Search users by name/email — query params `search`, `page`, `limit`      |
-| POST   | `/me/avatar-url`   | Returns a presigned R2 upload URL and `key` — body `{ contentType }`     |
-| POST   | `/me/avatar`       | Confirms the upload and updates the avatar — body `{ key }`              |
+| Method | Path                 | Description                                                          |
+| ------ | -------------------- | ------------------------------------------------------------------------ |
+| GET    | `/search`            | Search users by name/email — query params `search`, `page`, `limit`      |
+| GET    | `/me/preferences`    | Get the current user's preference flags                                |
+| PATCH  | `/me/preferences`    | Update preference flags — body `{ showOnline?, readReceipts?, … }`       |
+| POST   | `/me/avatar-url`     | Returns a presigned R2 upload URL and `key` — body `{ contentType }`     |
+| POST   | `/me/avatar`         | Confirms the upload and updates the avatar — body `{ key }`              |
 
 ### Conversations — `/api/conversation`
 
-| Method | Path                     | Description                                    |
-| ------ | ------------------------ | ------------------------------------------------- |
-| POST   | `/`                      | Create/get a direct conversation — body `{ userId }` |
-| GET    | `/`                      | List the current user's conversations           |
-| POST   | `/group`                 | Create a group — body `{ name, participantIds }` |
-| GET    | `/:id`                   | Get a single conversation                         |
-| GET    | `/:id/participants`      | List a group's participants                       |
-| POST   | `/:id/participants`      | Add participants to a group                       |
+| Method | Path                           | Description                                                          |
+| ------ | ------------------------------ | ----------------------------------------------------------------------- |
+| POST   | `/`                            | Create/get a direct conversation — body `{ userId }`                    |
+| GET    | `/`                            | List the current user's conversations (includes peer presence)          |
+| POST   | `/group`                       | Create a group — body `{ name, participantIds }`                        |
+| GET    | `/:id`                         | Get a single conversation                                               |
+| GET    | `/:id/with-messages`           | Get a conversation plus the first page of messages in one call            |
+| GET    | `/:id/participants`            | List a group's participants                                             |
+| POST   | `/:id/participants`            | Add participants to a group                                             |
 
 ### Messages — `/api/message`
 
@@ -228,11 +235,12 @@ server/src/
 
 ### Client (`client/`)
 
-| Command          | Description                              |
-| ------------------ | ------------------------------------------- |
-| `npm run dev`     | Start the development server               |
-| `npm run build`   | Production build (includes type-checking)  |
-| `npm run lint`     | Run ESLint                                 |
+| Command           | Description                                              |
+| ------------------- | --------------------------------------------------------- |
+| `npm run dev`      | Start the development server                             |
+| `npm run build`    | Production build (includes type-checking)                |
+| `npm run lint`     | Run ESLint                                               |
+| `npm run analyze`  | Build and open the bundle analyzer                       |
 
 ## License
 
