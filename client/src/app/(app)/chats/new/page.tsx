@@ -64,7 +64,7 @@ export default function NewChatPage() {
     groupName.trim().length > 0 && selected.length >= 2;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="bg-background flex h-full flex-col">
       <header className="flex items-center gap-2 border-b p-3">
         {!isDesktop && (
           <button

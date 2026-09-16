@@ -43,7 +43,7 @@ export default function SearchPage() {
     showResults && !isLoading && !isError && (!users || users.length === 0);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="bg-background flex h-full flex-col">
       <header className="flex items-center gap-2 border-b p-3">
         {!isDesktop && (
           <button

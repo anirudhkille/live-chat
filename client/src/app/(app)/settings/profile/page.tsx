@@ -4,7 +4,7 @@ import { EditProfileForm } from "./_components/edit-profile-form";
 
 export default function EditProfilePage() {
   return (
-    <div className="flex h-full flex-col">
+    <div className="bg-background flex h-full flex-col">
       <header className="flex items-center gap-2 border-b p-3">
         <Link
           href="/settings"

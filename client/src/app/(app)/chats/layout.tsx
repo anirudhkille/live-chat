@@ -20,7 +20,7 @@ export default function ChatsLayout({
         <Sidebar className={cn(!isRoot && "hidden md:flex")} />
         <main
           className={cn(
-            "min-w-0 flex-1 overflow-hidden",
+            "bg-background min-w-0 flex-1 overflow-hidden",
             isRoot && "hidden md:block"
           )}
         >

@@ -4,7 +4,7 @@ import { NotificationPreferences } from "./_components/notification-preferences"
 
 export default function NotificationsPage() {
   return (
-    <div className="flex h-full flex-col">
+    <div className="bg-background flex h-full flex-col">
       <header className="flex items-center gap-2 border-b p-3">
         <Link
           href="/settings"
