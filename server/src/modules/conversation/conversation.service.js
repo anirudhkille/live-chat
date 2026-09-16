@@ -118,7 +118,7 @@ export const getGroupPhotoUploadUrl = async (contentType) => {
 export const updateGroup = async (
   conversationId,
   actorId,
-  { name, photoUrl },
+  { name, photoKey },
 ) => {
   await assertGroupAdmin(conversationId, actorId);
 
@@ -128,7 +128,9 @@ export const updateGroup = async (
 
   const data = {};
   if (name !== undefined) data.name = name.trim();
-  if (photoUrl !== undefined) data.photoUrl = photoUrl;
+  if (photoKey !== undefined) {
+    data.photoUrl = `${env.R2_PUBLIC_URL}/${photoKey}`;
+  }
 
   const updated = await conversationRepository.updateById(conversationId, data);
 

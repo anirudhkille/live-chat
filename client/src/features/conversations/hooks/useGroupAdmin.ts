@@ -16,7 +16,7 @@ export function useUpdateGroup(conversationId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: { name?: string; photoUrl?: string }) =>
+    mutationFn: (payload: { name?: string; photoKey?: string }) =>
       updateGroup(conversationId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["conversations"] });

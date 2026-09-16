@@ -44,7 +44,7 @@ export async function getGroupPhotoUploadUrl(
 
 export async function updateGroup(
   conversationId: string,
-  payload: { name?: string; photoUrl?: string }
+  payload: { name?: string; photoKey?: string }
 ): Promise<ApiResponse<Conversation>> {
   const response = await api.patch<ApiResponse<Conversation>>(
     `/conversation/${conversationId}`,

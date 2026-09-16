@@ -20,7 +20,7 @@ export const addGroupParticipantsSchema = z.object({
 
 export const updateGroupSchema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
-  photoUrl: z.string().url().optional(),
+  photoKey: z.string().optional(),
 });
 
 export const groupPhotoUrlSchema = z.object({

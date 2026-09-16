@@ -94,7 +94,7 @@ export default function SettingsPage() {
           type="button"
           onClick={() => setConfirmOpen(true)}
           disabled={logout.isPending}
-          className="text-destructive hover:bg-accent flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors disabled:opacity-60"
+          className="text-destructive hover:bg-destructive/10 flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors disabled:opacity-60"
         >
           {logout.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -112,9 +112,9 @@ export default function SettingsPage() {
         description="You'll need to sign in again to access your chats."
         footer={
           <>
-            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>
-              Cancel
-            </Button>
+<Button variant="outline" onClick={() => setConfirmOpen(false)}>
+            Cancel
+          </Button>
             <Button
               variant="destructive"
               disabled={logout.isPending}

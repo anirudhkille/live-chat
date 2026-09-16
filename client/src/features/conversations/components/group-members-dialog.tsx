@@ -20,9 +20,6 @@ import {
 } from "../hooks/useGroupAdmin";
 import type { Conversation, GroupParticipant } from "@/types/api";
 
-const envApiUrl =
-  typeof process !== "undefined" ? process.env.NEXT_PUBLIC_API_URL : "";
-
 export function GroupMembersDialog({
   open,
   onClose,
@@ -79,8 +76,7 @@ export function GroupMembersDialog({
     if (!file) return;
     uploadPhoto.mutate(file, {
       onSuccess: (key) => {
-        const photoUrl = `${envApiUrl?.replace(/\/api$/, "") ?? ""}/${key}`;
-        updateGroup.mutate({ photoUrl });
+        updateGroup.mutate({ photoKey: key });
       },
     });
   };
