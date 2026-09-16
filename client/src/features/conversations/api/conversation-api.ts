@@ -6,6 +6,11 @@ import type {
   Message,
 } from "@/types/api";
 
+export type GroupPhotoUploadUrl = {
+  uploadUrl: string;
+  key: string;
+};
+
 export async function createConversation(
   userId: string
 ): Promise<ApiResponse<Conversation>> {
@@ -17,11 +22,52 @@ export async function createConversation(
 
 export async function createGroup(
   name: string,
-  participantIds: string[]
+  participantIds: string[],
+  photoKey?: string
 ): Promise<ApiResponse<Conversation>> {
   const response = await api.post<ApiResponse<Conversation>>(
     `/conversation/group`,
-    { name, participantIds }
+    { name, participantIds, photoKey }
+  );
+  return response.data;
+}
+
+export async function getGroupPhotoUploadUrl(
+  contentType: string
+): Promise<ApiResponse<GroupPhotoUploadUrl>> {
+  const response = await api.post<ApiResponse<GroupPhotoUploadUrl>>(
+    `/conversation/group/photo-url`,
+    { contentType }
+  );
+  return response.data;
+}
+
+export async function updateGroup(
+  conversationId: string,
+  payload: { name?: string; photoUrl?: string }
+): Promise<ApiResponse<Conversation>> {
+  const response = await api.patch<ApiResponse<Conversation>>(
+    `/conversation/${conversationId}`,
+    payload
+  );
+  return response.data;
+}
+
+export async function deleteGroup(
+  conversationId: string
+): Promise<ApiResponse<{ deleted: boolean }>> {
+  const response = await api.delete<ApiResponse<{ deleted: boolean }>>(
+    `/conversation/${conversationId}`
+  );
+  return response.data;
+}
+
+export async function removeGroupParticipant(
+  conversationId: string,
+  userId: string
+): Promise<ApiResponse<{ removed: string }>> {
+  const response = await api.delete<ApiResponse<{ removed: string }>>(
+    `/conversation/${conversationId}/participants/${userId}`
   );
   return response.data;
 }

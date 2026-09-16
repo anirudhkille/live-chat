@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, MessageSquarePlus, Users, X } from "lucide-react";
+import { ArrowLeft, Camera, Loader2, MessageSquarePlus, Users, X } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/avatar";
@@ -12,6 +12,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { useSearchUsers } from "@/features/users/hooks/useSearch";
 import { useCreateConversation } from "@/features/conversations/hooks/useCreateConversation";
 import { useCreateGroup } from "@/features/conversations/hooks/useCreateGroup";
+import { useUploadGroupPhoto } from "@/features/conversations/hooks/useGroupAdmin";
 import { cn } from "@/lib/utils";
 import { getApiErrorMessage } from "@/types/api";
 import type { User } from "@/types/api";
@@ -26,6 +27,11 @@ export default function NewChatPage() {
   const debouncedQuery = useDebounce(query, 250);
   const [groupName, setGroupName] = useState("");
   const [selected, setSelected] = useState<User[]>([]);
+  const [groupPhoto, setGroupPhoto] = useState<{
+    key: string;
+    preview: string;
+  } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     data: users,
@@ -35,6 +41,7 @@ export default function NewChatPage() {
   } = useSearchUsers(debouncedQuery, 1, 10);
   const createConversation = useCreateConversation();
   const createGroup = useCreateGroup();
+  const uploadPhoto = useUploadGroupPhoto();
 
   const toggleSelect = (user: User) => {
     setSelected((prev) =>
@@ -57,11 +64,21 @@ export default function NewChatPage() {
     createGroup.mutate({
       name: groupName.trim(),
       participantIds: selected.map((user) => user.id),
+      photoKey: groupPhoto?.key,
     });
   };
 
   const canCreateGroup =
     groupName.trim().length > 0 && selected.length >= 2;
+
+  const handlePhotoSelected = (file: File | undefined) => {
+    if (!file) return;
+    uploadPhoto.mutate(file, {
+      onSuccess: (key) => {
+        setGroupPhoto({ key, preview: URL.createObjectURL(file) });
+      },
+    });
+  };
 
   return (
     <div className="bg-background flex h-full flex-col">
@@ -130,13 +147,44 @@ export default function NewChatPage() {
       </div>
 
       {mode === "group" && (
-        <div className="p-3 pb-0">
+        <div className="space-y-2 p-3 pb-0">
           <Input
             value={groupName}
             onChange={(event) => setGroupName(event.target.value)}
             placeholder="Group name"
             aria-label="Group name"
           />
+          <div className="flex items-center gap-3">
+            <Avatar
+              name={groupName || "Group"}
+              src={groupPhoto?.preview ?? null}
+              size="md"
+              variant="primary"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadPhoto.isPending}
+              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm transition-colors disabled:opacity-50"
+            >
+              {uploadPhoto.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Camera className="h-4 w-4" />
+              )}
+              {groupPhoto ? "Change photo" : "Add group photo"}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                handlePhotoSelected(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+          </div>
         </div>
       )}
 

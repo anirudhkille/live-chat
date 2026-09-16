@@ -1,9 +1,32 @@
+import crypto from "crypto";
 import * as conversationRepository from "./conversation.repository.js";
 import * as userRepository from "../user/user.repository.js";
 import * as messageRepository from "../message/message.repository.js";
+import * as storageService from "../storage/storage.service.js";
+import { env } from "../../config/env.config.js";
 import { toConversationResponse, toParticipants } from "./conversation.mapper.js";
 import { getIO, isUserOnline, emitToUser } from "../../config/socket.js";
 import { AppError } from "../../utils/AppError.js";
+
+const GROUP_PHOTO_ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+const assertGroupAdmin = async (conversationId, actorId) => {
+  const conversation = await conversationRepository.getById(conversationId);
+  if (!conversation || !conversation.isGroup) {
+    throw new AppError(404, "Group not found");
+  }
+  const participant = await conversationRepository.findParticipant(
+    conversationId,
+    actorId,
+  );
+  if (!participant) {
+    throw new AppError(403, "You are not a member of this group");
+  }
+  if (participant.role !== "admin") {
+    throw new AppError(403, "Only group admins can do this");
+  }
+  return conversation;
+};
 
 export const createOrGetConversation = async (userId1, userId2) => {
   if (userId1 === userId2) {
@@ -51,7 +74,10 @@ export const getConversationWithMessages = async (
   return { conversation, messages, nextCursor };
 };
 
-export const createGroup = async (userId, { name, participantIds }) => {
+export const createGroup = async (
+  userId,
+  { name, participantIds, photoKey },
+) => {
   const uniqueIds = [...new Set(participantIds)];
   if (uniqueIds.some((id) => id === userId)) {
     throw new AppError(400, "You cannot add yourself as a participant");
@@ -62,13 +88,69 @@ export const createGroup = async (userId, { name, participantIds }) => {
     throw new AppError(400, "One or more users do not exist");
   }
 
+  let photoUrl = null;
+  if (photoKey) {
+    photoUrl = `${env.R2_PUBLIC_URL}/${photoKey}`;
+  }
+
   const conversation = await conversationRepository.createGroup(
     userId,
     name,
     uniqueIds,
+    photoUrl,
   );
 
   return toConversationResponse(conversation, userId);
+};
+
+export const getGroupPhotoUploadUrl = async (contentType) => {
+  if (!GROUP_PHOTO_ALLOWED_TYPES.includes(contentType)) {
+    throw new AppError(400, "Unsupported file type");
+  }
+  const key = `groups/${crypto.randomUUID()}`;
+  const uploadUrl = await storageService.generatePresignedUploadUrl(
+    key,
+    contentType,
+  );
+  return { uploadUrl, key };
+};
+
+export const updateGroup = async (
+  conversationId,
+  actorId,
+  { name, photoUrl },
+) => {
+  await assertGroupAdmin(conversationId, actorId);
+
+  if (name !== undefined && (!name || name.trim().length === 0)) {
+    throw new AppError(400, "Group name can't be empty");
+  }
+
+  const data = {};
+  if (name !== undefined) data.name = name.trim();
+  if (photoUrl !== undefined) data.photoUrl = photoUrl;
+
+  const updated = await conversationRepository.updateById(conversationId, data);
+
+  const io = getIO();
+  io.to(`conversation:${conversationId}`).emit("conversation-updated", {
+    conversationId,
+  });
+
+  return toConversationResponse(updated, actorId);
+};
+
+export const deleteGroup = async (conversationId, actorId) => {
+  await assertGroupAdmin(conversationId, actorId);
+
+  await conversationRepository.deleteById(conversationId);
+
+  const io = getIO();
+  io.to(`conversation:${conversationId}`).emit("group-deleted", {
+    conversationId,
+  });
+
+  return { deleted: true };
 };
 
 export const getGroupParticipants = async (conversationId, userId) => {
@@ -87,13 +169,7 @@ export const addGroupParticipants = async (
   actorId,
   participantIds,
 ) => {
-  const conversation = await conversationRepository.getById(conversationId);
-  if (!conversation || !conversation.isGroup) {
-    throw new AppError(404, "Group not found");
-  }
-  if (!conversation.participants.some((p) => p.userId === actorId)) {
-    throw new AppError(403, "Only group members can add participants");
-  }
+  await assertGroupAdmin(conversationId, actorId);
 
   const uniqueIds = [...new Set(participantIds)];
   if (uniqueIds.some((id) => id === actorId)) {
@@ -105,6 +181,7 @@ export const addGroupParticipants = async (
     throw new AppError(400, "One or more users do not exist");
   }
 
+  const conversation = await conversationRepository.getById(conversationId);
   const existingIds = new Set(conversation.participants.map((p) => p.userId));
   const newIds = uniqueIds.filter((id) => !existingIds.has(id));
 
@@ -125,4 +202,36 @@ export const addGroupParticipants = async (
   }
 
   return { added: newIds, participants: toParticipants(updated.participants) };
+};
+
+export const removeGroupParticipant = async (
+  conversationId,
+  actorId,
+  targetUserId,
+) => {
+  await assertGroupAdmin(conversationId, actorId);
+
+  if (actorId === targetUserId) {
+    throw new AppError(400, "You cannot remove yourself");
+  }
+
+  const participant = await conversationRepository.findParticipant(
+    conversationId,
+    targetUserId,
+  );
+  if (!participant) {
+    throw new AppError(404, "Member not found in this group");
+  }
+
+  await conversationRepository.removeParticipant(conversationId, targetUserId);
+
+  const io = getIO();
+  io.to(`conversation:${conversationId}`).emit("conversation-updated", {
+    conversationId,
+  });
+  if (isUserOnline(targetUserId)) {
+    emitToUser(targetUserId, "removed-from-group", { conversationId });
+  }
+
+  return { removed: targetUserId };
 };

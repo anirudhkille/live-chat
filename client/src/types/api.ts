@@ -16,6 +16,7 @@ export type GroupParticipant = {
   name: string | null;
   avatar: string | null;
   email: string;
+  role: string;
 };
 
 export type Conversation = {
@@ -27,6 +28,7 @@ export type Conversation = {
   otherUserId: string | null;
   isOnline: boolean | null;
   lastOnlineAt: string | null;
+  currentUserRole: string | null;
   unreadCount: number;
   participants: GroupParticipant[];
   lastMessage: Message | null;

@@ -95,11 +95,12 @@ export const getById = (conversationId) => {
   });
 };
 
-export const createGroup = (ownerId, name, participantIds) => {
+export const createGroup = (ownerId, name, participantIds, photoUrl = null) => {
   return prisma.conversation.create({
     data: {
       isGroup: true,
       name,
+      photoUrl,
       participants: {
         create: [
           { userId: ownerId, role: "admin" },
@@ -119,5 +120,31 @@ export const addParticipants = (conversationId, userIds) => {
       role: "member",
     })),
     skipDuplicates: true,
+  });
+};
+
+export const findParticipant = (conversationId, userId) => {
+  return prisma.conversationParticipant.findFirst({
+    where: { conversationId, userId },
+  });
+};
+
+export const updateById = (conversationId, data) => {
+  return prisma.conversation.update({
+    where: { id: conversationId },
+    data,
+    include: { participants: participantsWithUser },
+  });
+};
+
+export const deleteById = (conversationId) => {
+  return prisma.conversation.delete({
+    where: { id: conversationId },
+  });
+};
+
+export const removeParticipant = (conversationId, userId) => {
+  return prisma.conversationParticipant.deleteMany({
+    where: { conversationId, userId },
   });
 };

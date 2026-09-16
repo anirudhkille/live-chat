@@ -11,8 +11,11 @@ export function useCreateGroup() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: { name: string; participantIds: string[] }) =>
-      createGroup(payload.name, payload.participantIds),
+    mutationFn: (payload: {
+      name: string;
+      participantIds: string[];
+      photoKey?: string;
+    }) => createGroup(payload.name, payload.participantIds, payload.photoKey),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
       router.push(`/chats/${result.data.id}`);

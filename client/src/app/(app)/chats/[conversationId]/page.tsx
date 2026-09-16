@@ -220,7 +220,7 @@ export default function ChatThreadPage({
         <GroupMembersDialog
           open={membersOpen}
           onClose={() => setMembersOpen(false)}
-          conversationId={conversationId}
+          conversation={conversation}
         />
       )}
 

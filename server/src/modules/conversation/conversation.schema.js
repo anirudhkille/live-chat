@@ -9,10 +9,20 @@ export const createGroupSchema = z.object({
   participantIds: z
     .array(z.string().cuid("Invalid user id"))
     .min(2, "Select at least 2 members"),
+  photoKey: z.string().optional(),
 });
 
 export const addGroupParticipantsSchema = z.object({
   participantIds: z
     .array(z.string().cuid("Invalid user id"))
     .min(1, "Select at least one member"),
+});
+
+export const updateGroupSchema = z.object({
+  name: z.string().trim().min(1).max(100).optional(),
+  photoUrl: z.string().url().optional(),
+});
+
+export const groupPhotoUrlSchema = z.object({
+  contentType: z.string().min(1, "Content type is required"),
 });

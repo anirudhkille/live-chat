@@ -146,9 +146,13 @@ export function ConversationList() {
     };
     socket.on("conversation-updated", handleConversationChanged);
     socket.on("new-conversation", handleConversationChanged);
+    socket.on("group-deleted", handleConversationChanged);
+    socket.on("removed-from-group", handleConversationChanged);
     return () => {
       socket.off("conversation-updated", handleConversationChanged);
       socket.off("new-conversation", handleConversationChanged);
+      socket.off("group-deleted", handleConversationChanged);
+      socket.off("removed-from-group", handleConversationChanged);
     };
   }, [queryClient]);
 

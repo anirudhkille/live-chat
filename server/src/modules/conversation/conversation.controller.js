@@ -39,6 +39,29 @@ export const createGroup = asyncHandler(async (req, res) => {
   sendResponse(res, 201, "Group created successfully", group);
 });
 
+export const getGroupPhotoUploadUrl = asyncHandler(async (req, res) => {
+  const { contentType } = req.body;
+  const urlData = await conversationService.getGroupPhotoUploadUrl(contentType);
+  sendResponse(res, 200, "Group photo upload url generated", urlData);
+});
+
+export const updateGroup = asyncHandler(async (req, res) => {
+  const group = await conversationService.updateGroup(
+    req.params.id,
+    req.user.id,
+    req.body,
+  );
+  sendResponse(res, 200, "Group updated successfully", group);
+});
+
+export const deleteGroup = asyncHandler(async (req, res) => {
+  const result = await conversationService.deleteGroup(
+    req.params.id,
+    req.user.id,
+  );
+  sendResponse(res, 200, "Group deleted successfully", result);
+});
+
 export const getGroupParticipants = asyncHandler(async (req, res) => {
   const participants = await conversationService.getGroupParticipants(
     req.params.id,
@@ -54,4 +77,13 @@ export const addGroupParticipants = asyncHandler(async (req, res) => {
     req.body.participantIds,
   );
   sendResponse(res, 200, "Members added to group", result);
+});
+
+export const removeGroupParticipant = asyncHandler(async (req, res) => {
+  const result = await conversationService.removeGroupParticipant(
+    req.params.id,
+    req.user.id,
+    req.params.userId,
+  );
+  sendResponse(res, 200, "Member removed from group", result);
 });
