@@ -15,8 +15,11 @@ export function SecuritySettings() {
     keys,
     loading: keysLoading,
     restore,
+    setup,
     isRestoring,
+    isSettingUp,
     restoreError,
+    setupError,
   } = useE2EIdentity();
 
   if (userKeyLoading || keysLoading) {
@@ -67,8 +70,9 @@ export function SecuritySettings() {
               >[0]["recoveryBlob"],
             })
           }
-          isPending={isRestoring}
-          error={restoreError}
+          onReset={(passphrase) => setup(passphrase)}
+          isPending={isRestoring || isSettingUp}
+          error={(restoreError ?? setupError) as Error | null}
         />
       )}
     </div>

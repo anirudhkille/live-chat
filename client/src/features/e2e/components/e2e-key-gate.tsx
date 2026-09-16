@@ -42,8 +42,9 @@ export function E2EKeyGate() {
             >[0]["recoveryBlob"],
           })
         }
-        isPending={isRestoring}
-        error={restoreError}
+        onReset={(passphrase) => setup(passphrase)}
+        isPending={isRestoring || isSettingUp}
+        error={(restoreError ?? setupError) as Error | null}
       />
     );
   }
