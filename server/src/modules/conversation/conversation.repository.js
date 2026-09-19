@@ -12,6 +12,7 @@ const participantsWithUser = {
         isOnline: true,
         lastOnlineAt: true,
         showOnline: true,
+        pushNotifications: true,
       },
     },
   },
@@ -68,21 +69,24 @@ export const getAll = async (userId) => {
     },
   });
 
-  const unreadCounts = await Promise.all(
-    conversations.map((conversation) =>
-      prisma.message.count({
-        where: {
-          conversationId: conversation.id,
-          senderId: { not: userId },
-          reads: { none: { userId } },
-        },
-      }),
-    ),
+  if (conversations.length === 0) return [];
+
+  const unreadRows = await prisma.message.groupBy({
+    by: ["conversationId"],
+    where: {
+      conversationId: { in: conversations.map((c) => c.id) },
+      senderId: { not: userId },
+      reads: { none: { userId } },
+    },
+    _count: { _all: true },
+  });
+  const unreadByConversation = new Map(
+    unreadRows.map((row) => [row.conversationId, row._count._all]),
   );
 
-  return conversations.map((conversation, index) => ({
+  return conversations.map((conversation) => ({
     ...conversation,
-    _unreadCount: unreadCounts[index],
+    _unreadCount: unreadByConversation.get(conversation.id) ?? 0,
   }));
 };
 

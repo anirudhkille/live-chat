@@ -1,6 +1,10 @@
 import { randomUUID } from "crypto";
 import { env } from "../../config/env.config.js";
-import { generatePresignedUploadUrl } from "../storage/storage.service.js";
+import { AppError } from "../../utils/AppError.js";
+import {
+  generatePresignedUploadUrl,
+  getObjectMetadata,
+} from "../storage/storage.service.js";
 import * as attachmentRepository from "./attachment.repository.js";
 
 const ALLOWED_TYPES = [
@@ -33,20 +37,16 @@ export async function getAttachmentUploadUrl(
   { contentType, fileSize },
 ) {
   if (!ALLOWED_TYPES.includes(contentType)) {
-    throw new Error("Unsupported file type");
+    throw new AppError(400, "Unsupported file type");
   }
   if (fileSize && fileSize > MAX_SIZE) {
-    throw new Error("File too large");
+    throw new AppError(400, "File too large");
   }
 
   const extension = contentType.split("/")[1];
   const key = `attachments/${userId}/${randomUUID()}.${extension}`;
 
-  const uploadUrl = await generatePresignedUploadUrl(
-    key,
-    contentType,
-    MAX_SIZE,
-  );
+  const uploadUrl = await generatePresignedUploadUrl(key, contentType);
 
   return { uploadUrl, key };
 }
@@ -56,10 +56,23 @@ export async function confirmAttachmentUpload(userId, data) {
     data;
 
   if (!ALLOWED_TYPES.includes(contentType)) {
-    throw new Error("Unsupported file type");
+    throw new AppError(400, "Unsupported file type");
   }
   if (fileSize > MAX_SIZE) {
-    throw new Error("File too large");
+    throw new AppError(400, "File too large");
+  }
+  if (!key.startsWith(`attachments/${userId}/`)) {
+    throw new AppError(403, "Invalid upload key");
+  }
+
+  let metadata;
+  try {
+    metadata = await getObjectMetadata(key);
+  } catch {
+    throw new AppError(404, "Uploaded file not found");
+  }
+  if ((metadata.ContentLength ?? 0) !== fileSize) {
+    throw new AppError(400, "Upload size does not match declared size");
   }
 
   const url = `${env.R2_PUBLIC_URL}/${key}`;

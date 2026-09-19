@@ -3,17 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import {
-  AlertTriangle,
-  Loader2,
-  Mic,
-  Paperclip,
-  Send,
-  X,
-} from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import { AlertTriangle, Mic, Paperclip, Send, X } from "lucide-react";
 import { socket } from "@/lib/socket";
 import { useChatStore } from "@/store/chat-store";
 import { useSendMessage } from "@/features/conversations/hooks/useSendMessage";
+import { useUserPreferences } from "@/features/users/hooks/useUserPreferences";
 import { useE2EIdentity } from "@/features/e2e/hooks/useE2EIdentity";
 import { usePeerPublicKey } from "@/features/e2e/hooks/usePeerPublicKey";
 import { deriveConversationKey } from "@/lib/crypto/conversationKey";
@@ -61,6 +56,8 @@ export function MessageInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const revokeOnUnmountRef = useRef<string[]>([]);
   const sendMessage = useSendMessage();
+  const { data: preferences } = useUserPreferences();
+  const typingEnabled = preferences?.typingIndicators !== false;
   const { keys } = useE2EIdentity();
   const { data: peerPublicKey } = usePeerPublicKey(isGroup ? null : peerId);
   const canEncrypt = !isGroup && !!keys && !!peerPublicKey;
@@ -71,6 +68,7 @@ export function MessageInput({
 
   const [pending, setPending] = useState<PendingAttachment[]>([]);
   const [pickerError, setPickerError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [voiceActive, setVoiceActive] = useState(false);
 
   const isUploading = pending.some((p) => p.status === "uploading");
@@ -93,6 +91,11 @@ export function MessageInput({
       typingStopTimeoutRef.current = null;
     }
 
+    if (!typingEnabled) {
+      socket.emit("typing-conversation", { conversationId, isTyping: false });
+      return;
+    }
+
     if (draft.trim()) {
       const now = Date.now();
       if (now - lastTypingEmitAtRef.current >= TYPING_THROTTLE_MS) {
@@ -105,7 +108,7 @@ export function MessageInput({
     } else {
       socket.emit("typing-conversation", { conversationId, isTyping: false });
     }
-  }, [draft, conversationId]);
+  }, [draft, conversationId, typingEnabled]);
 
   useEffect(() => {
     return () => {
@@ -196,6 +199,7 @@ export function MessageInput({
 
     let content = rawContent;
     let cipherMeta: Record<string, unknown> | undefined;
+    setSendError(null);
 
     if (canEncrypt && rawContent) {
       const conversationKey = deriveConversationKey({
@@ -208,19 +212,30 @@ export function MessageInput({
       cipherMeta = encrypted.cipherMeta;
     }
 
-    sendMessage.mutate({
-      conversationId,
-      content,
-      cipherMeta,
-      attachmentIds: readyAttachmentIds,
-      ...(replyTo ? { replyToId: replyTo.messageId } : {}),
-    });
-    clearDraft(conversationId);
-    if (replyTo) setReplyTo(conversationId, null);
-    if (pending.length) {
-      pending.forEach((item) => URL.revokeObjectURL(item.previewUrl));
-      setPending([]);
-    }
+    sendMessage.mutate(
+      {
+        conversationId,
+        content,
+        cipherMeta,
+        attachmentIds: readyAttachmentIds,
+        ...(replyTo ? { replyToId: replyTo.messageId } : {}),
+      },
+      {
+        onSuccess: () => {
+          setSendError(null);
+          clearDraft(conversationId);
+          if (replyTo) setReplyTo(conversationId, null);
+          const sentLocalIds = new Set(pending.map((item) => item.localId));
+          pending.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+          setPending((prev) =>
+            prev.filter((item) => !sentLocalIds.has(item.localId))
+          );
+        },
+        onError: () => {
+          setSendError("Failed to send message. Please try again.");
+        },
+      }
+    );
   }, [
     draft,
     pending,
@@ -260,7 +275,7 @@ export function MessageInput({
               />
               {item.status === "uploading" && (
                 <div className="absolute inset-0 flex items-center justify-center rounded-md bg-black/50">
-                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                  <Spinner size="sm" className="text-white" />
                 </div>
               )}
               {item.status === "error" && (
@@ -283,6 +298,11 @@ export function MessageInput({
       {pickerError && (
         <p className="text-destructive px-3 pt-2 text-[11px]">{pickerError}</p>
       )}
+      {sendError && (
+        <p role="alert" className="text-destructive px-3 pt-2 text-[11px]">
+          {sendError}
+        </p>
+      )}
       {replyTo && (
         <div className="border-input/60 bg-muted/40 mx-3 mt-2 flex items-center gap-2 rounded-md border px-3 py-1.5">
           <button
@@ -294,7 +314,7 @@ export function MessageInput({
             <X className="h-3.5 w-3.5" />
           </button>
           <div className="min-w-0 flex-1 truncate text-xs">
-            <span className="font-medium text-foreground">
+            <span className="text-foreground font-medium">
               Replying to {replyTo.senderName ?? "Unknown"}
             </span>
             <span className="text-muted-foreground ml-1 truncate">
@@ -341,7 +361,7 @@ export function MessageInput({
             >
               <Paperclip className="h-5 w-5" />
             </Button>
-            <div className="bg-muted flex flex-1 items-end gap-1 rounded-lg p-1.5 transition-shadow focus-within:ring-2 focus-within:ring-primary/20">
+            <div className="bg-muted focus-within:ring-primary/20 flex flex-1 items-end gap-1 rounded-lg p-1.5 transition-shadow focus-within:ring-2">
               <textarea
                 ref={textareaRef}
                 value={draft}
@@ -351,7 +371,7 @@ export function MessageInput({
                 rows={1}
                 disabled={sendMessage.isPending}
                 aria-label="Message"
-                className="placeholder:text-muted-foreground min-w-0 flex-1 resize-none bg-transparent px-3 py-1 text-sm text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                className="placeholder:text-muted-foreground text-foreground min-w-0 flex-1 resize-none bg-transparent px-3 py-1 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
             {draft.trim() || readyAttachmentIds.length > 0 ? (
@@ -360,10 +380,10 @@ export function MessageInput({
                 size="icon"
                 aria-label="Send message"
                 disabled={sendMessage.isPending || isUploading}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 w-10 shrink-0 rounded-md transition-transform duration-150 ease-out disabled:opacity-50 active:scale-[0.98]"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 w-10 shrink-0 rounded-md transition-transform duration-150 ease-out active:scale-[0.98] disabled:opacity-50"
               >
                 {sendMessage.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Spinner size="sm" />
                 ) : (
                   <Send className="h-5 w-5" />
                 )}
@@ -376,7 +396,7 @@ export function MessageInput({
                 aria-label="Record voice message"
                 onClick={() => setVoiceActive(true)}
                 disabled={isUploading || sendMessage.isPending}
-                className="text-primary-foreground hover:bg-primary/90 border-none h-10 w-10 shrink-0 rounded-md bg-primary transition-transform duration-150 ease-out active:scale-[0.98]"
+                className="text-primary-foreground hover:bg-primary/90 bg-primary h-10 w-10 shrink-0 rounded-md border-none transition-transform duration-150 ease-out active:scale-[0.98]"
               >
                 <Mic className="h-5 w-5" />
               </Button>

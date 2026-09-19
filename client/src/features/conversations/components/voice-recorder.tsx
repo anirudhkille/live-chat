@@ -1,18 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Loader2,
-  Mic,
-  Pause,
-  Play,
-  Send,
-  Square,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Mic, Pause, Play, Send, Square, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { useSendMessage } from "../hooks/useSendMessage";
 import {
@@ -347,11 +339,7 @@ export function VoiceRecorder({
             disabled={isSending}
             onClick={handleSend}
           >
-            {isSending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
+            {isSending ? <Spinner size="sm" /> : <Send className="h-4 w-4" />}
           </Button>
         </>
       )}

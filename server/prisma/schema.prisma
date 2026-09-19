@@ -27,6 +27,8 @@ model User {
   phoneVisible     Boolean @default(false)
   typingIndicators Boolean @default(true)
   pushNotifications Boolean @default(true)
+  chatWallpaperUrl  String?
+  chatWallpaperColor String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -52,6 +54,8 @@ model Conversation {
   participants ConversationParticipant[]
   messages     Message[]
   keys         ConversationKey[]
+
+  @@index([lastMessageAt])
 }
 
 model ConversationParticipant {
@@ -66,7 +70,6 @@ model ConversationParticipant {
   conversationId String
 
   @@unique([userId, conversationId])
-  @@index([userId])
 }
 
 model Message {
@@ -137,6 +140,8 @@ model PushSubscription {
 
   user      User     @relation(fields: [userId], references: [id])
   userId    String
+
+  @@index([userId, createdAt])
 }
 
 model MessageReaction {
@@ -161,8 +166,6 @@ model UserKey {
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String @unique
-
-  @@index([userId])
 }
 
 model ConversationKey {

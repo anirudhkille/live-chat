@@ -1,8 +1,8 @@
 import { api, putPresignedObject } from "@/lib/api";
+import { IMAGE_TYPES } from "@/lib/images";
 import type { ApiResponse, Attachment } from "@/types/api";
 
 export const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024;
-const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const AUDIO_TYPES = [
   "audio/webm",
   "audio/ogg",

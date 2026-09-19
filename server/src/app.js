@@ -14,6 +14,18 @@ import { env } from "./config/env.config.js";
 
 const app = express();
 
+app.disable("x-powered-by");
+
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  if (req.path.startsWith("/api")) {
+    res.setHeader("Cache-Control", "no-store");
+  }
+  next();
+});
+
 app.use(
   cors({
     origin: env.ALLOWED_ORIGNS,

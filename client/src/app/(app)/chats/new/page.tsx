@@ -2,12 +2,12 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Camera, Loader2, MessageSquarePlus, Users, X } from "lucide-react";
+import { ArrowLeft, Camera, MessageSquarePlus, X } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { useIsDesktop } from "@/hooks/use-media-query";
+import { Spinner } from "@/components/ui/spinner";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useSearchUsers } from "@/features/users/hooks/useSearch";
 import { useCreateConversation } from "@/features/conversations/hooks/useCreateConversation";
@@ -21,7 +21,6 @@ type Mode = "chat" | "group";
 
 export default function NewChatPage() {
   const router = useRouter();
-  const isDesktop = useIsDesktop();
   const [mode, setMode] = useState<Mode>("chat");
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebounce(query, 250);
@@ -68,8 +67,7 @@ export default function NewChatPage() {
     });
   };
 
-  const canCreateGroup =
-    groupName.trim().length > 0 && selected.length >= 2;
+  const canCreateGroup = groupName.trim().length > 0 && selected.length >= 2;
 
   const handlePhotoSelected = (file: File | undefined) => {
     if (!file) return;
@@ -83,21 +81,16 @@ export default function NewChatPage() {
   return (
     <div className="bg-background flex h-full flex-col">
       <header className="flex items-center gap-2 border-b p-3">
-        {!isDesktop && (
-          <button
-            type="button"
-            aria-label="Back"
-            onClick={() => router.back()}
-            className="p-1"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-        )}
+        <button
+          type="button"
+          aria-label="Back"
+          onClick={() => router.push("/chats")}
+          className="text-foreground hover:bg-accent rounded-md p-1"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
         <div className="flex items-center gap-2">
-          {mode === "group" && (
-            <Users className="text-muted-foreground h-4 w-4" />
-          )}
-          <span className="text-sm font-medium text-foreground">
+          <span className="text-foreground text-sm font-medium">
             {mode === "group" ? "New group" : "New chat"}
           </span>
         </div>
@@ -121,7 +114,7 @@ export default function NewChatPage() {
             "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
             mode === "chat"
               ? "bg-accent text-foreground"
-              : "text-muted-foreground hover:bg-accent/50"
+              : "text-muted-foreground"
           )}
         >
           New chat
@@ -136,7 +129,7 @@ export default function NewChatPage() {
             setSelected([]);
           }}
           className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            "rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
             mode === "group"
               ? "bg-accent text-foreground"
               : "text-muted-foreground hover:bg-accent/50"
@@ -168,7 +161,7 @@ export default function NewChatPage() {
               className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm transition-colors disabled:opacity-50"
             >
               {uploadPhoto.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Spinner size="sm" />
               ) : (
                 <Camera className="h-4 w-4" />
               )}
@@ -195,7 +188,7 @@ export default function NewChatPage() {
               key={user.id}
               type="button"
               onClick={() => toggleSelect(user)}
-              className="hover:bg-accent flex items-center gap-1.5 rounded-full bg-muted py-1 pr-2 pl-1 text-xs transition-colors"
+              className="hover:bg-accent bg-muted flex items-center gap-1.5 rounded-full py-1 pr-2 pl-1 text-xs transition-colors"
               aria-label={`Remove ${user.name ?? user.email}`}
             >
               <Avatar
@@ -238,7 +231,7 @@ export default function NewChatPage() {
 
         {debouncedQuery.trim().length >= 2 && isLoading && (
           <div className="flex justify-center p-6">
-            <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
+            <Spinner size="sm" className="text-muted-foreground h-5 w-5" />
           </div>
         )}
 
@@ -281,7 +274,7 @@ export default function NewChatPage() {
               disabled={createConversation.isPending || createGroup.isPending}
               onClick={() => handleClickUser(user)}
               className={cn(
-                "hover:bg-accent flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-foreground transition-colors disabled:opacity-50",
+                "hover:bg-accent text-foreground flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors disabled:opacity-50",
                 isSelected && "bg-accent"
               )}
             >
@@ -292,7 +285,9 @@ export default function NewChatPage() {
                 size="sm"
               />
               <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-foreground">{user.name ?? "Unnamed"}</p>
+                <p className="text-foreground truncate font-medium">
+                  {user.name ?? "Unnamed"}
+                </p>
                 <p className="text-muted-foreground truncate text-xs">
                   {user.email}
                 </p>
@@ -314,11 +309,7 @@ export default function NewChatPage() {
             disabled={!canCreateGroup || createGroup.isPending}
             onClick={handleCreateGroup}
           >
-            {createGroup.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              "Create group"
-            )}
+            {createGroup.isPending ? <Spinner size="sm" /> : "Create group"}
           </Button>
           {!canCreateGroup && (
             <p className="text-muted-foreground mt-1.5 text-center text-xs">

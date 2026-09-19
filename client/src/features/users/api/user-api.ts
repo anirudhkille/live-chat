@@ -45,8 +45,45 @@ export async function uploadAvatar(
   return confirmAvatarUpload(urlData.key);
 }
 
-export async function getUserPreferences(): Promise<ApiResponse<UserPreferences>> {
-  const response = await api.get<ApiResponse<UserPreferences>>("/user/me/preferences");
+export type WallpaperUploadUrl = {
+  uploadUrl: string;
+  key: string;
+};
+
+export async function getWallpaperUploadUrl(
+  contentType: string
+): Promise<ApiResponse<WallpaperUploadUrl>> {
+  const response = await api.post<ApiResponse<WallpaperUploadUrl>>(
+    "/user/me/wallpaper-url",
+    { contentType }
+  );
+  return response.data;
+}
+
+export async function confirmWallpaperUpload(
+  key: string
+): Promise<ApiResponse<User>> {
+  const response = await api.post<ApiResponse<User>>("/user/me/wallpaper", {
+    key,
+  });
+  return response.data;
+}
+
+export async function uploadWallpaper(
+  blob: Blob,
+  contentType: string
+): Promise<ApiResponse<User>> {
+  const { data: urlData } = await getWallpaperUploadUrl(contentType);
+  await putPresignedObject(urlData.uploadUrl, blob, contentType);
+  return confirmWallpaperUpload(urlData.key);
+}
+
+export async function getUserPreferences(): Promise<
+  ApiResponse<UserPreferences>
+> {
+  const response = await api.get<ApiResponse<UserPreferences>>(
+    "/user/me/preferences"
+  );
   return response.data;
 }
 

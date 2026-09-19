@@ -1,8 +1,4 @@
-import {
-  PutObjectCommand,
-  GetObjectCommand,
-  DeleteObjectCommand,
-} from "@aws-sdk/client-s3";
+import { PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { r2 } from "../../config/r2.js";
 import { env } from "../../config/env.config.js";
@@ -18,15 +14,9 @@ export async function generatePresignedUploadUrl(key, contentType) {
   return getSignedUrl(r2, command, { expiresIn: 300 }); // 5 min
 }
 
-export async function generatePresignedGetUrl(key) {
-  const command = new GetObjectCommand({ Bucket: BUCKET, Key: key });
-  return getSignedUrl(r2, command, { expiresIn: 3600 });
-}
-
-export async function deleteObject(key) {
-  return r2.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
-}
-
-export function buildKey(conversationId, filename) {
-  return `conversations/${conversationId}/${crypto.randomUUID()}-${filename}`;
+export async function getObjectMetadata(key) {
+  const response = await r2.send(
+    new HeadObjectCommand({ Bucket: BUCKET, Key: key }),
+  );
+  return response;
 }

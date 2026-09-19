@@ -14,20 +14,38 @@ self.addEventListener("push", (event) => {
     data = {};
   }
 
-  const title = data.title || "New message";
+  const isCall = data.type === "call";
+  const title = data.title || (isCall ? "Incoming call" : "New message");
   const options = {
     body: data.body || "",
-    data: { url: data.url || "/chats" },
+    data: {
+      url: data.url || "/chats",
+      callId: data.callId || null,
+      conversationId: data.conversationId || null,
+      callType: data.callType || null,
+    },
   };
+
+  if (isCall) {
+    options.tag = `call-${data.callId || "incoming"}`;
+    options.renotify = true;
+    options.requireInteraction = true;
+    options.actions = [
+      { action: "accept", title: "Accept" },
+      { action: "decline", title: "Decline" },
+    ];
+  }
 
   event.waitUntil(
     (async () => {
-      const windowClients = await self.clients.matchAll({
-        type: "window",
-        includeUncontrolled: true,
-      });
-      const focused = windowClients.some((client) => client.focused);
-      if (focused) return;
+      if (!isCall) {
+        const windowClients = await self.clients.matchAll({
+          type: "window",
+          includeUncontrolled: true,
+        });
+        const focused = windowClients.some((client) => client.focused);
+        if (focused) return;
+      }
       await self.registration.showNotification(title, options);
     })()
   );
@@ -35,10 +53,17 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetUrl = new URL(
-    event.notification?.data?.url || "/chats",
-    self.location.origin
-  ).href;
+
+  const data = event.notification?.data || {};
+  const targetUrl = new URL(data.url || "/chats", self.location.origin);
+
+  if (data.callId && event.action === "accept") {
+    targetUrl.searchParams.set("accept-call", data.callId);
+  } else if (data.callId && event.action === "decline") {
+    targetUrl.searchParams.set("decline-call", data.callId);
+  }
+
+  const href = targetUrl.href;
 
   event.waitUntil(
     (async () => {
@@ -50,12 +75,12 @@ self.addEventListener("notificationclick", (event) => {
       for (const client of allClients) {
         if ("focus" in client && client.url?.startsWith(self.location.origin)) {
           await client.focus();
-          await client.navigate(targetUrl);
+          await client.navigate(href);
           return;
         }
       }
 
-      await clients.openWindow(targetUrl);
+      await clients.openWindow(href);
     })()
   );
 });

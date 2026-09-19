@@ -10,6 +10,7 @@ import {
   getGroupPhotoUploadUrl,
 } from "../api/conversation-api";
 import { putPresignedObject } from "@/lib/api";
+import { validateImageFile } from "@/lib/images";
 import { getApiErrorMessage } from "@/types/api";
 
 export function useUpdateGroup(conversationId: string) {
@@ -69,17 +70,12 @@ export function useRemoveGroupParticipant(conversationId: string) {
   });
 }
 
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_SIZE = 5 * 1024 * 1024;
-
 export function useUploadGroupPhoto() {
   return useMutation({
     mutationFn: async (file: File) => {
-      if (!ALLOWED_TYPES.includes(file.type)) {
-        throw new Error("Please choose a JPG, PNG, or WebP image.");
-      }
-      if (file.size > MAX_SIZE) {
-        throw new Error("Image must be 5MB or smaller.");
+      const error = validateImageFile(file);
+      if (error) {
+        throw new Error(error);
       }
       const { data: urlData } = await getGroupPhotoUploadUrl(file.type);
       await putPresignedObject(urlData.uploadUrl, file, file.type);

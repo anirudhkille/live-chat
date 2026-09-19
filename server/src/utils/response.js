@@ -1,7 +1,7 @@
 export const sendResponse = (
   res,
   status = 200,
-  message = "Sucess",
+  message = "Success",
   data = {},
 ) => {
   return res.status(status).json({

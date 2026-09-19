@@ -4,13 +4,14 @@ import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Camera, Loader2 } from "lucide-react";
+import { Camera } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar } from "@/components/ui/avatar";
+import { Spinner } from "@/components/ui/spinner";
 import { AvatarCropDialog } from "@/features/settings/components/avatar-crop-dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { getApiErrorMessage } from "@/types/api";
@@ -19,9 +20,7 @@ import { completeProfileSchema } from "@/features/auth/schemas/complete-profile-
 import { useAuthStore } from "@/store/auth-store";
 import { useUpdateProfile } from "@/features/settings/hooks/use-update-profile";
 import { useAvatarUpload } from "@/features/users/hooks/useAvatarUpload";
-
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_SIZE = 5 * 1024 * 1024;
+import { IMAGE_ACCEPT, validateImageFile } from "@/lib/images";
 
 type PendingAvatar = {
   src: string;
@@ -58,12 +57,9 @@ export function EditProfileForm() {
     setFileError(null);
     if (!file) return;
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      setFileError("Please choose a JPG, PNG, or WebP image.");
-      return;
-    }
-    if (file.size > MAX_SIZE) {
-      setFileError("Image must be 5MB or smaller.");
+    const error = validateImageFile(file);
+    if (error) {
+      setFileError(error);
       return;
     }
 
@@ -142,7 +138,7 @@ export function EditProfileForm() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept={IMAGE_ACCEPT}
             className="hidden"
             onChange={(e) => {
               handleFileSelected(e.target.files?.[0]);
@@ -192,7 +188,7 @@ export function EditProfileForm() {
         <Button type="submit" disabled={saveDisabled}>
           {mutation.isPending || avatarMutation.isPending ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Spinner size="sm" />
               Saving…
             </>
           ) : (

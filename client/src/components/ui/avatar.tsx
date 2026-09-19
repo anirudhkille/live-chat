@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { cn } from "@/lib/utils";
+import { safeImageUrl } from "@/lib/safe-url";
 
 const SIZES = {
   xs: "h-8 w-8 text-xs",
@@ -49,7 +50,7 @@ export function Avatar({
   className,
 }: AvatarProps) {
   const [imageFailed, setImageFailed] = useState(false);
-  const imageSrc = src && !imageFailed ? src : null;
+  const imageSrc = imageFailed ? null : safeImageUrl(src);
 
   return (
     <div
@@ -67,6 +68,8 @@ export function Avatar({
         <img
           src={imageSrc}
           alt=""
+          loading="lazy"
+          decoding="async"
           className="h-full w-full object-cover"
           onError={() => setImageFailed(true)}
         />

@@ -3,6 +3,17 @@ import * as authService from "./auth.service.js";
 import { sendResponse } from "../../utils/response.js";
 import { env } from "../../config/env.config.js";
 
+const REFRESH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+
+const setRefreshCookie = (res, refreshToken) => {
+  res.cookie("refreshToken", refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: REFRESH_COOKIE_MAX_AGE,
+  });
+};
+
 export const sendLoginOtp = asyncHandler(async (req, res) => {
   await authService.loginUser(req.body.email);
   sendResponse(res, 200, "Login otp sent your email");
@@ -14,12 +25,7 @@ export const verifyLoginOtp = asyncHandler(async (req, res) => {
     req.body.otp,
   );
 
-  res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
+  setRefreshCookie(res, refreshToken);
 
   sendResponse(res, 200, "Logged in successfully", { user, accessToken });
 });
@@ -29,12 +35,7 @@ export const refreshToken = asyncHandler(async (req, res) => {
     req.cookies.refreshToken,
   );
 
-  res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
+  setRefreshCookie(res, refreshToken);
 
   sendResponse(res, 200, "Token refreshed", { accessToken });
 });
@@ -66,12 +67,7 @@ export const googleCallback = asyncHandler(async (req, res) => {
   const { user, accessToken, refreshToken } =
     await authService.googleLogin(code);
 
-  res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
+  setRefreshCookie(res, refreshToken);
 
   const userData = {
     _id: user.id,

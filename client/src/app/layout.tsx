@@ -15,7 +15,8 @@ export const metadata: Metadata = {
 const themeInitScript = `
 try {
   const stored = localStorage.getItem("live-chat.theme");
-  const dark = stored ? stored === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const theme = stored === "light" || stored === "dark" ? stored : "system";
+  const dark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
   document.documentElement.classList.toggle("dark", dark);
 } catch {}
 `;

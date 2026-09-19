@@ -24,12 +24,29 @@ export const confirmAvatarUpload = asyncHandler(async (req, res) => {
   sendResponse(res, 200, "Avatar saved successfully", user);
 });
 
+export const getWallpaperUploadUrl = asyncHandler(async (req, res) => {
+  const { contentType } = req.body;
+
+  const url = await userService.getWallpaperUploadUrl(req.user.id, contentType);
+  sendResponse(res, 200, "Wallpaper upload url generated successfully", url);
+});
+
+export const confirmWallpaperUpload = asyncHandler(async (req, res) => {
+  const { key } = req.body;
+
+  const user = await userService.confirmWallpaperUpload(req.user.id, key);
+  sendResponse(res, 200, "Wallpaper saved successfully", user);
+});
+
 export const getPreferences = asyncHandler(async (req, res) => {
   const preferences = await userService.getUserPreferences(req.user.id);
   sendResponse(res, 200, "Preferences fetched successfully", preferences);
 });
 
 export const updatePreferences = asyncHandler(async (req, res) => {
-  const preferences = await userService.updateUserPreferences(req.user.id, req.body);
+  const preferences = await userService.updateUserPreferences(
+    req.user.id,
+    req.body,
+  );
   sendResponse(res, 200, "Preferences updated successfully", preferences);
 });

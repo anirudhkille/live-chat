@@ -120,7 +120,9 @@ export function useCalls() {
       return;
     }
 
-    socket.emit("call:accept", { callId: state.callId });
+    socket.emit(state.pending ? "call:accept-pending" : "call:accept", {
+      callId: state.callId,
+    });
   }, [applyLocalTracks, setupPeerConnection]);
 
   const setupIncomingOffer = useCallback(
@@ -138,7 +140,15 @@ export function useCalls() {
   );
 
   const endCallFlow = useCallback(
-    (reason: "ended" | "rejected" | "cancelled" | "timedOut" | "error") => {
+    (
+      reason:
+        | "ended"
+        | "rejected"
+        | "cancelled"
+        | "timedOut"
+        | "pendingTimedOut"
+        | "error"
+    ) => {
       resetConnection();
       useCallStore.getState().endCall(reason);
     },
@@ -148,7 +158,9 @@ export function useCalls() {
   const rejectCall = useCallback(() => {
     const state = useCallStore.getState();
     if (!state.callId) return;
-    socket.emit("call:reject", { callId: state.callId });
+    socket.emit(state.pending ? "call:reject-pending" : "call:reject", {
+      callId: state.callId,
+    });
     endCallFlow("rejected");
   }, [endCallFlow]);
 
@@ -256,6 +268,39 @@ export function useCalls() {
       endCallFlow("error");
     };
 
+    const handlePending = () => {
+      const state = useCallStore.getState();
+      if (state.status !== "outgoing" || state.role !== "caller") return;
+      state.markPending();
+    };
+
+    const handlePendingIncoming = (payload: {
+      callId: string;
+      type: CallType;
+      conversationId: string;
+      callerId: string;
+      callerName: string | null;
+    }) => {
+      if (useCallStore.getState().status !== "idle") return;
+      callIdRef.current = payload.callId;
+      useCallStore.getState().receiveIncoming({
+        callId: payload.callId,
+        type: payload.type,
+        conversationId: payload.conversationId,
+        callerId: payload.callerId,
+        callerName: payload.callerName,
+        pending: true,
+      });
+    };
+
+    const handlePendingTimedOut = () => {
+      endCallFlow("pendingTimedOut");
+    };
+
+    const handlePendingExpired = () => {
+      endCallFlow("timedOut");
+    };
+
     socket.on("call:ringing", handleRinging);
     socket.on("call:accepted", handleAccepted);
     socket.on("call:peer-offer", handlePeerOffer);
@@ -266,6 +311,10 @@ export function useCalls() {
     socket.on("call:cancelled", handleCancelled);
     socket.on("call:timed-out", handleTimedOut);
     socket.on("call:unavailable", handleUnavailable);
+    socket.on("call:pending", handlePending);
+    socket.on("call:pending-incoming", handlePendingIncoming);
+    socket.on("call:pending-timed-out", handlePendingTimedOut);
+    socket.on("call:pending-expired", handlePendingExpired);
 
     return () => {
       socket.off("call:ringing", handleRinging);
@@ -278,8 +327,30 @@ export function useCalls() {
       socket.off("call:cancelled", handleCancelled);
       socket.off("call:timed-out", handleTimedOut);
       socket.off("call:unavailable", handleUnavailable);
+      socket.off("call:pending", handlePending);
+      socket.off("call:pending-incoming", handlePendingIncoming);
+      socket.off("call:pending-timed-out", handlePendingTimedOut);
+      socket.off("call:pending-expired", handlePendingExpired);
     };
   }, [applyLocalTracks, endCallFlow, setupIncomingOffer, setupPeerConnection]);
+
+  useEffect(() => {
+    const unsubscribe = useCallStore.subscribe((state) => {
+      const action = state.autoAction;
+      if (!action) return;
+      if (
+        state.status !== "incoming" ||
+        state.callId !== action.callId ||
+        !state.pending
+      ) {
+        return;
+      }
+      useCallStore.getState().clearAutoAction();
+      if (action.action === "accept") void acceptCall();
+      else rejectCall();
+    });
+    return unsubscribe;
+  }, [acceptCall, rejectCall]);
 
   return {
     startCall,

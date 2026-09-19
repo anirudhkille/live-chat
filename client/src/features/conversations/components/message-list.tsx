@@ -7,13 +7,17 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
 } from "react";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { socket } from "@/lib/socket";
+import { useSocketEvents } from "@/hooks/useSocketEvents";
 import { useGetMessages } from "@/features/conversations/hooks/useGetMessages";
 import { useMarkConversationRead } from "@/features/conversations/hooks/useMarkConversationRead";
+import { useUserPreferences } from "@/features/users/hooks/useUserPreferences";
+import { safeImageUrl } from "@/lib/safe-url";
+import { dayKey, dayLabel } from "@/lib/datetime";
 import { useDecryptedMessages } from "@/features/e2e/hooks/useDecryptedMessages";
 import { MessageBubble } from "./message-bubble";
 import { useAuthStore } from "@/store/auth-store";
@@ -54,31 +58,6 @@ function updateCachedMessages(
   );
 }
 
-function dayKey(iso: string) {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-}
-
-function dayLabel(iso: string) {
-  const d = new Date(iso);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const dateOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const diffDays = Math.round(
-    (today.getTime() - dateOnly.getTime()) / 86400000
-  );
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays > 1 && diffDays < 7) {
-    return d.toLocaleDateString([], { weekday: "long" });
-  }
-  return d.toLocaleDateString([], {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
 export function MessageList({
   conversationId,
   peerId = null,
@@ -105,6 +84,24 @@ export function MessageList({
   const currentUserId = useAuthStore((s) => s.user?.id);
   const queryClient = useQueryClient();
   const { mutate: markConversationRead } = useMarkConversationRead();
+  const { data: preferences } = useUserPreferences();
+
+  const wallpaperStyle = useMemo<CSSProperties | undefined>(() => {
+    const url = safeImageUrl(preferences?.chatWallpaperUrl);
+    const color = preferences?.chatWallpaperColor ?? null;
+    if (!url && !color) return undefined;
+    return {
+      backgroundColor: color ?? undefined,
+      ...(url
+        ? {
+            backgroundImage: `url(${url})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+          }
+        : {}),
+    };
+  }, [preferences?.chatWallpaperUrl, preferences?.chatWallpaperColor]);
 
   if (conversationId !== prevConversationId) {
     setPrevConversationId(conversationId);
@@ -114,10 +111,16 @@ export function MessageList({
 
   const historyMessages = useMemo(() => (data ? data.flat() : []), [data]);
 
-  const messages = useMemo(
-    () => [...historyMessages].reverse().concat(socketMessages),
-    [historyMessages, socketMessages]
-  );
+  const messages = useMemo(() => {
+    const history = [...historyMessages].reverse();
+    const seen = new Set(history.map((message) => message.id));
+    const live = socketMessages.filter((message) => {
+      if (seen.has(message.id)) return false;
+      seen.add(message.id);
+      return true;
+    });
+    return history.concat(live);
+  }, [historyMessages, socketMessages]);
 
   const displayMessages = useDecryptedMessages(
     conversationId,
@@ -163,20 +166,13 @@ export function MessageList({
     [items.length, virtualizer]
   );
 
-  useEffect(() => {
-    const handleNewMessage = (newMessage: Message) => {
+  useSocketEvents({
+    "new-message": (newMessage: Message) => {
       if (newMessage.conversationId !== conversationId) return;
       setSocketMessages((prev) => [...prev, newMessage]);
       markConversationRead(conversationId);
-    };
-    socket.on("new-message", handleNewMessage);
-    return () => {
-      socket.off("new-message", handleNewMessage);
-    };
-  }, [conversationId, markConversationRead]);
-
-  useEffect(() => {
-    const handleMessagesRead = (payload: {
+    },
+    "messages-read": (payload: {
       conversationId: string;
       userId: string;
       readAt: string;
@@ -195,15 +191,8 @@ export function MessageList({
           ? { ...message, readAt: payload.readAt }
           : message
       );
-    };
-    socket.on("messages-read", handleMessagesRead);
-    return () => {
-      socket.off("messages-read", handleMessagesRead);
-    };
-  }, [conversationId, currentUserId, queryClient]);
-
-  useEffect(() => {
-    const handleMessageUpdated = (payload: {
+    },
+    "message-updated": (payload: {
       conversationId: string;
       message: Message;
     }) => {
@@ -215,9 +204,8 @@ export function MessageList({
       updateCachedMessages(queryClient, conversationId, (message) =>
         message.id === updated.id ? updated : message
       );
-    };
-
-    const handleMessageDeleted = (payload: {
+    },
+    "message-deleted": (payload: {
       conversationId: string;
       message: Message;
     }) => {
@@ -229,18 +217,8 @@ export function MessageList({
       updateCachedMessages(queryClient, conversationId, (message) =>
         message.id === deleted.id ? deleted : message
       );
-    };
-
-    socket.on("message-updated", handleMessageUpdated);
-    socket.on("message-deleted", handleMessageDeleted);
-    return () => {
-      socket.off("message-updated", handleMessageUpdated);
-      socket.off("message-deleted", handleMessageDeleted);
-    };
-  }, [conversationId, queryClient]);
-
-  useEffect(() => {
-    const handleMessageReacted = (payload: {
+    },
+    "message-reacted": (payload: {
       conversationId: string;
       message: Message;
     }) => {
@@ -252,13 +230,8 @@ export function MessageList({
       updateCachedMessages(queryClient, conversationId, (message) =>
         message.id === reacted.id ? reacted : message
       );
-    };
-
-    socket.on("message-reacted", handleMessageReacted);
-    return () => {
-      socket.off("message-reacted", handleMessageReacted);
-    };
-  }, [conversationId, queryClient]);
+    },
+  });
 
   useEffect(() => {
     if (!conversationId || isLoading) return;
@@ -312,7 +285,7 @@ export function MessageList({
   if (isLoading) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
+        <Spinner size="sm" className="text-muted-foreground h-5 w-5" />
       </div>
     );
   }
@@ -328,7 +301,10 @@ export function MessageList({
 
   if (!displayMessages.length) {
     return (
-      <div className="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-1 p-6 text-center">
+      <div
+        style={wallpaperStyle}
+        className="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-1 p-6 text-center"
+      >
         <p className="text-xs">No messages yet.</p>
         <p className="text-[11px]">Send the first message to get started.</p>
       </div>
@@ -339,15 +315,19 @@ export function MessageList({
     <div
       ref={containerRef}
       onScroll={handleScroll}
+      style={wallpaperStyle}
       className="relative flex flex-1 flex-col overflow-x-hidden overflow-y-auto p-4"
     >
       {isFetchingNextPage && (
         <div className="pointer-events-none absolute top-0 right-0 left-0 z-10 flex justify-center py-2">
-          <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
+          <Spinner size="sm" className="text-muted-foreground" />
         </div>
       )}
 
-      <div style={{ height: `${virtualizer.getTotalSize()}px` }} className="relative w-full flex-1">
+      <div
+        style={{ height: `${virtualizer.getTotalSize()}px` }}
+        className="relative w-full flex-1"
+      >
         {virtualizer.getVirtualItems().map((virtualRow) => {
           const item = items[virtualRow.index];
           return (

@@ -6,7 +6,13 @@ export type CallType = "voice" | "video";
 export type CallRole = "caller" | "callee" | null;
 export type CallStatus = "idle" | "outgoing" | "incoming" | "active" | "ended";
 
-type CallEndReason = "ended" | "rejected" | "cancelled" | "timedOut" | "error";
+type CallEndReason =
+  "ended" | "rejected" | "cancelled" | "timedOut" | "pendingTimedOut" | "error";
+
+type AutoAction = {
+  callId: string;
+  action: "accept" | "decline";
+};
 
 type CallState = {
   status: CallStatus;
@@ -23,6 +29,8 @@ type CallState = {
   localMuted: boolean;
   cameraOff: boolean;
   isConnecting: boolean;
+  pending: boolean;
+  autoAction: AutoAction | null;
 
   startOutgoing: (args: {
     callId: string;
@@ -38,9 +46,11 @@ type CallState = {
     conversationId: string;
     callerId: string;
     callerName: string | null;
+    pending?: boolean;
   }) => void;
 
   markConnecting: () => void;
+  markPending: () => void;
 
   toActive: (local: MediaStream, remote?: MediaStream | null) => void;
 
@@ -48,6 +58,9 @@ type CallState = {
   setRemoteStream: (stream: MediaStream) => void;
   toggleLocalMuted: () => void;
   toggleCamera: () => void;
+
+  setAutoAction: (action: AutoAction) => void;
+  clearAutoAction: () => void;
 
   endCall: (reason: CallEndReason) => void;
   reset: () => void;
@@ -79,6 +92,8 @@ export const useCallStore = create<CallState>((set, get) => ({
   localMuted: false,
   cameraOff: false,
   isConnecting: false,
+  pending: false,
+  autoAction: null,
 
   startOutgoing: ({ callId, type, conversationId, peerId, peerName }) =>
     set({
@@ -94,9 +109,17 @@ export const useCallStore = create<CallState>((set, get) => ({
       localMuted: false,
       cameraOff: false,
       isConnecting: false,
+      pending: false,
     }),
 
-  receiveIncoming: ({ callId, type, conversationId, callerId, callerName }) =>
+  receiveIncoming: ({
+    callId,
+    type,
+    conversationId,
+    callerId,
+    callerName,
+    pending,
+  }) =>
     set({
       status: "incoming",
       role: "callee",
@@ -110,9 +133,11 @@ export const useCallStore = create<CallState>((set, get) => ({
       localMuted: false,
       cameraOff: false,
       isConnecting: false,
+      pending: pending ?? false,
     }),
 
   markConnecting: () => set({ isConnecting: true }),
+  markPending: () => set({ pending: true }),
   toActive: (local, remote) =>
     set({
       status: "active",
@@ -120,6 +145,7 @@ export const useCallStore = create<CallState>((set, get) => ({
       localStream: local,
       remoteStream: remote ?? get().remoteStream,
       isConnecting: false,
+      pending: false,
     }),
 
   setLocalStream: (stream) => set({ localStream: stream }),
@@ -143,6 +169,9 @@ export const useCallStore = create<CallState>((set, get) => ({
     });
     set({ cameraOff: next });
   },
+
+  setAutoAction: (action) => set({ autoAction: action }),
+  clearAutoAction: () => set({ autoAction: null }),
 
   endCall: (reason) =>
     set((state) => ({
@@ -169,6 +198,8 @@ export const useCallStore = create<CallState>((set, get) => ({
       localMuted: false,
       cameraOff: false,
       isConnecting: false,
+      pending: false,
+      autoAction: null,
     });
   },
 }));

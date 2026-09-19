@@ -6,6 +6,7 @@ export const getMessages = asyncHandler(async (req, res) => {
   const { before, limit } = req.query;
   const { conversationId } = req.params;
   const messages = await messageService.getMessages(
+    req.user.id,
     conversationId,
     before,
     limit,

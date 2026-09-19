@@ -7,6 +7,7 @@ import {
   handleCallDisconnect,
 } from "../modules/call/call.socket.js";
 import * as userService from "../modules/user/user.service.js";
+import * as conversationRepository from "../modules/conversation/conversation.repository.js";
 
 let io;
 const online = new Map(); // userId -> Set<socketId>
@@ -36,6 +37,16 @@ export const emitToUser = (userId, event, payload) => {
     io.to(socketId).emit(event, payload);
   }
 };
+
+export const conversationRoom = (conversationId) =>
+  `conversation:${conversationId}`;
+
+export const emitToConversation = (conversationId, event, payload) => {
+  if (!io) return;
+  io.to(conversationRoom(conversationId)).emit(event, payload);
+};
+
+const visibleOnline = new Set();
 
 export const createSocketServer = (httpServer) => {
   io = new Server(httpServer, {
@@ -73,37 +84,87 @@ export const createSocketServer = (httpServer) => {
     try {
       preferences = await userService.getUserPreferences(userId);
     } catch (error) {
-      logger.error({ err: error.message, userId }, "Failed to load preferences");
+      logger.error(
+        { err: error.message, userId },
+        "Failed to load preferences",
+      );
     }
 
     const canShowOnline = preferences?.showOnline ?? true;
     socket.showOnline = canShowOnline;
 
     if (canShowOnline) {
-      await userService.setUserPresence(userId, true);
-      socket.broadcast.emit("user-online", { userId });
+      visibleOnline.add(userId);
+      try {
+        await userService.setUserPresence(userId, true);
+        socket.broadcast.emit("user-online", { userId });
+      } catch (error) {
+        logger.error({ err: error.message, userId }, "Failed to set presence");
+      }
     }
     logger.info(`User connected: ${userId}`);
 
-    socket.on("join-conversation", (conversationId) => {
-      socket.join(`conversation:${conversationId}`);
-      socket.emit("online-users", [...online.keys()]);
-      logger.info(`User joined conversationId: ${conversationId}`);
+    socket.on("join-conversation", async (conversationId) => {
+      try {
+        const member = await conversationRepository.findParticipant(
+          conversationId,
+          userId,
+        );
+        if (!member) {
+          socket.emit("conversation-error", {
+            conversationId,
+            message: "You are not a participant of this conversation",
+          });
+          return;
+        }
+        socket.join(conversationRoom(conversationId));
+        socket.emit("online-users", [...visibleOnline]);
+        logger.info(`User joined conversationId: ${conversationId}`);
+      } catch (error) {
+        logger.error(
+          { err: error.message, userId, conversationId },
+          "Join failed",
+        );
+        socket.emit("conversation-error", {
+          conversationId,
+          message: "Failed to join conversation",
+        });
+      }
+    });
+
+    socket.on("leave-conversation", (conversationId) => {
+      socket.leave(conversationRoom(conversationId));
     });
 
     socket.on("disconnect", async () => {
-      const sockets = online.get(userId);
-      if (sockets) {
-        sockets.delete(socket.id);
-        if (sockets.size === 0) {
-          online.delete(userId);
-          if (socket.showOnline) {
-            await userService.setUserPresence(userId, false);
-            socket.broadcast.emit("user-offline", { userId });
+      try {
+        const sockets = online.get(userId);
+        if (sockets) {
+          sockets.delete(socket.id);
+          if (sockets.size === 0) {
+            online.delete(userId);
+            visibleOnline.delete(userId);
+            if (socket.showOnline) {
+              await userService.setUserPresence(userId, false);
+              socket.broadcast.emit("user-offline", { userId });
+            }
           }
         }
+      } catch (error) {
+        logger.error(
+          { err: error.message, userId },
+          "Disconnect presence cleanup failed",
+        );
+      } finally {
+        try {
+          await handleCallDisconnect(userId);
+        } catch (error) {
+          logger.error(
+            { err: error.message, userId },
+            "Disconnect call cleanup failed",
+          );
+        }
       }
-      handleCallDisconnect(userId);
       logger.info("User disconnected");
     });
 
@@ -116,20 +177,14 @@ export const createSocketServer = (httpServer) => {
 
     socket.on("typing-conversation", (payload) => {
       const { conversationId, isTyping } = payload ?? {};
-      socket.to(`conversation:${conversationId}`).emit("user-typing", {
+      const room = conversationRoom(conversationId);
+      if (!socket.rooms.has(room)) return;
+      socket.to(room).emit("user-typing", {
         userId,
         conversationId,
         isTyping: typeof isTyping === "boolean" ? isTyping : true,
       });
     });
   });
-  return io;
-};
-
-export const getIO = () => {
-  if (!io) {
-    throw new Error("Socket.IO has not been initialized");
-  }
-
   return io;
 };

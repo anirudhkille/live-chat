@@ -4,6 +4,14 @@ export const create = (email) => {
   return prisma.user.create({ data: { email } });
 };
 
+export const upsertByEmail = (email) => {
+  return prisma.user.upsert({
+    where: { email },
+    update: {},
+    create: { email },
+  });
+};
+
 export const findEmail = (email) => {
   return prisma.user.findUnique({ where: { email } });
 };
@@ -70,6 +78,8 @@ export const findPreferencesById = (id) => {
       phoneVisible: true,
       typingIndicators: true,
       pushNotifications: true,
+      chatWallpaperUrl: true,
+      chatWallpaperColor: true,
     },
   });
 };
@@ -85,7 +95,16 @@ export const updatePreferences = (id, data) => {
       phoneVisible: true,
       typingIndicators: true,
       pushNotifications: true,
+      chatWallpaperUrl: true,
+      chatWallpaperColor: true,
     },
+  });
+};
+
+export const updateWallpaper = (userId, wallpaperUrl) => {
+  return prisma.user.update({
+    where: { id: userId },
+    data: { chatWallpaperUrl: wallpaperUrl },
   });
 };
 

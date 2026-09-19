@@ -1,9 +1,9 @@
 import { prisma } from "../../config/prisma.js";
 
-const withDetails = {
+export const withDetails = {
   include: {
     attachments: true,
-    reads: true,
+    reads: { take: 1, orderBy: { readAt: "desc" } },
     reactions: {
       include: {
         user: {
@@ -35,11 +35,21 @@ export const findById = (messageId) => {
   });
 };
 
+export const findInConversationForUser = (messageId, userId) => {
+  return prisma.message.findFirst({
+    where: {
+      id: messageId,
+      conversation: { participants: { some: { userId } } },
+    },
+    ...withDetails,
+  });
+};
+
 export const getMessages = (conversationId, before, limit) => {
   return prisma.message.findMany({
     where: {
       conversationId,
-      ...(before ? { createdAt: { lt: new Date(before) } } : {}),
+      ...(before ? { createdAt: { lt: before } } : {}),
     },
     orderBy: { createdAt: "desc" },
     take: limit,
@@ -64,26 +74,28 @@ export const deleteMessage = (messageId) => {
 };
 
 export const markMessagesRead = async (conversationId, userId) => {
-  const messages = await prisma.message.findMany({
-    where: {
-      conversationId,
-      senderId: { not: userId },
-      reads: { none: { userId } },
-    },
-    select: { id: true },
-  });
-  if (messages.length === 0) return 0;
+  return prisma.$transaction(async (tx) => {
+    const messages = await tx.message.findMany({
+      where: {
+        conversationId,
+        senderId: { not: userId },
+        reads: { none: { userId } },
+      },
+      select: { id: true },
+    });
+    if (messages.length === 0) return 0;
 
-  const readAt = new Date();
-  await prisma.messageRead.createMany({
-    data: messages.map((message) => ({
-      messageId: message.id,
-      userId,
-      readAt,
-    })),
-    skipDuplicates: true,
+    const readAt = new Date();
+    await tx.messageRead.createMany({
+      data: messages.map((message) => ({
+        messageId: message.id,
+        userId,
+        readAt,
+      })),
+      skipDuplicates: true,
+    });
+    return messages.length;
   });
-  return messages.length;
 };
 
 export const sendMessage = async (
@@ -101,36 +113,14 @@ export const sendMessage = async (
         senderId,
         conversationId,
         content,
+        createdAt: now,
         ...(cipherMeta ? { cipherMeta } : {}),
         ...(replyToId ? { replyToId } : {}),
         ...(attachmentIds?.length
           ? { attachments: { connect: attachmentIds.map((id) => ({ id })) } }
           : {}),
       },
-      include: {
-        attachments: true,
-        reads: true,
-        reactions: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-        replyTo: {
-          include: {
-            sender: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-      },
+      include: withDetails.include,
     }),
     prisma.conversation.update({
       where: { id: conversationId },
@@ -157,22 +147,5 @@ export const createReaction = (messageId, userId, emoji) => {
 export const deleteUserReactions = (messageId, userId) => {
   return prisma.messageReaction.deleteMany({
     where: { messageId, userId },
-  });
-};
-
-export const toggleReaction = async (messageId, userId, emoji) => {
-  const existing = await prisma.messageReaction.findUnique({
-    where: { messageId_userId_emoji: { messageId, userId, emoji } },
-  });
-
-  if (existing) {
-    await prisma.messageReaction.delete({ where: { id: existing.id } });
-  } else {
-    await prisma.messageReaction.create({ data: { messageId, userId, emoji } });
-  }
-
-  return prisma.message.findUnique({
-    where: { id: messageId },
-    ...withDetails,
   });
 };

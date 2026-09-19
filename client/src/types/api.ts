@@ -104,6 +104,8 @@ export type UserPreferences = {
   phoneVisible: boolean;
   typingIndicators: boolean;
   pushNotifications: boolean;
+  chatWallpaperUrl: string | null;
+  chatWallpaperColor: string | null;
 };
 
 export type Notification = {

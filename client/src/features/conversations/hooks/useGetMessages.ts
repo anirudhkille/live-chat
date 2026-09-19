@@ -17,6 +17,7 @@ export function useGetMessages(
       }),
     initialPageParam: undefined as string | undefined,
     enabled: !!conversationId,
+    staleTime: 30 * 1000,
     select: (data) => data.pages.map((page) => page.data),
     initialData: initialMessages
       ? {

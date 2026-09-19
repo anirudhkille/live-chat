@@ -25,7 +25,10 @@ export const getConversationById = asyncHandler(async (req, res) => {
 });
 
 export const getConversationWithMessages = asyncHandler(async (req, res) => {
-  const limit = Number(req.query.limit) || 30;
+  const requestedLimit = Number(req.query.limit);
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(100, Math.max(1, requestedLimit))
+    : 30;
   const result = await conversationService.getConversationWithMessages(
     req.params.id,
     req.user.id,

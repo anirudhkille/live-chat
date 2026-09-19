@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   getUserPreferences,
   updateUserPreferences,
 } from "@/features/users/api/user-api";
-import type { UserPreferences } from "@/types/api";
+import { getApiErrorMessage, type UserPreferences } from "@/types/api";
 
 export function useUserPreferences() {
   return useQuery({
@@ -22,6 +23,9 @@ export function useUpdateUserPreferences() {
       updateUserPreferences(preferences),
     onSuccess: (response) => {
       queryClient.setQueryData(["user-preferences"], response);
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, "Couldn't update preferences"));
     },
   });
 }

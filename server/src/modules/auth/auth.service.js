@@ -15,22 +15,46 @@ import {
 } from "./auth.google.js";
 import { logger } from "../../config/logger.js";
 
-export const loginUser = async (email) => {
-  const user = await userRepository.findEmail(email);
+const OTP_TTL_SECONDS = 300;
+const OTP_RESEND_COOLDOWN_SECONDS = 60;
+const OTP_MAX_ATTEMPTS = 5;
+const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
 
-  if (!user) {
-    await userRepository.create(email);
+const issueSession = async (userId) => {
+  const accessToken = generateAccessToken(userId);
+  const refreshToken = generateRefreshToken(userId);
+
+  await redis.set(
+    `refreshToken:${userId}`,
+    refreshToken,
+    "EX",
+    REFRESH_TOKEN_TTL_SECONDS,
+  );
+
+  return { accessToken, refreshToken };
+};
+
+export const loginUser = async (email) => {
+  const cooldownKey = `loginOtpCooldown:${email}`;
+  const cooldown = await redis.get(cooldownKey);
+  if (cooldown) {
+    throw new AppError(429, "Please wait before requesting another OTP");
   }
+
+  const user = await userRepository.upsertByEmail(email);
 
   const otp = generateOtp();
 
-  await redis.set(`loginOtp:${email}`, otp, "EX", 300);
+  await redis.set(`loginOtp:${email}`, otp, "EX", OTP_TTL_SECONDS);
+  await redis.del(`loginOtpAttempts:${email}`);
 
-  return sendEmail(email, "Your Login OTP", otpTemplate(otp));
+  await sendEmail(email, "Your Login OTP", otpTemplate(otp));
+  await redis.set(cooldownKey, "1", "EX", OTP_RESEND_COOLDOWN_SECONDS);
 };
 
 export const verifyOtp = async (email, otp) => {
   const otpKey = `loginOtp:${email}`;
+  const attemptsKey = `loginOtpAttempts:${email}`;
 
   const otpValue = await redis.get(otpKey);
   if (!otpValue) {
@@ -38,22 +62,25 @@ export const verifyOtp = async (email, otp) => {
   }
 
   if (otpValue !== otp) {
+    const attempts = await redis.incr(attemptsKey);
+    await redis.expire(attemptsKey, OTP_TTL_SECONDS);
+    if (attempts >= OTP_MAX_ATTEMPTS) {
+      await redis.del(otpKey);
+      await redis.del(attemptsKey);
+      throw new AppError(
+        429,
+        "Too many incorrect attempts. Request a new OTP.",
+      );
+    }
     throw new AppError(401, "Invalid Otp");
   }
 
   await redis.del(otpKey);
+  await redis.del(attemptsKey);
 
   const user = await userService.findUserByEmailOrThrow(email);
-  const accessToken = generateAccessToken(user.id);
-  const refreshToken = generateRefreshToken(user.id);
-
-  await redis.set(
-    `refreshToken:${user.id}`,
-    refreshToken,
-    "EX",
-    60 * 60 * 24 * 7,
-  );
-  return { user, accessToken, refreshToken };
+  const tokens = await issueSession(user.id);
+  return { user, ...tokens };
 };
 
 export const refreshToken = async (token) => {
@@ -84,17 +111,7 @@ export const refreshToken = async (token) => {
     throw new AppError(401, "Token mismatch");
   }
 
-  const accessToken = generateAccessToken(decoded._id);
-  const refreshToken = generateRefreshToken(decoded._id);
-
-  await redis.set(
-    `refreshToken:${decoded._id}`,
-    refreshToken,
-    "EX",
-    60 * 60 * 24 * 7,
-  );
-
-  return { accessToken, refreshToken };
+  return issueSession(decoded._id);
 };
 
 export const logout = async (token) => {
@@ -123,25 +140,13 @@ export const googleLogin = async (code) => {
 
   const { email, name } = googleUser;
 
-  let user = await userRepository.findEmail(email);
-
-  if (!user) {
-    user = await userRepository.create(email);
-  }
+  let user = await userRepository.upsertByEmail(email);
 
   if (!user.name && name) {
     user = await userRepository.updateById(user.id, { name });
   }
 
-  const accessToken = generateAccessToken(user.id);
-  const refreshToken = generateRefreshToken(user.id);
+  const session = await issueSession(user.id);
 
-  await redis.set(
-    `refreshToken:${user.id}`,
-    refreshToken,
-    "EX",
-    60 * 60 * 24 * 7,
-  );
-
-  return { user, accessToken, refreshToken };
+  return { user, ...session };
 };

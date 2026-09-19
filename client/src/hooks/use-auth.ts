@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useAuthStore } from "@/store/auth-store";
 
 export function useAuth() {
@@ -7,11 +8,14 @@ export function useAuth() {
   const user = useAuthStore((state) => state.user);
   const hasHydrated = useAuthStore((state) => state.hasHydrated);
 
-  return {
-    token,
-    user,
-    hasHydrated,
-    isAuthenticated: hasHydrated && !!token,
-    isProfileComplete: hasHydrated && !!token && !!user?.name,
-  };
+  return useMemo(
+    () => ({
+      token,
+      user,
+      hasHydrated,
+      isAuthenticated: hasHydrated && !!token,
+      isProfileComplete: hasHydrated && !!token && !!user?.name,
+    }),
+    [token, user, hasHydrated]
+  );
 }

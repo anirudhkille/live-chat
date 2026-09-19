@@ -37,47 +37,8 @@ export const removeSubscription = async (userId, endpoint) => {
 
 export const getPublicKey = () => env.VAPID_PUBLIC_KEY;
 
-export const sendMessageNotification = async ({
-  userId,
-  senderName,
-  conversationId,
-  content,
-  attachmentCount,
-  isAudio,
-  isEncrypted = false,
-}) => {
-  let subscriptions;
-  try {
-    subscriptions = await pushRepository.getSubscriptionsByUserId(userId);
-  } catch (error) {
-    logger.error(
-      { err: error.message, userId },
-      "Failed to load push subscriptions",
-    );
-    return;
-  }
-
+const deliver = async (subscriptions, userId, payload, options) => {
   if (subscriptions.length === 0) return;
-
-  let body = "";
-  if (!isEncrypted && typeof content === "string" && content.trim()) {
-    body = content.trim();
-  }
-  if (!body) {
-    body = isAudio
-      ? "Voice message"
-      : attachmentCount > 0
-        ? attachmentCount === 1
-          ? "Shared a photo or file"
-          : `Shared ${attachmentCount} items`
-        : "Sent a message";
-  }
-
-  const payload = {
-    title: senderName || "New message",
-    body,
-    url: `/chats/${conversationId}`,
-  };
 
   await Promise.allSettled(
     subscriptions.map(async (subscription) => {
@@ -85,7 +46,7 @@ export const sendMessageNotification = async ({
         await webpush.sendNotification(
           { endpoint: subscription.endpoint, keys: subscription.keys },
           JSON.stringify(payload),
-          { TTL: 86400 },
+          options,
         );
       } catch (error) {
         const statusCode = error?.statusCode;
@@ -107,4 +68,122 @@ export const sendMessageNotification = async ({
       }
     }),
   );
+};
+
+const sendToSubscriptions = async (userId, payload, options, subscriptions) => {
+  let list = subscriptions;
+  if (!list) {
+    try {
+      list = await pushRepository.getSubscriptionsByUserId(userId);
+    } catch (error) {
+      logger.error(
+        { err: error.message, userId },
+        "Failed to load push subscriptions",
+      );
+      return;
+    }
+  }
+  await deliver(list, userId, payload, options);
+};
+
+const buildMessagePayload = ({
+  senderName,
+  conversationId,
+  content,
+  attachmentCount,
+  isAudio,
+  isEncrypted,
+}) => {
+  let body = "";
+  if (!isEncrypted && typeof content === "string" && content.trim()) {
+    body = content.trim();
+  }
+  if (!body) {
+    body = isAudio
+      ? "Voice message"
+      : attachmentCount > 0
+        ? attachmentCount === 1
+          ? "Shared a photo or file"
+          : `Shared ${attachmentCount} items`
+        : "Sent a message";
+  }
+
+  return {
+    title: senderName || "New message",
+    body,
+    url: `/chats/${conversationId}`,
+  };
+};
+
+export const sendMessageNotification = async ({
+  userId,
+  senderName,
+  conversationId,
+  content,
+  attachmentCount,
+  isAudio,
+  isEncrypted = false,
+}) => {
+  const payload = buildMessagePayload({
+    senderName,
+    conversationId,
+    content,
+    attachmentCount,
+    isAudio,
+    isEncrypted,
+  });
+
+  await sendToSubscriptions(userId, payload, { TTL: 86400 });
+};
+
+export const sendBulkMessageNotifications = async (notifications) => {
+  const active = notifications.filter((notification) => notification.userId);
+  if (active.length === 0) return;
+
+  let subscriptions;
+  try {
+    subscriptions = await pushRepository.getSubscriptionsByUserIds(
+      active.map((notification) => notification.userId),
+    );
+  } catch (error) {
+    logger.error({ err: error.message }, "Failed to load push subscriptions");
+    return;
+  }
+
+  const grouped = new Map();
+  for (const subscription of subscriptions) {
+    const list = grouped.get(subscription.userId) ?? [];
+    list.push(subscription);
+    grouped.set(subscription.userId, list);
+  }
+
+  await Promise.allSettled(
+    active.map(async (notification) => {
+      const list = grouped.get(notification.userId);
+      if (!list?.length) return;
+      const payload = buildMessagePayload(notification);
+      await deliver(list, notification.userId, payload, { TTL: 86400 });
+    }),
+  );
+};
+
+export const sendCallNotification = async ({
+  userId,
+  callerName,
+  conversationId,
+  callType,
+  callId,
+}) => {
+  const payload = {
+    type: "call",
+    title: `Incoming ${callType === "video" ? "video" : "voice"} call`,
+    body: `${callerName || "Someone"} is calling you`,
+    url: `/chats/${conversationId}`,
+    conversationId,
+    callId,
+    callType,
+    callerName: callerName ?? null,
+  };
+
+  await sendToSubscriptions(userId, payload, { TTL: 120, urgency: "high" });
 };

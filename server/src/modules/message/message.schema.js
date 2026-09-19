@@ -1,15 +1,23 @@
 import { z } from "zod";
+import { cuidSchema } from "../../utils/schemas.js";
 
 export const updateMessageSchema = z.object({
   content: z.string().min(1, "Content can't be empty"),
 });
 
-export const sendMessageSchema = z.object({
-  content: z.string(),
-  cipherMeta: z.record(z.unknown()).optional(),
-  attachmentIds: z.array(z.string().cuid()).optional(),
-  replyToId: z.string().cuid().optional(),
-});
+export const sendMessageSchema = z
+  .object({
+    content: z.string().max(4000, "Message is too long").optional(),
+    cipherMeta: z.record(z.unknown()).optional(),
+    attachmentIds: z.array(cuidSchema).optional(),
+    replyToId: cuidSchema.optional(),
+  })
+  .refine(
+    (data) =>
+      (data.content?.trim().length ?? 0) > 0 ||
+      (data.attachmentIds?.length ?? 0) > 0,
+    { message: "Message content or attachments are required" },
+  );
 
 export const toggleReactionSchema = z.object({
   emoji: z

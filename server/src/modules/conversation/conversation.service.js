@@ -4,20 +4,27 @@ import * as userRepository from "../user/user.repository.js";
 import * as messageRepository from "../message/message.repository.js";
 import * as storageService from "../storage/storage.service.js";
 import { env } from "../../config/env.config.js";
-import { toConversationResponse, toParticipants } from "./conversation.mapper.js";
-import { getIO, isUserOnline, emitToUser } from "../../config/socket.js";
+import {
+  toConversationResponse,
+  toParticipants,
+} from "./conversation.mapper.js";
+import {
+  emitToConversation,
+  isUserOnline,
+  emitToUser,
+} from "../../config/socket.js";
 import { AppError } from "../../utils/AppError.js";
 
 const GROUP_PHOTO_ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const GROUP_PHOTO_MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
 const assertGroupAdmin = async (conversationId, actorId) => {
   const conversation = await conversationRepository.getById(conversationId);
   if (!conversation || !conversation.isGroup) {
     throw new AppError(404, "Group not found");
   }
-  const participant = await conversationRepository.findParticipant(
-    conversationId,
-    actorId,
+  const participant = conversation.participants.find(
+    (p) => p.userId === actorId,
   );
   if (!participant) {
     throw new AppError(403, "You are not a member of this group");
@@ -26,6 +33,18 @@ const assertGroupAdmin = async (conversationId, actorId) => {
     throw new AppError(403, "Only group admins can do this");
   }
   return conversation;
+};
+
+const assertGroupPhoto = async (photoKey) => {
+  let metadata;
+  try {
+    metadata = await storageService.getObjectMetadata(photoKey);
+  } catch {
+    throw new AppError(404, "Group photo not found");
+  }
+  if ((metadata.ContentLength ?? 0) > GROUP_PHOTO_MAX_SIZE) {
+    throw new AppError(400, "Group photo is too large");
+  }
 };
 
 export const createOrGetConversation = async (userId1, userId2) => {
@@ -90,6 +109,7 @@ export const createGroup = async (
 
   let photoUrl = null;
   if (photoKey) {
+    await assertGroupPhoto(photoKey);
     photoUrl = `${env.R2_PUBLIC_URL}/${photoKey}`;
   }
 
@@ -129,13 +149,13 @@ export const updateGroup = async (
   const data = {};
   if (name !== undefined) data.name = name.trim();
   if (photoKey !== undefined) {
+    await assertGroupPhoto(photoKey);
     data.photoUrl = `${env.R2_PUBLIC_URL}/${photoKey}`;
   }
 
   const updated = await conversationRepository.updateById(conversationId, data);
 
-  const io = getIO();
-  io.to(`conversation:${conversationId}`).emit("conversation-updated", {
+  emitToConversation(conversationId, "conversation-updated", {
     conversationId,
   });
 
@@ -147,8 +167,7 @@ export const deleteGroup = async (conversationId, actorId) => {
 
   await conversationRepository.deleteById(conversationId);
 
-  const io = getIO();
-  io.to(`conversation:${conversationId}`).emit("group-deleted", {
+  emitToConversation(conversationId, "group-deleted", {
     conversationId,
   });
 
@@ -171,7 +190,7 @@ export const addGroupParticipants = async (
   actorId,
   participantIds,
 ) => {
-  await assertGroupAdmin(conversationId, actorId);
+  const conversation = await assertGroupAdmin(conversationId, actorId);
 
   const uniqueIds = [...new Set(participantIds)];
   if (uniqueIds.some((id) => id === actorId)) {
@@ -183,7 +202,6 @@ export const addGroupParticipants = async (
     throw new AppError(400, "One or more users do not exist");
   }
 
-  const conversation = await conversationRepository.getById(conversationId);
   const existingIds = new Set(conversation.participants.map((p) => p.userId));
   const newIds = uniqueIds.filter((id) => !existingIds.has(id));
 
@@ -193,8 +211,7 @@ export const addGroupParticipants = async (
 
   const updated = await conversationRepository.getById(conversationId);
 
-  const io = getIO();
-  io.to(`conversation:${conversationId}`).emit("conversation-updated", {
+  emitToConversation(conversationId, "conversation-updated", {
     conversationId,
   });
   for (const id of newIds) {
@@ -227,8 +244,7 @@ export const removeGroupParticipant = async (
 
   await conversationRepository.removeParticipant(conversationId, targetUserId);
 
-  const io = getIO();
-  io.to(`conversation:${conversationId}`).emit("conversation-updated", {
+  emitToConversation(conversationId, "conversation-updated", {
     conversationId,
   });
   if (isUserOnline(targetUserId)) {

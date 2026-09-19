@@ -1,17 +1,24 @@
 import { z } from "zod";
+import {
+  contentTypeSchema,
+  hexColorSchema,
+  keySchema,
+} from "../../utils/schemas.js";
 
 export const avatarUrlSchema = z.object({
-  contentType: z.string().min(1, "Content type can't be empty"),
+  contentType: contentTypeSchema,
 });
 
 export const avatarConfirmSchema = z.object({
-  key: z.string().min(1, "Key can't be empty"),
-  contentType: z.string().min(1, "Content type can't be empty"),
-  fileName: z.string().min(1, "File name can't be empty"),
-  fileSize: z.number().min(1, "File size can't be empty"),
-  width: z.number(),
-  height: z.number(),
-  duration: z.string(),
+  key: keySchema,
+});
+
+export const wallpaperUrlSchema = z.object({
+  contentType: contentTypeSchema,
+});
+
+export const wallpaperConfirmSchema = z.object({
+  key: keySchema,
 });
 
 export const updatePreferencesSchema = z.object({
@@ -21,4 +28,6 @@ export const updatePreferencesSchema = z.object({
   phoneVisible: z.boolean().optional(),
   typingIndicators: z.boolean().optional(),
   pushNotifications: z.boolean().optional(),
+  chatWallpaperUrl: z.string().nullable().optional(),
+  chatWallpaperColor: hexColorSchema.nullable().optional(),
 });

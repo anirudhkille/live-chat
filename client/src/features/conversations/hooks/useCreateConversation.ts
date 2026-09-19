@@ -1,6 +1,8 @@
 import { useMutation } from "@tanstack/react-query";
-import { createConversation } from "../api/conversation-api";
+import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { getApiErrorMessage } from "@/types/api";
+import { createConversation } from "../api/conversation-api";
 
 export function useCreateConversation() {
   const router = useRouter();
@@ -9,6 +11,9 @@ export function useCreateConversation() {
     mutationFn: (userId: string) => createConversation(userId),
     onSuccess: (result) => {
       router.push(`/chats/${result.data.id}`);
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, "Couldn't start conversation"));
     },
   });
 }

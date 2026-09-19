@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { Search, SquarePen, Settings } from "lucide-react";
 
 import { ConversationList } from "@/features/conversations/components/conversation-list";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
@@ -26,7 +25,7 @@ export function Sidebar({ className }: { className?: string }) {
           size="xs"
           variant="primary"
         />
-        <span className="truncate text-sm font-medium text-card-foreground">
+        <span className="text-card-foreground truncate text-sm font-medium">
           {user?.name ?? "Account"}
         </span>
         <Link
@@ -48,7 +47,6 @@ export function Sidebar({ className }: { className?: string }) {
       <ConversationList />
 
       <div className="hidden items-center gap-1 border-t p-2 md:flex">
-        <ThemeToggle />
         <Link
           href="/settings"
           aria-current={pathname.startsWith("/settings") ? "page" : undefined}

@@ -20,3 +20,10 @@ export const getSubscriptionsByUserId = (userId) => {
     orderBy: { createdAt: "desc" },
   });
 };
+
+export const getSubscriptionsByUserIds = (userIds) => {
+  return prisma.pushSubscription.findMany({
+    where: { userId: { in: userIds } },
+    orderBy: { createdAt: "desc" },
+  });
+};

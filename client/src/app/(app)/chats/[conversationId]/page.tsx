@@ -2,9 +2,11 @@
 
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Info, Loader2, Users } from "lucide-react";
+import { ArrowLeft, Info, Users } from "lucide-react";
 import { socket } from "@/lib/socket";
+import { useSocketEvents } from "@/hooks/useSocketEvents";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Avatar } from "@/components/ui/avatar";
 import { MessageList } from "@/features/conversations/components/message-list";
 import { MessageInput } from "@/features/conversations/components/message-input";
@@ -13,21 +15,8 @@ import { CallButtons } from "@/features/calls/call-buttons";
 import { useCalls } from "@/features/calls/use-calls";
 import { useCallStore } from "@/features/calls/call-store";
 import dynamic from "next/dynamic";
+import { formatRelativeTime as formatLastSeen } from "@/lib/datetime";
 import type { Conversation } from "@/types/api";
-
-function formatLastSeen(iso: string) {
-  const date = new Date(iso);
-  const now = new Date();
-  const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
-  if (diffSec < 60) return "just now";
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour}h ago`;
-  const diffDay = Math.floor(diffHour / 24);
-  if (diffDay < 7) return `${diffDay}d ago`;
-  return date.toLocaleDateString([], { month: "short", day: "numeric" });
-}
 
 function initialStatus(conversation: Conversation | undefined) {
   if (!conversation || conversation.isGroup) return null;
@@ -88,12 +77,39 @@ export default function ChatThreadPage({
   useEffect(() => {
     socket.connect();
     socket.emit("join-conversation", conversationId);
+    return () => {
+      socket.emit("leave-conversation", conversationId);
+    };
   }, [conversationId, conversation?.otherUserId]);
 
   useEffect(() => {
-    const otherUserId = conversation?.otherUserId;
+    const params = new URLSearchParams(window.location.search);
+    const acceptId = params.get("accept-call");
+    const declineId = params.get("decline-call");
+    if (!acceptId && !declineId) return;
 
-    const handleUserTyping = (payload: {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("accept-call");
+    url.searchParams.delete("decline-call");
+    window.history.replaceState(
+      {},
+      "",
+      url.pathname + (url.search ? url.search : "")
+    );
+
+    if (acceptId) {
+      useCallStore
+        .getState()
+        .setAutoAction({ callId: acceptId, action: "accept" });
+    } else if (declineId) {
+      useCallStore
+        .getState()
+        .setAutoAction({ callId: declineId, action: "decline" });
+    }
+  }, []);
+
+  useSocketEvents({
+    "user-typing": (payload: {
       conversationId: string;
       userId: string;
       isTyping?: boolean;
@@ -108,36 +124,39 @@ export default function ChatThreadPage({
       typingTimeoutRef.current = setTimeout(() => {
         setLiveStatus("online");
       }, 3000);
-    };
-
-    const handleUserOnline = (payload: { userId: string }) => {
-      if (!otherUserId || payload.userId !== otherUserId) return;
+    },
+    "user-online": (payload: { userId: string }) => {
+      if (
+        !conversation?.otherUserId ||
+        payload.userId !== conversation.otherUserId
+      )
+        return;
       setLiveStatus("online");
-    };
-
-    const handleUserOffline = (payload: { userId: string }) => {
-      if (!otherUserId || payload.userId !== otherUserId) return;
+    },
+    "user-offline": (payload: { userId: string }) => {
+      if (
+        !conversation?.otherUserId ||
+        payload.userId !== conversation.otherUserId
+      )
+        return;
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       setLiveStatus("last seen just now");
-    };
+    },
+    "online-users": (userIds: string[]) => {
+      if (
+        conversation?.otherUserId &&
+        userIds.includes(conversation.otherUserId)
+      ) {
+        setLiveStatus("online");
+      }
+    },
+  });
 
-    const handleOnlineUsers = (userIds: string[]) => {
-      if (otherUserId && userIds.includes(otherUserId)) setLiveStatus("online");
-    };
-
-    socket.on("user-typing", handleUserTyping);
-    socket.on("user-online", handleUserOnline);
-    socket.on("user-offline", handleUserOffline);
-    socket.on("online-users", handleOnlineUsers);
-
+  useEffect(() => {
     return () => {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      socket.off("user-typing", handleUserTyping);
-      socket.off("user-online", handleUserOnline);
-      socket.off("user-offline", handleUserOffline);
-      socket.off("online-users", handleOnlineUsers);
     };
-  }, [conversationId, conversation?.otherUserId, setLiveStatus]);
+  }, [conversationId]);
 
   return (
     <div className="bg-background flex h-full min-w-0 flex-1 flex-col">
@@ -145,7 +164,7 @@ export default function ChatThreadPage({
         <Link
           href="/chats"
           aria-label="Back"
-          className="inline-flex items-center justify-center p-1 md:hidden"
+          className="text-foreground hover:bg-accent inline-flex items-center justify-center rounded-md p-1"
         >
           <ArrowLeft className="h-4 w-4" />
         </Link>
@@ -159,11 +178,11 @@ export default function ChatThreadPage({
             />
           ) : (
             <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-md">
-              <Loader2 className="text-muted-foreground h-3 w-3 animate-spin" />
+              <Spinner size="xs" className="text-muted-foreground" />
             </div>
           )}
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-foreground">
+            <p className="text-foreground truncate text-sm font-medium">
               {loadingConversation ? "Loading..." : otherUserName}
             </p>
             <p className="text-muted-foreground text-xs">

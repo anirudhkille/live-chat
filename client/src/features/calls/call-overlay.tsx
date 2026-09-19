@@ -11,6 +11,7 @@ const ENDED_LABELS: Record<string, string> = {
   rejected: "Call declined",
   cancelled: "Call cancelled",
   timedOut: "No answer",
+  pendingTimedOut: "No answer",
   error: "Call failed",
 };
 
@@ -43,6 +44,7 @@ export function CallOverlay({
 }) {
   const status = useCallStore((s) => s.status);
   const type = useCallStore((s) => s.type);
+  const pending = useCallStore((s) => s.pending);
   const peerName = useCallStore((s) => s.peerName);
   const peerId = useCallStore((s) => s.peerId);
   const startedAt = useCallStore((s) => s.startedAt);
@@ -103,9 +105,14 @@ export function CallOverlay({
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-4">
           <Avatar name={peerName ?? peerId ?? ""} size="lg" />
-          <h2 className="text-xl font-semibold text-foreground">{peerName ?? "..."}</h2>
+          <h2 className="text-foreground text-xl font-semibold">
+            {peerName ?? "..."}
+          </h2>
           <p className="text-muted-foreground text-sm">
-            {status === "outgoing" && "Calling..."}
+            {status === "outgoing" &&
+              (pending
+                ? `Waiting for ${peerName ?? "them"} to answer...`
+                : "Calling...")}
             {status === "incoming" &&
               `${isVideo ? "Video" : "Voice"} incoming call`}
             {status === "active" && (isConnecting ? "Connecting..." : elapsed)}

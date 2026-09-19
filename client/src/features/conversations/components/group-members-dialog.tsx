@@ -1,13 +1,14 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Loader2, Plus, Trash2, Camera, Pencil, X } from "lucide-react";
+import { Plus, Trash2, Camera, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Dialog } from "@/components/ui/dialog";
 import { Avatar } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { useGroupParticipants } from "../hooks/useGroupParticipants";
 import { useAddGroupParticipants } from "../hooks/useAddGroupParticipants";
 import { useSearchUsers } from "@/features/users/hooks/useSearch";
@@ -115,7 +116,7 @@ export function GroupMembersDialog({
               className="bg-card absolute right-0 bottom-0 flex h-7 w-7 items-center justify-center rounded-full border"
             >
               {uploadPhoto.isPending ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
+                <Spinner size="xs" />
               ) : (
                 <Camera className="text-muted-foreground h-3.5 w-3.5" />
               )}
@@ -161,7 +162,7 @@ export function GroupMembersDialog({
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <span className="text-lg font-medium text-foreground">
+            <span className="text-foreground text-lg font-medium">
               {conversation.name}
             </span>
             {isAdmin && (
@@ -180,7 +181,9 @@ export function GroupMembersDialog({
 
       {isAdmin && (
         <div className="mt-4 grid gap-2">
-          <p className="mb-1 text-sm font-medium text-foreground">Add members</p>
+          <p className="text-foreground mb-1 text-sm font-medium">
+            Add members
+          </p>
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -191,7 +194,7 @@ export function GroupMembersDialog({
             {query.trim().length >= 2 ? (
               searching ? (
                 <div className="flex justify-center py-2">
-                  <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
+                  <Spinner size="sm" className="text-muted-foreground" />
                 </div>
               ) : addableUsers.length === 0 ? (
                 <p className="text-muted-foreground text-xs">
@@ -213,7 +216,7 @@ export function GroupMembersDialog({
                       size="xs"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-foreground">
+                      <p className="text-foreground truncate font-medium">
                         {user.name ?? "Unnamed"}
                       </p>
                       <p className="text-muted-foreground truncate text-xs">
@@ -233,11 +236,11 @@ export function GroupMembersDialog({
         </div>
       )}
 
-      <p className="mb-2 mt-4 text-sm font-medium text-foreground">Members</p>
+      <p className="text-foreground mt-4 mb-2 text-sm font-medium">Members</p>
       <div className="max-h-48 space-y-0.5 overflow-y-auto">
         {isLoading ? (
           <div className="flex justify-center py-4">
-            <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
+            <Spinner size="sm" className="text-muted-foreground" />
           </div>
         ) : (
           (members ?? []).map((member) => (
@@ -316,16 +319,14 @@ function MemberRow({
         size="xs"
       />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-foreground">
+        <p className="text-foreground truncate text-sm font-medium">
           {member.name ?? "Unnamed"}
           {isMe ? " (you)" : ""}
           {member.role === "admin" && (
             <span className="text-muted-foreground ml-1 text-xs">admin</span>
           )}
         </p>
-        <p className="text-muted-foreground truncate text-xs">
-          {member.email}
-        </p>
+        <p className="text-muted-foreground truncate text-xs">{member.email}</p>
       </div>
       {isAdmin && !isMe && (
         <button

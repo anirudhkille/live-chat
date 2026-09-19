@@ -144,11 +144,11 @@
   --link: 213 94% 68%;
 }
 
-* {
-  border-color: hsl(var(--border));
-}
-
 @layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+
   html,
   body {
     min-height: 100%;

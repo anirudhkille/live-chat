@@ -1,17 +1,41 @@
-import { getIO, isUserInRoom } from "../../config/socket.js";
+import {
+  emitToConversation,
+  isUserInRoom,
+  conversationRoom,
+} from "../../config/socket.js";
 import { logger } from "../../config/logger.js";
 import { AppError } from "../../utils/AppError.js";
 import * as messageRepository from "./message.repository.js";
 import * as conversationRepository from "../conversation/conversation.repository.js";
-import * as userRepository from "../user/user.repository.js";
 import * as pushService from "../push/push.service.js";
 import { toMessageResponse } from "./message.mapper.js";
 
-export const getMessages = async (conversationId, before, limit) => {
+const assertParticipant = async (conversationId, userId) => {
+  const participant = await conversationRepository.findParticipant(
+    conversationId,
+    userId,
+  );
+  if (!participant) {
+    throw new AppError(403, "You are not a participant of this conversation");
+  }
+};
+
+const parseBefore = (before) => {
+  if (!before) return null;
+  const date = new Date(before);
+  if (Number.isNaN(date.getTime())) {
+    throw new AppError(400, "Invalid before date");
+  }
+  return date;
+};
+
+export const getMessages = async (userId, conversationId, before, limit) => {
+  await assertParticipant(conversationId, userId);
   const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 30));
+  const parsedBefore = parseBefore(before);
   const messages = await messageRepository.getMessages(
     conversationId,
-    before,
+    parsedBefore,
     safeLimit,
   );
   return messages.map(toMessageResponse);
@@ -39,12 +63,10 @@ export const updateMessage = async (userId, messageId, content) => {
   }
 
   const message = await messageRepository.updateMessage(messageId, trimmed);
-  getIO()
-    .to(`conversation:${existing.conversationId}`)
-    .emit("message-updated", {
-      conversationId: existing.conversationId,
-      message: toMessageResponse(message),
-    });
+  emitToConversation(existing.conversationId, "message-updated", {
+    conversationId: existing.conversationId,
+    message: toMessageResponse(message),
+  });
 
   return toMessageResponse(message);
 };
@@ -54,17 +76,16 @@ export const deleteMessage = async (userId, messageId) => {
   assertCanModify(existing, userId);
 
   const message = await messageRepository.deleteMessage(messageId);
-  getIO()
-    .to(`conversation:${existing.conversationId}`)
-    .emit("message-deleted", {
-      conversationId: existing.conversationId,
-      message: toMessageResponse(message),
-    });
+  emitToConversation(existing.conversationId, "message-deleted", {
+    conversationId: existing.conversationId,
+    message: toMessageResponse(message),
+  });
 
   return toMessageResponse(message);
 };
 
 export const markMessagesRead = async (userId, conversationId) => {
+  await assertParticipant(conversationId, userId);
   const updatedCount = await messageRepository.markMessagesRead(
     conversationId,
     userId,
@@ -72,9 +93,11 @@ export const markMessagesRead = async (userId, conversationId) => {
 
   if (updatedCount > 0) {
     const readAt = new Date().toISOString();
-    getIO()
-      .to(`conversation:${conversationId}`)
-      .emit("messages-read", { conversationId, userId, readAt });
+    emitToConversation(conversationId, "messages-read", {
+      conversationId,
+      userId,
+      readAt,
+    });
   }
 
   return { conversationId, updatedCount };
@@ -88,6 +111,8 @@ export const sendMessage = async (
   attachmentIds,
   replyToId,
 ) => {
+  await assertParticipant(conversationId, senderId);
+
   if (replyToId) {
     const parent = await messageRepository.findById(replyToId);
     if (!parent || parent.conversationId !== conversationId) {
@@ -114,9 +139,8 @@ export const sendMessage = async (
     (message.attachments ?? []).every((a) => a.type === "AUDIO") &&
     !content?.trim();
 
-  const io = getIO();
-  io.to(`conversation:${conversationId}`).emit("new-message", response);
-  io.to(`conversation:${conversationId}`).emit("conversation-updated", {
+  emitToConversation(conversationId, "new-message", response);
+  emitToConversation(conversationId, "conversation-updated", {
     conversationId,
   });
 
@@ -133,16 +157,12 @@ export const sendMessage = async (
 };
 
 export const toggleReaction = async (userId, messageId, emoji) => {
-  const message = await messageRepository.findById(messageId);
+  const message = await messageRepository.findInConversationForUser(
+    messageId,
+    userId,
+  );
   if (!message) {
     throw new AppError(404, "Message not found");
-  }
-
-  const conversation = await conversationRepository.getById(
-    message.conversationId,
-  );
-  if (!conversation.participants.some((p) => p.userId === userId)) {
-    throw new AppError(403, "You are not a participant of this conversation");
   }
 
   const existing = await messageRepository.findUserReaction(messageId, userId);
@@ -157,12 +177,10 @@ export const toggleReaction = async (userId, messageId, emoji) => {
 
   const updated = await messageRepository.findById(messageId);
 
-  getIO()
-    .to(`conversation:${message.conversationId}`)
-    .emit("message-reacted", {
-      conversationId: message.conversationId,
-      message: toMessageResponse(updated),
-    });
+  emitToConversation(message.conversationId, "message-reacted", {
+    conversationId: message.conversationId,
+    message: toMessageResponse(updated),
+  });
 
   return toMessageResponse(updated);
 };
@@ -183,33 +201,29 @@ const notifyRecipients = async (
       (participant) => participant.userId === senderId,
     );
     const recipients = conversation.participants.filter(
-      (participant) => participant.userId !== senderId,
+      (participant) =>
+        participant.userId !== senderId && participant.user?.pushNotifications,
     );
     if (recipients.length === 0) return;
 
-    await Promise.all(
-      recipients.map(async (recipient) => {
-        const inActiveRoom = isUserInRoom(
-          recipient.userId,
-          `conversation:${conversationId}`,
-        );
-        if (inActiveRoom) return;
+    const offlineRecipients = recipients.filter(
+      (recipient) =>
+        !isUserInRoom(recipient.userId, conversationRoom(conversationId)),
+    );
+    if (offlineRecipients.length === 0) return;
 
-        const recipientUser = await userRepository.findById(recipient.userId);
-        if (!recipientUser?.pushNotifications) return;
-
-        await pushService.sendMessageNotification({
-          userId: recipient.userId,
-          senderName: sender?.user?.name ?? null,
-          conversationId,
-          content,
-          attachmentCount: Array.isArray(attachmentIds)
-            ? attachmentIds.length
-            : 0,
-          isAudio,
-          isEncrypted,
-        });
-      }),
+    await pushService.sendBulkMessageNotifications(
+      offlineRecipients.map((recipient) => ({
+        userId: recipient.userId,
+        senderName: sender?.user?.name ?? null,
+        conversationId,
+        content,
+        attachmentCount: Array.isArray(attachmentIds)
+          ? attachmentIds.length
+          : 0,
+        isAudio,
+        isEncrypted,
+      })),
     );
   } catch (error) {
     logger.error(
