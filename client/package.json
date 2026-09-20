@@ -39,7 +39,6 @@
     "react-dom": "19.2.8",
     "react-easy-crop": "^6.2.3",
     "react-hook-form": "^7.86.0",
-    "shadcn": "^4.21.0",
     "socket.io-client": "^4.8.3",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.6.0",
@@ -59,6 +58,7 @@
     "eslint-config-next": "16.3.2",
     "prettier": "^3.9.1",
     "prettier-plugin-tailwindcss": "^0.8.0",
+    "shadcn": "^4.21.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^2.1.9"
