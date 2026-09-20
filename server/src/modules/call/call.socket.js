@@ -9,6 +9,7 @@ import {
 } from "../../config/call-registry.js";
 import * as userRepository from "../user/user.repository.js";
 import * as pushService from "../push/push.service.js";
+import { writeCallLog } from "./call.service.js";
 
 const CALL_TYPES = new Set(["voice", "video"]);
 const RING_TIMEOUT_MS = 30 * 1000;
@@ -82,6 +83,7 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
         callerName: resolvedCallerName,
         calleeId: targetUserId,
         status: "pending",
+        startedAt: new Date(),
       };
 
       try {
@@ -116,6 +118,7 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
               });
             }
             await deletePendingCall(resolvedCallId, record.calleeId);
+            writeCallLog(record, "missed");
           } catch (error) {
             logger.error(
               { err: error.message, callId: resolvedCallId },
@@ -162,6 +165,8 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
       calleeId: targetUserId,
       calleeSocketId: null,
       status: "ringing",
+      startedAt: new Date(),
+      answeredAt: null,
       timeout: null,
     };
 
@@ -174,7 +179,8 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
         });
       }
       send(record.callerSocketId, "call:timed-out", { callId: record.callId });
-      removeCall(record.callId);
+      const removed = removeCall(record.callId);
+      if (removed) writeCallLog(removed, "missed");
     }, RING_TIMEOUT_MS);
 
     calls.set(call.callId, call);
@@ -200,6 +206,7 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
     }
     call.calleeSocketId = socket.id;
     call.status = "active";
+    call.answeredAt = new Date();
     if (call.timeout) {
       clearTimeout(call.timeout);
       call.timeout = null;
@@ -254,6 +261,8 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
       calleeId: socket.userId,
       calleeSocketId: socket.id,
       status: "active",
+      startedAt: record.startedAt ?? new Date(),
+      answeredAt: new Date(),
       timeout: null,
     };
     calls.set(callId, call);
@@ -283,6 +292,7 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
     if (emitToUserRef) {
       emitToUserRef(record.callerId, "call:rejected", { callId });
     }
+    writeCallLog(record, "declined");
     logger.info({ callId }, "Pending call rejected");
   });
 
@@ -291,7 +301,8 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
     const call = getCall(callId);
     if (!call || call.calleeId !== socket.userId) return;
     send(call.callerSocketId, "call:rejected", { callId: call.callId });
-    removeCall(call.callId);
+    const removed = removeCall(call.callId);
+    if (removed) writeCallLog(removed, "declined");
   });
 
   socket.on("call:cancel", async (payload) => {
@@ -302,7 +313,13 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
       if (call.calleeSocketId) {
         send(call.calleeSocketId, "call:cancelled", { callId: call.callId });
       }
-      removeCall(call.callId);
+      const removed = removeCall(call.callId);
+      if (removed) {
+        writeCallLog(
+          removed,
+          removed.status === "active" ? "completed" : "missed",
+        );
+      }
       return;
     }
 
@@ -319,6 +336,7 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
     if (emitToUserRef) {
       emitToUserRef(record.calleeId, "call:cancelled", { callId });
     }
+    writeCallLog(record, "missed");
   });
 
   socket.on("call:hangup", async (payload) => {
@@ -336,7 +354,14 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
       if (otherSocketId) {
         send(otherSocketId, "call:ended", { callId: call.callId });
       }
-      removeCall(call.callId);
+      const removed = removeCall(call.callId);
+      if (removed) {
+        writeCallLog(
+          removed,
+          removed.status === "active" ? "completed" : "missed",
+        );
+      }
+      send(socket.id, "call:ended", { callId: call.callId });
       return;
     }
 
@@ -358,6 +383,7 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
       emitToUserRef(record.callerId, "call:cancelled", { callId });
       emitToUserRef(record.calleeId, "call:cancelled", { callId });
     }
+    writeCallLog(record, "missed");
   });
 
   socket.on("call:peer-offer", (payload) => {
@@ -425,7 +451,13 @@ export const handleCallDisconnect = async (userId) => {
     if (otherSocketId && ioRef) {
       ioRef.to(otherSocketId).emit("call:ended", { callId });
     }
-    removeCall(callId);
+    const removed = removeCall(callId);
+    if (removed) {
+      writeCallLog(
+        removed,
+        removed.status === "active" ? "completed" : "missed",
+      );
+    }
   }
 
   try {
@@ -438,6 +470,7 @@ export const handleCallDisconnect = async (userId) => {
       if (emitToUserRef) {
         emitToUserRef(otherId, "call:cancelled", { callId: record.callId });
       }
+      writeCallLog(record, "missed");
     }
   } catch (error) {
     logger.error(

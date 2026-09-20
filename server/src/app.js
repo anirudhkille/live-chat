@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import { errorHandler } from "./middleware/error.middleware.js";
 import attachmentRoutes from "./modules/attachment/attachment.route.js";
 import authRoutes from "./modules/auth/auth.route.js";
+import callRoutes from "./modules/call/call.route.js";
 import conversationRoutes from "./modules/conversation/conversation.route.js";
 import messageRoutes from "./modules/message/message.route.js";
 import pushRoutes from "./modules/push/push.route.js";
@@ -45,6 +46,7 @@ app.get("/api/health", (req, res) => {
 
 app.use("/api/attachment", attachmentRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/call", callRoutes);
 app.use("/api/conversation", conversationRoutes);
 app.use("/api/message", messageRoutes);
 app.use("/api/push", pushRoutes);

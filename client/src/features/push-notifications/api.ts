@@ -2,9 +2,8 @@ import { api } from "@/lib/api";
 import type { ApiResponse } from "@/types/api";
 
 export async function getVapidPublicKey(): Promise<string> {
-  const response = await api.get<ApiResponse<{ publicKey: string }>>(
-    "/push/vapid-key"
-  );
+  const response =
+    await api.get<ApiResponse<{ publicKey: string }>>("/push/vapid-key");
   return response.data.data.publicKey;
 }
 

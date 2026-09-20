@@ -107,6 +107,30 @@ model MessageRead {
   @@unique([messageId, userId])
 }
 
+enum CallStatus {
+  completed
+  missed
+  declined
+}
+
+model Call {
+  id              String     @id @default(cuid())
+  callId          String     @unique
+  type            String
+  conversationId  String
+  callerId        String
+  calleeId        String
+  status          CallStatus
+  startedAt       DateTime
+  answeredAt      DateTime?
+  endedAt         DateTime
+  durationSeconds Int
+  createdAt       DateTime   @default(now())
+
+  @@index([callerId, startedAt])
+  @@index([calleeId, startedAt])
+}
+
 enum FileType {
   IMAGE
   VIDEO

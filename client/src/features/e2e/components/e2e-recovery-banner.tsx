@@ -63,7 +63,7 @@ export function E2ERecoveryBanner({
         </>
       ) : (
         <>
-          <p className="text-sm font-medium text-destructive">
+          <p className="text-destructive text-sm font-medium">
             Reset encryption keys
           </p>
           <p className="text-muted-foreground text-xs">
@@ -76,10 +76,7 @@ export function E2ERecoveryBanner({
       <div className="mt-2 grid gap-2">
         <div className="flex items-end gap-2">
           <div className="flex-1">
-            <Label
-              htmlFor="e2e-recovery-passphrase"
-              className="sr-only"
-            >
+            <Label htmlFor="e2e-recovery-passphrase" className="sr-only">
               {mode === "restore" ? "Recovery passphrase" : "New passphrase"}
             </Label>
             <Input

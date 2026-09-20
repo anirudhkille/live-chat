@@ -118,6 +118,28 @@ export type Notification = {
   createdAt: string;
 };
 
+export type CallLogUser = {
+  id: string;
+  name: string | null;
+  avatar: string | null;
+};
+
+export type CallLog = {
+  id: string;
+  callId: string;
+  type: "voice" | "video";
+  status: "completed" | "missed" | "declined";
+  conversationId: string;
+  callerId: string;
+  calleeId: string;
+  caller: CallLogUser | null;
+  callee: CallLogUser | null;
+  durationSeconds: number;
+  startedAt: string;
+  answeredAt: string | null;
+  endedAt: string;
+};
+
 export function normalizeUser(raw: unknown): User | null {
   if (typeof raw !== "object" || raw === null) return null;
   const record = raw as Record<string, unknown>;

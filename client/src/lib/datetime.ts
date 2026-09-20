@@ -68,3 +68,10 @@ export function formatMessageTime(iso: string) {
     minute: "2-digit",
   });
 }
+
+export function formatCallDuration(seconds: number) {
+  const total = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(total / 60);
+  const remainder = total % 60;
+  return `${minutes}:${String(remainder).padStart(2, "0")}`;
+}

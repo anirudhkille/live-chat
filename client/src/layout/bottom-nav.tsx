@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MessageCircle, Search, Settings } from "lucide-react";
+import { MessageCircle, Phone, Search, Settings } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 const TABS = [
   { to: "/chats", label: "Chats", icon: MessageCircle },
+  { to: "/calls", label: "Calls", icon: Phone },
   { to: "/search", label: "Search", icon: Search },
   { to: "/settings", label: "Settings", icon: Settings },
 ];

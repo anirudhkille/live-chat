@@ -80,7 +80,9 @@ export function usePushNotifications() {
       const subscription = await registration.pushManager.getSubscription();
       if (subscription) {
         await subscription.unsubscribe();
-        await removePushSubscription(subscription.endpoint).catch(() => undefined);
+        await removePushSubscription(subscription.endpoint).catch(
+          () => undefined
+        );
       }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
@@ -88,8 +90,7 @@ export function usePushNotifications() {
 
   return {
     supported: query.data?.state !== "unsupported",
-    permission:
-      query.data?.state === "ok" ? query.data.permission : undefined,
+    permission: query.data?.state === "ok" ? query.data.permission : undefined,
     enabled: query.data?.state === "ok" ? query.data.enabled : false,
     isLoading:
       query.isLoading || enable.isPending || disable.isPending || !query.data,

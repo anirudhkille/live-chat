@@ -9,7 +9,13 @@ import { Avatar } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 
-export function Sidebar({ className }: { className?: string }) {
+export function Sidebar({
+  className,
+  children,
+}: {
+  className?: string;
+  children?: React.ReactNode;
+}) {
   const pathname = usePathname();
   const { user } = useAuth();
 
@@ -44,7 +50,7 @@ export function Sidebar({ className }: { className?: string }) {
         </Link>
       </div>
 
-      <ConversationList />
+      {children ?? <ConversationList />}
 
       <div className="hidden items-center gap-1 border-t p-2 md:flex">
         <Link

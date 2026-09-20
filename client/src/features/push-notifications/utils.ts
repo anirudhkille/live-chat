@@ -11,9 +11,7 @@ export function urlBase64ToUint8Array(
   return output;
 }
 
-export function subscriptionToStored(
-  subscription: PushSubscription
-): {
+export function subscriptionToStored(subscription: PushSubscription): {
   endpoint: string;
   keys: { p256dh: string; auth: string };
 } {

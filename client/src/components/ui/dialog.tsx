@@ -63,7 +63,7 @@ export function Dialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overscroll-contain"
+      className="fixed inset-0 z-50 flex items-center justify-center overscroll-contain bg-black/50 p-4"
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -74,13 +74,13 @@ export function Dialog({
         aria-modal="true"
         aria-labelledby="dialog-title"
         tabIndex={-1}
-        className="w-full max-w-md rounded-lg border bg-background p-5 shadow-xl outline-none"
+        className="bg-background w-full max-w-md rounded-lg border p-5 shadow-xl outline-none"
       >
-        <div id="dialog-title" className="text-base text-primary">
+        <div id="dialog-title" className="text-primary text-base">
           {title}
         </div>
         {description ? (
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          <p className="text-muted-foreground mt-1 text-sm">{description}</p>
         ) : null}
         <div className="mt-4">{children}</div>
         {footer ? (

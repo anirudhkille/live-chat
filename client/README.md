@@ -14,10 +14,10 @@ npm run dev                  # http://localhost:3000
 
 ## Environment variables
 
-| Variable              | Purpose                                         |
-| --------------------- | ----------------------------------------------- |
-| `NEXT_PUBLIC_API_URL` | REST base URL, e.g. `http://localhost:8080/api` |
-| `NEXT_PUBLIC_SOCKET_URL` | Socket.IO URL, e.g. `http://localhost:8080`   |
+| Variable                 | Purpose                                         |
+| ------------------------ | ----------------------------------------------- |
+| `NEXT_PUBLIC_API_URL`    | REST base URL, e.g. `http://localhost:8080/api` |
+| `NEXT_PUBLIC_SOCKET_URL` | Socket.IO URL, e.g. `http://localhost:8080`     |
 
 > Add `http://localhost:3000` to `ALLOWED_ORIGNS` and set
 > `CLIENT_URL=http://localhost:3000` in `server/.env`, otherwise CORS and the
