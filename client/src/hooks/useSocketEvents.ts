@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 
 import { socket } from "@/lib/socket";
 
-type SocketHandler = (...args: never[]) => void;
+type SocketHandler = Parameters<typeof socket.on>[1];
 
 export function useSocketEvents(handlers: Record<string, SocketHandler>) {
   const handlersRef = useRef(handlers);
@@ -18,9 +18,9 @@ export function useSocketEvents(handlers: Record<string, SocketHandler>) {
     const listeners: Record<string, SocketHandler> = {};
 
     for (const event of events) {
-      const listener = ((...args: never[]) => {
+      const listener = (...args: Parameters<SocketHandler>) => {
         handlersRef.current[event]?.(...args);
-      }) as SocketHandler;
+      };
       listeners[event] = listener;
       socket.on(event, listener);
     }
