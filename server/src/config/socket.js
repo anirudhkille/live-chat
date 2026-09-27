@@ -2,6 +2,7 @@ import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import { env } from "./env.config.js";
 import { logger } from "./logger.js";
+import { captureError, setSentryUser } from "../utils/sentry.js";
 import {
   registerCallHandlers,
   handleCallDisconnect,
@@ -74,6 +75,7 @@ export const createSocketServer = (httpServer) => {
 
   io.on("connection", async (socket) => {
     const userId = socket.userId;
+    setSentryUser({ id: userId });
 
     if (!online.has(userId)) {
       online.set(userId, new Set());
@@ -88,6 +90,7 @@ export const createSocketServer = (httpServer) => {
         { err: error.message, userId },
         "Failed to load preferences",
       );
+      captureError(error, { source: "socket.connection", userId });
     }
 
     const canShowOnline = preferences?.showOnline ?? true;
@@ -100,6 +103,7 @@ export const createSocketServer = (httpServer) => {
         socket.broadcast.emit("user-online", { userId });
       } catch (error) {
         logger.error({ err: error.message, userId }, "Failed to set presence");
+        captureError(error, { source: "socket.connection", userId });
       }
     }
     logger.info(`User connected: ${userId}`);
@@ -125,6 +129,11 @@ export const createSocketServer = (httpServer) => {
           { err: error.message, userId, conversationId },
           "Join failed",
         );
+        captureError(error, {
+          source: "socket.join-conversation",
+          userId,
+          conversationId,
+        });
         socket.emit("conversation-error", {
           conversationId,
           message: "Failed to join conversation",
@@ -155,6 +164,10 @@ export const createSocketServer = (httpServer) => {
           { err: error.message, userId },
           "Disconnect presence cleanup failed",
         );
+        captureError(error, {
+          source: "socket.disconnect",
+          userId,
+        });
       } finally {
         try {
           await handleCallDisconnect(userId);
@@ -163,6 +176,10 @@ export const createSocketServer = (httpServer) => {
             { err: error.message, userId },
             "Disconnect call cleanup failed",
           );
+          captureError(error, {
+            source: "socket.disconnect",
+            userId,
+          });
         }
       }
       logger.info("User disconnected");

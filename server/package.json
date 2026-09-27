@@ -5,8 +5,8 @@
   "main": "src/server.js",
   "type": "module",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
+    "start": "node --import ./src/instrument.js src/server.js",
+    "dev": "nodemon --exec \"node --import ./src/instrument.js src/server.js\" src/server.js",
     "build": "prisma generate",
     "lint": "eslint src/",
     "format": "prettier --write src/"
@@ -24,6 +24,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1121.0",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
+    "@sentry/node": "^11.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",

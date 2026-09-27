@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { env } from "../config/env.config.js";
 import { findUserByIdOrThrow } from "../modules/user/user.service.js";
 import { logger } from "../config/logger.js";
+import { setSentryUser } from "../utils/sentry.js";
 
 export const authenticate = asyncHandler(async (req, res, next) => {
   let token;
@@ -22,6 +23,7 @@ export const authenticate = asyncHandler(async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET);
     req.user = await findUserByIdOrThrow(decoded._id);
+    setSentryUser(req.user);
     next();
   } catch (error) {
     logger.error(error);

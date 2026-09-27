@@ -28,6 +28,8 @@ const envSchema = z.object({
   VAPID_SUBJECT: z.string(),
   VAPID_PUBLIC_KEY: z.string(),
   VAPID_PRIVATE_KEY: z.string(),
+  SENTRY_DSN: z.string().optional(),
+  SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
 });
 
 const result = envSchema.safeParse(process.env);

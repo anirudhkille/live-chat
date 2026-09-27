@@ -90,6 +90,9 @@ npm run dev                  # http://localhost:3000
 | `VAPID_SUBJECT`                                            | Email/URL for the web-push VAPID key                   |
 | `VAPID_PUBLIC_KEY`                                         | VAPID public key (base64url) for web push              |
 | `VAPID_PRIVATE_KEY`                                        | VAPID private key (base64url) for web push             |
+| `SENTRY_DSN`                                               | Sentry DSN — omit to disable error reporting entirely  |
+| `SENTRY_TRACES_SAMPLE_RATE`                                | Share of requests traced, `0`–`1` (default `0.1`)     |
+| `SENTRY_RELEASE`                                           | Optional release tag, e.g. a git SHA (read from `process.env`) |
 
 ### Client (`client/.env.local`)
 
@@ -206,7 +209,8 @@ client/src/
 ```
 server/src/
 ├── app.js                  # Express app wiring (cors, cookie-parser, routes)
-├── server.js                # HTTP + Socket.IO bootstrap
+├── server.js                # HTTP + Socket.IO bootstrap + graceful shutdown
+├── instrument.js            # Sentry init, loaded via `--import` before everything else
 ├── generated/prisma/        # Generated Prisma client (run `node_modules/.bin/prisma generate`)
 ├── config/                   # env validation, prisma, redis, r2, mail, logger
 ├── middleware/                # auth (JWT), validate (zod), error handler
@@ -219,8 +223,16 @@ server/src/
 │   ├── push/                  # web-push subscriptions + VAPID
 │   └── storage/               # R2 presigned URL helpers
 ├── templates/                 # OTP email template
-└── utils/                      # jwt, otp, email, response envelope, errors
+└── utils/                      # jwt, otp, email, response envelope, errors, sentry
 ```
+
+## Error Tracking (Sentry)
+
+Optional — with no `SENTRY_DSN` the SDK stays inert and nothing is sent.
+
+`src/instrument.js` runs `Sentry.init()` and is loaded via `--import` (see the `start`/`dev` scripts) so `http`, Express, `pg`, `ioredis` and the AWS SDK are instrumented before the app loads. 5xx request errors are reported by the built-in Express integration; socket connection, join and disconnect failures go through `utils/sentry.js`. `authenticate` tags each request's scope with the user id, and `SIGTERM`/`SIGINT` flush buffered events so a container swap does not drop them.
+
+`dataCollection` in `instrument.js` disables cookies, request/response bodies, database query data, stack frame variables and inferred user info. This service holds message content and refresh token cookies, so those are never sent to a third party — loosen it only if you have accepted that.
 
 ## Scripts
 
