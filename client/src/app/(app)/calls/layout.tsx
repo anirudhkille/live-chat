@@ -1,27 +1,19 @@
 "use client";
 
-import dynamic from "next/dynamic";
-
 import { BottomNav } from "@/layout/bottom-nav";
 import { Sidebar } from "@/layout/sidebar";
 import { useAuthStore } from "@/store/auth-store";
-import { useCallStore } from "@/features/calls/call-store";
-import { useCalls } from "@/features/calls/use-calls";
+import { useCallActions } from "@/features/calls/call-provider";
 import { CallList } from "@/features/calls/components/call-list";
 import type { CallType } from "@/features/calls/call-store";
 import type { CallLog } from "@/types/api";
-
-const CallOverlay = dynamic(
-  () => import("@/features/calls/call-overlay").then((m) => m.CallOverlay),
-  { ssr: false }
-);
 
 export default function CallsLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const calls = useCalls();
+  const calls = useCallActions();
   const currentUserId = useAuthStore((s) => s.user?.id);
 
   const handleCallBack = (log: CallLog, type: CallType) => {
@@ -46,13 +38,6 @@ export default function CallsLayout({
         </main>
       </div>
       <BottomNav />
-      <CallOverlay
-        onAccept={calls.acceptCall}
-        onDecline={calls.rejectCall}
-        onCancel={calls.cancelOutgoing}
-        onHangup={calls.hangup}
-        onClose={() => useCallStore.getState().reset()}
-      />
     </div>
   );
 }

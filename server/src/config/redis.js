@@ -9,5 +9,5 @@ redis.on("connect", () => {
 });
 
 redis.on("error", (err) => {
-  logger.error("Redis error:", err);
+  logger.error({ err: err.message }, "Redis error");
 });

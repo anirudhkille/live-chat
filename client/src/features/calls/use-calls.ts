@@ -335,6 +335,12 @@ export function useCalls() {
   }, [applyLocalTracks, endCallFlow, setupIncomingOffer, setupPeerConnection]);
 
   useEffect(() => {
+    return () => {
+      resetConnection();
+    };
+  }, [resetConnection]);
+
+  useEffect(() => {
     const unsubscribe = useCallStore.subscribe((state) => {
       const action = state.autoAction;
       if (!action) return;

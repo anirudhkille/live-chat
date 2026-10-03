@@ -17,6 +17,11 @@ const app = express();
 
 app.disable("x-powered-by");
 
+// One hop in front of the app (the reverse proxy or container ingress). Without
+// this Express reports the proxy's address as req.ip, so every client shares a
+// single rate-limit bucket.
+app.set("trust proxy", 1);
+
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");

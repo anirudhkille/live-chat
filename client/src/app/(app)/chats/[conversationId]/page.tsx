@@ -12,7 +12,7 @@ import { MessageList } from "@/features/conversations/components/message-list";
 import { MessageInput } from "@/features/conversations/components/message-input";
 import { useConversationWithMessages } from "@/features/conversations/hooks/useConversationWithMessages";
 import { CallButtons } from "@/features/calls/call-buttons";
-import { useCalls } from "@/features/calls/use-calls";
+import { useCallActions } from "@/features/calls/call-provider";
 import { useCallStore } from "@/features/calls/call-store";
 import dynamic from "next/dynamic";
 import { formatRelativeTime as formatLastSeen } from "@/lib/datetime";
@@ -26,11 +26,6 @@ function initialStatus(conversation: Conversation | undefined) {
   }
   return null;
 }
-
-const CallOverlay = dynamic(
-  () => import("@/features/calls/call-overlay").then((m) => m.CallOverlay),
-  { ssr: false }
-);
 
 const GroupMembersDialog = dynamic(
   () =>
@@ -68,8 +63,8 @@ export default function ChatThreadPage({
     [conversationId]
   );
 
-  const calls = useCalls();
   const callStatus = useCallStore((s) => s.status);
+  const calls = useCallActions();
 
   const otherUserName = conversation?.name ?? conversation?.email ?? "Unknown";
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -249,14 +244,6 @@ export default function ChatThreadPage({
           conversation={conversation}
         />
       )}
-
-      <CallOverlay
-        onAccept={calls.acceptCall}
-        onDecline={calls.rejectCall}
-        onCancel={calls.cancelOutgoing}
-        onHangup={calls.hangup}
-        onClose={() => useCallStore.getState().reset()}
-      />
     </div>
   );
 }

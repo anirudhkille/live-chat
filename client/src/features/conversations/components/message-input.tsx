@@ -55,6 +55,7 @@ export function MessageInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const revokeOnUnmountRef = useRef<string[]>([]);
+  const sendingRef = useRef(false);
   const sendMessage = useSendMessage();
   const { data: preferences } = useUserPreferences();
   const typingEnabled = preferences?.typingIndicators !== false;
@@ -188,6 +189,8 @@ export function MessageInput({
   );
 
   const handleSend = useCallback(async () => {
+    if (sendingRef.current) return;
+
     const rawContent = draft.trim();
     if (
       (!rawContent && readyAttachmentIds.length === 0) ||
@@ -197,19 +200,26 @@ export function MessageInput({
       return;
     }
 
+    sendingRef.current = true;
+
     let content = rawContent;
     let cipherMeta: Record<string, unknown> | undefined;
     setSendError(null);
 
-    if (canEncrypt && rawContent) {
-      const conversationKey = deriveConversationKey({
-        privateKey: keys.privateKey,
-        peerPublicKey,
-        conversationId,
-      });
-      const encrypted = await encryptMessage(conversationKey, rawContent);
-      content = encrypted.content;
-      cipherMeta = encrypted.cipherMeta;
+    try {
+      if (canEncrypt && rawContent) {
+        const conversationKey = deriveConversationKey({
+          privateKey: keys.privateKey,
+          peerPublicKey,
+          conversationId,
+        });
+        const encrypted = await encryptMessage(conversationKey, rawContent);
+        content = encrypted.content;
+        cipherMeta = encrypted.cipherMeta;
+      }
+    } catch (error) {
+      sendingRef.current = false;
+      throw error;
     }
 
     sendMessage.mutate(
@@ -221,6 +231,9 @@ export function MessageInput({
         ...(replyTo ? { replyToId: replyTo.messageId } : {}),
       },
       {
+        onSettled: () => {
+          sendingRef.current = false;
+        },
         onSuccess: () => {
           setSendError(null);
           clearDraft(conversationId);

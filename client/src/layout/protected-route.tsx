@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { Spinner } from "@/components/ui/spinner";
 import { E2EKeyGate } from "@/features/e2e/components/e2e-key-gate";
+import { CallProvider } from "@/features/calls/call-provider";
 import { useAuth } from "@/hooks/use-auth";
 import { socket } from "@/lib/socket";
 
@@ -50,7 +51,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return (
     <>
       <E2EKeyGate />
-      {children}
+      <CallProvider>{children}</CallProvider>
     </>
   );
 }
