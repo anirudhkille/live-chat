@@ -75,12 +75,19 @@ export default function ChatThreadPage({
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    const join = () => {
+      socket.emit("join-conversation", conversationId);
+    };
+
     socket.connect();
-    socket.emit("join-conversation", conversationId);
+    join();
+    socket.on("connect", join);
+
     return () => {
+      socket.off("connect", join);
       socket.emit("leave-conversation", conversationId);
     };
-  }, [conversationId, conversation?.otherUserId]);
+  }, [conversationId]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

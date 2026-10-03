@@ -58,7 +58,7 @@ api.interceptors.response.use(
     const authStore = useAuthStore.getState();
 
     if (
-      (status === 401 || status === 403) &&
+      status === 401 &&
       authStore.token &&
       originalRequest &&
       !originalRequest._retry

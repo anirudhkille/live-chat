@@ -58,6 +58,8 @@ export const searchUser = (search, page, limit, id) => {
     },
     take: limit,
     skip: (page - 1) * limit,
+    orderBy: [{ name: "asc" }, { id: "asc" }],
+    select: { id: true, name: true, email: true, avatar: true },
   });
 };
 

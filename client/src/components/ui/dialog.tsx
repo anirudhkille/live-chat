@@ -21,6 +21,11 @@ export function Dialog({
 }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -29,7 +34,7 @@ export function Dialog({
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== "Tab") return;
@@ -57,7 +62,7 @@ export function Dialog({
       document.removeEventListener("keydown", onKeyDown);
       previouslyFocusedRef.current?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
