@@ -12,8 +12,10 @@ export const toMessageResponse = (message) => {
   const { reads, reactions, replyTo, ...rest } = message;
   const readAt =
     reads?.find((read) => read.userId !== message.senderId)?.readAt ?? null;
+  const { content, ...restWithoutContent } = rest;
   return {
-    ...rest,
+    ...restWithoutContent,
+    content: message.deletedAt ? null : content,
     readAt,
     reactions: (reactions ?? []).map((reaction) => ({
       id: reaction.id,

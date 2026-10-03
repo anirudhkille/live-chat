@@ -47,6 +47,14 @@ export const emitToConversation = (conversationId, event, payload) => {
   io.to(conversationRoom(conversationId)).emit(event, payload);
 };
 
+export const removeUserFromConversation = (userId, conversationId) => {
+  if (!io) return;
+  const room = conversationRoom(conversationId);
+  for (const socketId of online.get(userId) ?? []) {
+    io.sockets.sockets.get(socketId)?.leave(room);
+  }
+};
+
 const visibleOnline = new Set();
 
 export const createSocketServer = (httpServer) => {
@@ -81,32 +89,6 @@ export const createSocketServer = (httpServer) => {
       online.set(userId, new Set());
     }
     online.get(userId).add(socket.id);
-
-    let preferences;
-    try {
-      preferences = await userService.getUserPreferences(userId);
-    } catch (error) {
-      logger.error(
-        { err: error.message, userId },
-        "Failed to load preferences",
-      );
-      captureError(error, { source: "socket.connection", userId });
-    }
-
-    const canShowOnline = preferences?.showOnline ?? true;
-    socket.showOnline = canShowOnline;
-
-    if (canShowOnline) {
-      visibleOnline.add(userId);
-      try {
-        await userService.setUserPresence(userId, true);
-        socket.broadcast.emit("user-online", { userId });
-      } catch (error) {
-        logger.error({ err: error.message, userId }, "Failed to set presence");
-        captureError(error, { source: "socket.connection", userId });
-      }
-    }
-    logger.info(`User connected: ${userId}`);
 
     socket.on("join-conversation", async (conversationId) => {
       try {
@@ -185,13 +167,6 @@ export const createSocketServer = (httpServer) => {
       logger.info("User disconnected");
     });
 
-    registerCallHandlers({
-      io,
-      socket,
-      getOnline: (targetUserId) => online.get(targetUserId),
-      emitToUser,
-    });
-
     socket.on("typing-conversation", (payload) => {
       const { conversationId, isTyping } = payload ?? {};
       const room = conversationRoom(conversationId);
@@ -202,6 +177,39 @@ export const createSocketServer = (httpServer) => {
         isTyping: typeof isTyping === "boolean" ? isTyping : true,
       });
     });
+
+    registerCallHandlers({
+      io,
+      socket,
+      getOnline: (targetUserId) => online.get(targetUserId),
+      emitToUser,
+    });
+
+    let preferences;
+    try {
+      preferences = await userService.getUserPreferences(userId);
+    } catch (error) {
+      logger.error(
+        { err: error.message, userId },
+        "Failed to load preferences",
+      );
+      captureError(error, { source: "socket.connection", userId });
+    }
+
+    const canShowOnline = preferences?.showOnline ?? true;
+    socket.showOnline = canShowOnline;
+
+    if (canShowOnline) {
+      visibleOnline.add(userId);
+      try {
+        await userService.setUserPresence(userId, true);
+        socket.broadcast.emit("user-online", { userId });
+      } catch (error) {
+        logger.error({ err: error.message, userId }, "Failed to set presence");
+        captureError(error, { source: "socket.connection", userId });
+      }
+    }
+    logger.info(`User connected: ${userId}`);
   });
   return io;
 };

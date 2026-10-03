@@ -12,6 +12,7 @@ import {
   emitToConversation,
   isUserOnline,
   emitToUser,
+  removeUserFromConversation,
 } from "../../config/socket.js";
 import { AppError } from "../../utils/AppError.js";
 
@@ -163,13 +164,17 @@ export const updateGroup = async (
 };
 
 export const deleteGroup = async (conversationId, actorId) => {
-  await assertGroupAdmin(conversationId, actorId);
-
-  await conversationRepository.deleteById(conversationId);
+  const conversation = await assertGroupAdmin(conversationId, actorId);
 
   emitToConversation(conversationId, "group-deleted", {
     conversationId,
   });
+
+  for (const participant of conversation.participants) {
+    removeUserFromConversation(participant.userId, conversationId);
+  }
+
+  await conversationRepository.deleteById(conversationId);
 
   return { deleted: true };
 };
@@ -243,6 +248,7 @@ export const removeGroupParticipant = async (
   }
 
   await conversationRepository.removeParticipant(conversationId, targetUserId);
+  removeUserFromConversation(targetUserId, conversationId);
 
   emitToConversation(conversationId, "conversation-updated", {
     conversationId,

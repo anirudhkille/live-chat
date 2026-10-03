@@ -386,40 +386,26 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
     writeCallLog(record, "missed");
   });
 
-  socket.on("call:peer-offer", (payload) => {
-    const { callId, sdp } = payload ?? {};
-    const call = getCall(callId);
-    if (!call || !sdp) return;
-    const otherSocketId =
-      socket.id === call.callerSocketId
-        ? call.calleeSocketId
-        : call.callerSocketId;
-    if (otherSocketId) send(otherSocketId, "call:peer-offer", { callId, sdp });
-  });
+  const relay = (event, field) => {
+    socket.on(event, (payload) => {
+      const { callId } = payload ?? {};
+      const call = getCall(callId);
+      if (!call || payload?.[field] == null) return;
+      if (call.callerId !== socket.userId && call.calleeId !== socket.userId)
+        return;
+      const otherSocketId =
+        socket.id === call.callerSocketId
+          ? call.calleeSocketId
+          : call.callerSocketId;
+      if (otherSocketId) {
+        send(otherSocketId, event, { callId, [field]: payload[field] });
+      }
+    });
+  };
 
-  socket.on("call:peer-answer", (payload) => {
-    const { callId, sdp } = payload ?? {};
-    const call = getCall(callId);
-    if (!call || !sdp) return;
-    const otherSocketId =
-      socket.id === call.callerSocketId
-        ? call.calleeSocketId
-        : call.callerSocketId;
-    if (otherSocketId) send(otherSocketId, "call:peer-answer", { callId, sdp });
-  });
-
-  socket.on("call:ice-candidate", (payload) => {
-    const { callId, candidate } = payload ?? {};
-    const call = getCall(callId);
-    if (!call || candidate == null) return;
-    const otherSocketId =
-      socket.id === call.callerSocketId
-        ? call.calleeSocketId
-        : call.callerSocketId;
-    if (otherSocketId) {
-      send(otherSocketId, "call:ice-candidate", { callId, candidate });
-    }
-  });
+  relay("call:peer-offer", "sdp");
+  relay("call:peer-answer", "sdp");
+  relay("call:ice-candidate", "candidate");
 
   (async () => {
     try {

@@ -108,6 +108,11 @@ export const refreshToken = async (token) => {
   }
 
   if (storedToken !== token) {
+    await redis.del(`refreshToken:${decoded._id}`);
+    logger.error(
+      { userId: decoded._id },
+      "Refresh token mismatch, session revoked",
+    );
     throw new AppError(401, "Token mismatch");
   }
 
@@ -115,9 +120,19 @@ export const refreshToken = async (token) => {
 };
 
 export const logout = async (token) => {
-  const decoded = jwt.verify(token, env.JWT_REFRESH_SECRET);
+  if (!token) return;
 
-  await redis.del(`refreshToken:${decoded._id}`);
+  let decoded;
+
+  try {
+    decoded = jwt.verify(token, env.JWT_REFRESH_SECRET);
+  } catch {
+    return;
+  }
+
+  if (decoded._id) {
+    await redis.del(`refreshToken:${decoded._id}`);
+  }
 };
 
 export const updateUserProfile = async (userId, body) => {
