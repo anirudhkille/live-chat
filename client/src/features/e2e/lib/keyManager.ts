@@ -16,14 +16,27 @@ export async function saveIdentityKeys(keys: IdentityKeys): Promise<void> {
   await dbSet(KEY_STORAGE_KEY, keys);
 }
 
-export async function createAndUploadIdentity(passphrase: string) {
+export async function createAndUploadIdentity(passphrase?: string) {
   const masterSeed = generateMasterSeed();
   const keys = deriveIdentityKeys(masterSeed);
-  const recoveryBlob = await buildRecoveryBlob(passphrase, {
+  const recoveryBlob = passphrase
+    ? await buildRecoveryBlob(passphrase, {
+        masterSeed: keys.masterSeed,
+        privateKey: keys.privateKey,
+        publicKey: keys.publicKey,
+      })
+    : null;
+  await saveIdentityKeys(keys);
+  return { keys, recoveryBlob };
+}
+
+export async function buildRecoveryBlobForKeys(
+  passphrase: string,
+  keys: IdentityKeys
+) {
+  return buildRecoveryBlob(passphrase, {
     masterSeed: keys.masterSeed,
     privateKey: keys.privateKey,
     publicKey: keys.publicKey,
   });
-  await saveIdentityKeys(keys);
-  return { keys, recoveryBlob };
 }

@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Spinner } from "@/components/ui/spinner";
-import { memo } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { memo, useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useConversations } from "@/features/conversations/hooks/useConversations";
@@ -47,7 +47,8 @@ const ConversationItem = memo(function ConversationItem({
 
   const lastMessagePreview = (() => {
     if (!lastMessage) return null;
-    if (lastMessage.cipherMeta) return decryptedPreview ?? "Message";
+    if (lastMessage.deletedAt) return "This message was deleted";
+    if (lastMessage.cipherMeta) return decryptedPreview ?? null;
     if (lastMessage.content?.trim()) return lastMessage.content;
     const audioOnly =
       (lastMessage.attachments?.length ?? 0) > 0 &&
@@ -102,15 +103,52 @@ const ConversationItem = memo(function ConversationItem({
   );
 });
 
+function ConversationListSkeleton() {
+  return (
+    <div className="flex-1" aria-hidden="true">
+      {Array.from({ length: 8 }).map((_, index) => (
+        <div key={index} className="flex items-center gap-3 px-3 py-2.5">
+          <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <Skeleton className="h-3.5 w-2/5" />
+              <Skeleton className="h-2.5 w-8 shrink-0" />
+            </div>
+            <Skeleton className="h-3 w-3/5" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function ConversationList() {
   const pathname = usePathname();
   const currentUserId = useAuthStore((s) => s.user?.id);
   const { data: conversations, isLoading, isError } = useConversations();
   const queryClient = useQueryClient();
 
-  const handleConversationChanged = () => {
-    queryClient.invalidateQueries({ queryKey: ["conversations"] });
-  };
+  const invalidateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+
+  // The server emits conversation-updated per message send, so a short trailing
+  // window collapses a burst into a single refetch.
+  const handleConversationChanged = useCallback(() => {
+    if (invalidateTimeoutRef.current)
+      clearTimeout(invalidateTimeoutRef.current);
+    invalidateTimeoutRef.current = setTimeout(() => {
+      invalidateTimeoutRef.current = null;
+      void queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    }, 300);
+  }, [queryClient]);
+
+  useEffect(() => {
+    return () => {
+      if (invalidateTimeoutRef.current)
+        clearTimeout(invalidateTimeoutRef.current);
+    };
+  }, []);
 
   useSocketEvents({
     "conversation-updated": handleConversationChanged,
@@ -120,11 +158,7 @@ export function ConversationList() {
   });
 
   if (isLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center p-6">
-        <Spinner size="sm" className="text-muted-foreground h-5 w-5" />
-      </div>
-    );
+    return <ConversationListSkeleton />;
   }
 
   if (isError) {

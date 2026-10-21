@@ -9,6 +9,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -55,6 +56,36 @@ function updateCachedMessages(
         })),
       };
     }
+  );
+}
+
+const MESSAGE_SKELETONS = [
+  { own: false, width: "w-40", height: "h-10" },
+  { own: true, width: "w-56", height: "h-10" },
+  { own: false, width: "w-56", height: "h-16" },
+  { own: false, width: "w-32", height: "h-10" },
+  { own: true, width: "w-44", height: "h-10" },
+  { own: false, width: "w-48", height: "h-10" },
+  { own: true, width: "w-52", height: "h-14" },
+] as const;
+
+function MessageListSkeleton({ style }: { style?: CSSProperties }) {
+  return (
+    <div
+      style={style}
+      aria-hidden="true"
+      className="flex flex-1 flex-col gap-3 overflow-hidden p-4"
+    >
+      <Skeleton className="mx-auto h-2.5 w-16" />
+      {MESSAGE_SKELETONS.map((item, index) => (
+        <div
+          key={index}
+          className={item.own ? "flex justify-end" : "flex justify-start"}
+        >
+          <Skeleton className={`${item.width} ${item.height} rounded-2xl`} />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -166,11 +197,33 @@ export function MessageList({
     [items.length, virtualizer]
   );
 
+  const markReadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const markReadNow = useCallback(() => {
+    if (!conversationId) return;
+    markConversationRead(conversationId);
+  }, [conversationId, markConversationRead]);
+
+  // A burst of inbound messages would otherwise fire one POST per message.
+  const scheduleMarkRead = useCallback(() => {
+    if (markReadTimeoutRef.current) clearTimeout(markReadTimeoutRef.current);
+    markReadTimeoutRef.current = setTimeout(() => {
+      markReadTimeoutRef.current = null;
+      markReadNow();
+    }, 400);
+  }, [markReadNow]);
+
+  useEffect(() => {
+    return () => {
+      if (markReadTimeoutRef.current) clearTimeout(markReadTimeoutRef.current);
+    };
+  }, []);
+
   useSocketEvents({
     "new-message": (newMessage: Message) => {
       if (newMessage.conversationId !== conversationId) return;
       setSocketMessages((prev) => [...prev, newMessage]);
-      markConversationRead(conversationId);
+      scheduleMarkRead();
     },
     "messages-read": (payload: {
       conversationId: string;
@@ -235,8 +288,8 @@ export function MessageList({
 
   useEffect(() => {
     if (!conversationId || isLoading) return;
-    markConversationRead(conversationId);
-  }, [conversationId, isLoading, markConversationRead]);
+    markReadNow();
+  }, [conversationId, isLoading, markReadNow]);
 
   useEffect(() => {
     if (isLoading || displayMessages.length === 0) return;
@@ -283,11 +336,7 @@ export function MessageList({
   }, [loadOlder]);
 
   if (isLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner size="sm" className="text-muted-foreground h-5 w-5" />
-      </div>
-    );
+    return <MessageListSkeleton style={wallpaperStyle} />;
   }
 
   if (isError) {

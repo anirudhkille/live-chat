@@ -15,25 +15,23 @@ export function useDecryptedPreview(
   return useQuery({
     queryKey: ["decrypted-preview", message?.id, peerId],
     queryFn: async () => {
-      if (!message?.cipherMeta) return null;
-      if (!keys || !peerPublicKey) return "Message";
+      if (!message?.cipherMeta || !keys || !peerPublicKey) return null;
       try {
         const conversationKey = deriveConversationKey({
           privateKey: keys.privateKey,
           peerPublicKey,
           conversationId: message.conversationId,
         });
-        const plaintext = await decryptMessage(
+        return await decryptMessage(
           conversationKey,
           message.content,
           message.cipherMeta ?? null
         );
-        return plaintext ?? "Message";
       } catch {
-        return "Message";
+        return null;
       }
     },
-    enabled: !!message?.cipherMeta,
+    enabled: !!message?.cipherMeta && !!keys && !!peerPublicKey,
     staleTime: Infinity,
   });
 }

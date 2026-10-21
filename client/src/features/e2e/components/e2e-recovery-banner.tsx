@@ -14,7 +14,7 @@ export function E2ERecoveryBanner({
   error,
 }: {
   onRestore: (passphrase: string) => void;
-  onReset: (passphrase: string) => void;
+  onReset: (passphrase?: string) => void;
   isPending: boolean;
   error: Error | null;
 }) {
@@ -28,18 +28,18 @@ export function E2ERecoveryBanner({
   );
 
   const handleSubmit = () => {
-    if (!passphrase) return;
     if (mode === "reset") {
       if (!showResetConfirm) {
         setShowResetConfirm(true);
         return;
       }
       if (passphrase !== confirmPassphrase) return;
-      onReset(passphrase);
+      onReset(passphrase || undefined);
       setPassphrase("");
       setConfirmPassphrase("");
       setShowResetConfirm(false);
     } else {
+      if (!passphrase) return;
       onRestore(passphrase);
     }
   };
@@ -68,7 +68,8 @@ export function E2ERecoveryBanner({
           </p>
           <p className="text-muted-foreground text-xs">
             Create new keys. You will not be able to read previously encrypted
-            messages.
+            messages. A passphrase is optional and only needed to restore these
+            keys on another device.
           </p>
         </>
       )}
@@ -85,7 +86,9 @@ export function E2ERecoveryBanner({
               value={passphrase}
               onChange={(e) => setPassphrase(e.target.value)}
               placeholder={
-                mode === "restore" ? "Recovery passphrase" : "New passphrase"
+                mode === "restore"
+                  ? "Recovery passphrase"
+                  : "Optional passphrase"
               }
               disabled={isPending}
             />
@@ -93,7 +96,9 @@ export function E2ERecoveryBanner({
           <Button
             type="button"
             variant={mode === "reset" ? "destructive" : "default"}
-            disabled={!passphrase || isPending || resetMismatch}
+            disabled={
+              isPending || resetMismatch || (mode === "restore" && !passphrase)
+            }
             onClick={handleSubmit}
           >
             {isPending

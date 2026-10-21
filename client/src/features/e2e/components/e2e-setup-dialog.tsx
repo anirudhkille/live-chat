@@ -9,13 +9,21 @@ import { Label } from "@/components/ui/label";
 export function E2ESetupDialog({
   open,
   onSetup,
+  onClose,
   isPending,
   error,
+  title = "Enable end-to-end encryption",
+  description = "Choose a recovery passphrase. This is the only way to restore your keys on a new device. We cannot reset it for you.",
+  submitLabel = "Enable encryption",
 }: {
   open: boolean;
   onSetup: (passphrase: string) => void;
+  onClose?: () => void;
   isPending: boolean;
   error: Error | null;
+  title?: string;
+  description?: string;
+  submitLabel?: string;
 }) {
   const [passphrase, setPassphrase] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -26,16 +34,16 @@ export function E2ESetupDialog({
   return (
     <Dialog
       open={open}
-      onClose={() => {}}
-      title="Enable end-to-end encryption"
-      description="Choose a recovery passphrase. This is the only way to restore your keys on a new device. We cannot reset it for you."
+      onClose={onClose ?? (() => {})}
+      title={title}
+      description={description}
       footer={
         <Button
           type="button"
           disabled={!canSubmit}
           onClick={() => onSetup(passphrase)}
         >
-          {isPending ? "Setting up..." : "Enable encryption"}
+          {isPending ? "Saving..." : submitLabel}
         </Button>
       }
     >

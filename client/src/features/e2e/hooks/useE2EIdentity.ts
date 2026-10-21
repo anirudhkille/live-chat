@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { IdentityKeys } from "@/lib/crypto/identity";
 import { restoreFromBlob, type RecoveryBlob } from "@/lib/crypto/recovery";
 import { saveKey } from "../api/user-key-api";
@@ -9,27 +9,29 @@ import {
   loadIdentityKeys,
   saveIdentityKeys,
   createAndUploadIdentity,
+  buildRecoveryBlobForKeys,
 } from "../lib/keyManager";
 
+const IDENTITY_QUERY_KEY = ["e2e-identity"];
+
 export function useE2EIdentity() {
-  const [keys, setKeys] = useState<IdentityKeys | null>(null);
-  const [loading, setLoading] = useState(true);
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    loadIdentityKeys()
-      .then(setKeys)
-      .finally(() => setLoading(false));
-  }, []);
+  const identityQuery = useQuery({
+    queryKey: IDENTITY_QUERY_KEY,
+    queryFn: loadIdentityKeys,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
 
   const setupMutation = useMutation({
-    mutationFn: async (passphrase: string) => {
+    mutationFn: async (passphrase?: string) => {
       const { keys, recoveryBlob } = await createAndUploadIdentity(passphrase);
       await saveKey({ publicKey: keys.publicKey, recoveryBlob });
       return keys;
     },
     onSuccess: (newKeys) => {
-      setKeys(newKeys);
+      queryClient.setQueryData(IDENTITY_QUERY_KEY, newKeys);
       queryClient.invalidateQueries({ queryKey: ["user-key", "me"] });
     },
   });
@@ -50,19 +52,40 @@ export function useE2EIdentity() {
       return restoredKeys;
     },
     onSuccess: (restoredKeys) => {
-      setKeys(restoredKeys);
+      queryClient.setQueryData(IDENTITY_QUERY_KEY, restoredKeys);
       queryClient.invalidateQueries({ queryKey: ["user-key", "me"] });
     },
   });
 
+  const passphraseMutation = useMutation({
+    mutationFn: async (args: { passphrase: string; keys: IdentityKeys }) => {
+      const recoveryBlob = await buildRecoveryBlobForKeys(
+        args.passphrase,
+        args.keys
+      );
+      await saveKey({ publicKey: args.keys.publicKey, recoveryBlob });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user-key", "me"] });
+    },
+  });
+
+  const setup = useCallback(
+    (passphrase?: string) => setupMutation.mutateAsync(passphrase),
+    [setupMutation.mutateAsync]
+  );
+
   return {
-    keys,
-    loading,
-    setup: setupMutation.mutateAsync,
+    keys: identityQuery.data ?? null,
+    loading: identityQuery.isPending,
+    setup,
     restore: restoreMutation.mutateAsync,
+    addPassphrase: passphraseMutation.mutateAsync,
     isSettingUp: setupMutation.isPending,
     isRestoring: restoreMutation.isPending,
+    isAddingPassphrase: passphraseMutation.isPending,
     setupError: setupMutation.error,
     restoreError: restoreMutation.error,
+    addPassphraseError: passphraseMutation.error,
   };
 }

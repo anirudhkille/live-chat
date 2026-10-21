@@ -14,7 +14,7 @@ export function useDecryptedMessages(
 ) {
   const { keys } = useE2EIdentity();
   const { data: peerPublicKey } = usePeerPublicKey(peerId);
-  const [decrypted, setDecrypted] = useState<Record<string, string>>({});
+  const [decrypted, setDecrypted] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     if (!keys || !peerPublicKey || !conversationId) return;
@@ -34,14 +34,13 @@ export function useDecryptedMessages(
     if (pending.length === 0) return;
 
     (async () => {
-      const results: Record<string, string> = {};
+      const results: Record<string, string | null> = {};
       for (const message of pending) {
-        const plain = await decryptMessage(
+        results[message.id] = await decryptMessage(
           conversationKey,
           message.content,
           message.cipherMeta!
         );
-        results[message.id] = plain ?? "Unable to decrypt message.";
       }
       if (!cancelled) {
         setDecrypted((prev) => ({ ...prev, ...results }));
@@ -56,16 +55,19 @@ export function useDecryptedMessages(
 
   return useMemo(
     () =>
-      messages.map((message) => {
-        if (!message.cipherMeta) return message;
-        if (!keys || !peerPublicKey) {
-          return { ...message, content: "Message" };
+      messages.flatMap((message) => {
+        if (message.deletedAt) return [message];
+        if (!message.cipherMeta) return [message];
+
+        const plain = decrypted[message.id];
+        if (plain === undefined) return [];
+        if (plain === null) {
+          return (message.attachments?.length ?? 0) > 0
+            ? [{ ...message, content: "" }]
+            : [];
         }
-        if (decrypted[message.id] === undefined) {
-          return { ...message, content: "Message" };
-        }
-        return { ...message, content: decrypted[message.id] };
+        return [{ ...message, content: plain }];
       }),
-    [messages, keys, peerPublicKey, decrypted]
+    [messages, decrypted]
   );
 }
