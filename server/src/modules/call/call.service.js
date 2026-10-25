@@ -1,5 +1,6 @@
 import { logger } from "../../config/logger.js";
 import * as callRepository from "./call.repository.js";
+import { PARTICIPANT_STATE } from "./call-state.js";
 
 const CALL_STATUSES = new Set(["completed", "missed", "declined"]);
 
@@ -50,6 +51,58 @@ export const writeCallLog = (record, endStatus = "missed") => {
       "Failed to write call log",
     );
   });
+};
+
+const participantStatus = (participant) => {
+  if (participant.state === PARTICIPANT_STATE.joined) return "completed";
+  if (participant.state === PARTICIPANT_STATE.declined) return "declined";
+  return "missed";
+};
+
+export const writeCallLogsForCall = (call) => {
+  const callees = [...call.participants.values()].filter(
+    (participant) => participant.userId !== call.callerId,
+  );
+  if (callees.length === 0) return Promise.resolve();
+
+  const multiParty = callees.length > 1;
+  const endedAt = new Date();
+
+  const writes = callees.map((participant) => {
+    const status = participantStatus(participant);
+    const answeredAt =
+      status === "completed"
+        ? (participant.joinedAt ?? call.answeredAt ?? endedAt)
+        : null;
+    const durationSeconds =
+      status === "completed"
+        ? Math.max(0, Math.floor((endedAt - answeredAt) / 1000))
+        : 0;
+    const logCallId = multiParty
+      ? `${call.callId}:${participant.userId}`
+      : call.callId;
+
+    const data = {
+      type: call.type,
+      conversationId: call.conversationId,
+      callerId: call.callerId,
+      calleeId: participant.userId,
+      status,
+      startedAt: call.startedAt ?? endedAt,
+      answeredAt,
+      endedAt,
+      durationSeconds,
+    };
+
+    return callRepository.upsert(logCallId, data).catch((error) => {
+      logger.error(
+        { err: error.message, callId: logCallId },
+        "Failed to write call log",
+      );
+    });
+  });
+
+  return Promise.all(writes);
 };
 
 export const getCallLogsForUser = async (userId, { filter } = {}) => {

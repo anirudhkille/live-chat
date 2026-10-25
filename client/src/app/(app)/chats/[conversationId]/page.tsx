@@ -201,34 +201,41 @@ export default function ChatThreadPage({
             )}
           </div>
         </div>
-        {conversation?.isGroup ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="ml-auto"
-            aria-label="Group members"
-            onClick={() => setMembersOpen(true)}
-          >
-            <Users className="h-4 w-4" />
-          </Button>
-        ) : (
-          <div className="ml-auto flex items-center gap-1">
-            <CallButtons
-              disabled={callStatus !== "idle"}
-              onStart={(type) =>
-                calls.startCall({
-                  type,
-                  conversationId,
-                  peerId: conversation?.otherUserId ?? "",
-                  peerName: conversation?.name ?? null,
-                })
-              }
-            />
+        <div className="ml-auto flex items-center gap-1">
+          <CallButtons
+            disabled={callStatus !== "idle"}
+            onStart={(type) =>
+              calls.startCall({
+                type,
+                conversationId,
+                peerId: conversation?.isGroup
+                  ? null
+                  : (conversation?.otherUserId ?? null),
+                peerName: conversation?.isGroup
+                  ? null
+                  : (conversation?.name ?? null),
+                isGroup: conversation?.isGroup ?? false,
+                conversationName: conversation?.isGroup
+                  ? (conversation?.name ?? null)
+                  : null,
+              })
+            }
+          />
+          {conversation?.isGroup ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Group members"
+              onClick={() => setMembersOpen(true)}
+            >
+              <Users className="h-4 w-4" />
+            </Button>
+          ) : (
             <Button variant="ghost" size="icon" aria-label="Chat info" disabled>
               <Info className="h-4 w-4" />
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </header>
 
       <MessageList

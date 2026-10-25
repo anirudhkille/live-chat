@@ -6,8 +6,32 @@ export type CallType = "voice" | "video";
 export type CallRole = "caller" | "callee" | null;
 export type CallStatus = "idle" | "outgoing" | "incoming" | "active" | "ended";
 
-type CallEndReason =
-  "ended" | "rejected" | "cancelled" | "timedOut" | "pendingTimedOut" | "error";
+export type CallEndReason =
+  | "ended"
+  | "rejected"
+  | "cancelled"
+  | "timedOut"
+  | "pendingTimedOut"
+  | "busy"
+  | "offline"
+  | "tooMany"
+  | "unavailable"
+  | "error";
+
+export type RemoteParticipant = {
+  userId: string;
+  name: string | null;
+  stream: MediaStream | null;
+  muted: boolean;
+  cameraOff: boolean;
+};
+
+type ParticipantSeed = {
+  userId: string;
+  name: string | null;
+  muted?: boolean;
+  cameraOff?: boolean;
+};
 
 type AutoAction = {
   callId: string;
@@ -22,12 +46,14 @@ type CallState = {
   conversationId: string | null;
   peerId: string | null;
   peerName: string | null;
+  isGroup: boolean;
+  conversationName: string | null;
   startedAt: number | null;
   endReason: CallEndReason | null;
   localStream: MediaStream | null;
-  remoteStream: MediaStream | null;
   localMuted: boolean;
   cameraOff: boolean;
+  remoteParticipants: Record<string, RemoteParticipant>;
   isConnecting: boolean;
   pending: boolean;
   autoAction: AutoAction | null;
@@ -36,8 +62,10 @@ type CallState = {
     callId: string;
     type: CallType;
     conversationId: string;
-    peerId: string;
+    peerId: string | null;
     peerName: string | null;
+    isGroup?: boolean;
+    conversationName?: string | null;
   }) => void;
 
   receiveIncoming: (args: {
@@ -46,16 +74,26 @@ type CallState = {
     conversationId: string;
     callerId: string;
     callerName: string | null;
+    isGroup?: boolean;
+    conversationName?: string | null;
     pending?: boolean;
   }) => void;
 
   markConnecting: () => void;
   markPending: () => void;
 
-  toActive: (local: MediaStream, remote?: MediaStream | null) => void;
+  toActive: (local: MediaStream) => void;
 
   setLocalStream: (stream: MediaStream) => void;
-  setRemoteStream: (stream: MediaStream) => void;
+  setParticipants: (participants: ParticipantSeed[]) => void;
+  upsertParticipant: (participant: ParticipantSeed) => void;
+  removeParticipant: (userId: string) => void;
+  setRemoteStream: (userId: string, stream: MediaStream) => void;
+  setParticipantMedia: (
+    userId: string,
+    media: { muted: boolean; cameraOff: boolean }
+  ) => void;
+  setLocalMedia: (media: { muted: boolean; cameraOff: boolean }) => void;
   toggleLocalMuted: () => void;
   toggleCamera: () => void;
 
@@ -66,37 +104,45 @@ type CallState = {
   reset: () => void;
 };
 
-const settleStreams = (
-  localStream: MediaStream | null,
-  remoteStream: MediaStream | null
-) => {
-  localStream?.getTracks().forEach((track) => track.stop());
-  localStream?.getVideoTracks().forEach((track) => track.stop());
-  if (remoteStream) {
-    remoteStream.getTracks().forEach((track) => track.stop());
-  }
+const stopStream = (stream: MediaStream | null) => {
+  stream?.getTracks().forEach((track) => track.stop());
 };
 
-export const useCallStore = create<CallState>((set, get) => ({
-  status: "idle",
-  role: null,
-  callId: null,
-  type: null,
-  conversationId: null,
-  peerId: null,
-  peerName: null,
-  startedAt: null,
-  endReason: null,
-  localStream: null,
-  remoteStream: null,
+const idleState = () => ({
+  status: "idle" as CallStatus,
+  role: null as CallRole,
+  callId: null as string | null,
+  type: null as CallType | null,
+  conversationId: null as string | null,
+  peerId: null as string | null,
+  peerName: null as string | null,
+  isGroup: false,
+  conversationName: null as string | null,
+  startedAt: null as number | null,
+  endReason: null as CallEndReason | null,
+  localStream: null as MediaStream | null,
   localMuted: false,
   cameraOff: false,
+  remoteParticipants: {} as Record<string, RemoteParticipant>,
   isConnecting: false,
   pending: false,
-  autoAction: null,
+  autoAction: null as AutoAction | null,
+});
 
-  startOutgoing: ({ callId, type, conversationId, peerId, peerName }) =>
+export const useCallStore = create<CallState>((set, get) => ({
+  ...idleState(),
+
+  startOutgoing: ({
+    callId,
+    type,
+    conversationId,
+    peerId,
+    peerName,
+    isGroup,
+    conversationName,
+  }) =>
     set({
+      ...idleState(),
       status: "outgoing",
       role: "caller",
       callId,
@@ -104,12 +150,9 @@ export const useCallStore = create<CallState>((set, get) => ({
       conversationId,
       peerId,
       peerName,
-      startedAt: null,
-      endReason: null,
-      localMuted: false,
-      cameraOff: false,
-      isConnecting: false,
-      pending: false,
+      isGroup: isGroup ?? false,
+      conversationName: conversationName ?? null,
+      isConnecting: true,
     }),
 
   receiveIncoming: ({
@@ -118,9 +161,12 @@ export const useCallStore = create<CallState>((set, get) => ({
     conversationId,
     callerId,
     callerName,
+    isGroup,
+    conversationName,
     pending,
   }) =>
     set({
+      ...idleState(),
       status: "incoming",
       role: "callee",
       callId,
@@ -128,28 +174,112 @@ export const useCallStore = create<CallState>((set, get) => ({
       conversationId,
       peerId: callerId,
       peerName: callerName,
-      startedAt: null,
-      endReason: null,
-      localMuted: false,
-      cameraOff: false,
-      isConnecting: false,
+      isGroup: isGroup ?? false,
+      conversationName: conversationName ?? null,
       pending: pending ?? false,
+      isConnecting: true,
     }),
 
   markConnecting: () => set({ isConnecting: true }),
   markPending: () => set({ pending: true }),
-  toActive: (local, remote) =>
+
+  toActive: (local) =>
     set({
       status: "active",
       startedAt: get().startedAt ?? Date.now(),
       localStream: local,
-      remoteStream: remote ?? get().remoteStream,
       isConnecting: false,
       pending: false,
     }),
 
   setLocalStream: (stream) => set({ localStream: stream }),
-  setRemoteStream: (stream) => set({ remoteStream: stream }),
+
+  setParticipants: (participants) =>
+    set((state) => {
+      const next: Record<string, RemoteParticipant> = {};
+      for (const participant of participants) {
+        const existing = state.remoteParticipants[participant.userId];
+        next[participant.userId] = {
+          userId: participant.userId,
+          name: participant.name ?? existing?.name ?? null,
+          stream: existing?.stream ?? null,
+          muted: participant.muted ?? existing?.muted ?? false,
+          cameraOff: participant.cameraOff ?? existing?.cameraOff ?? false,
+        };
+      }
+      for (const [userId, participant] of Object.entries(
+        state.remoteParticipants
+      )) {
+        if (!next[userId]) stopStream(participant.stream);
+      }
+      return { remoteParticipants: next };
+    }),
+
+  upsertParticipant: ({ userId, name }) =>
+    set((state) => {
+      const existing = state.remoteParticipants[userId];
+      return {
+        remoteParticipants: {
+          ...state.remoteParticipants,
+          [userId]: {
+            userId,
+            name: name ?? existing?.name ?? null,
+            stream: existing?.stream ?? null,
+            muted: existing?.muted ?? false,
+            cameraOff: existing?.cameraOff ?? false,
+          },
+        },
+      };
+    }),
+
+  removeParticipant: (userId) =>
+    set((state) => {
+      const existing = state.remoteParticipants[userId];
+      if (!existing) return state;
+      stopStream(existing.stream);
+      const next = { ...state.remoteParticipants };
+      delete next[userId];
+      return { remoteParticipants: next };
+    }),
+
+  setRemoteStream: (userId, stream) =>
+    set((state) => {
+      const existing = state.remoteParticipants[userId];
+      if (!existing) {
+        return {
+          remoteParticipants: {
+            ...state.remoteParticipants,
+            [userId]: {
+              userId,
+              name: null,
+              stream,
+              muted: false,
+              cameraOff: false,
+            },
+          },
+        };
+      }
+      return {
+        remoteParticipants: {
+          ...state.remoteParticipants,
+          [userId]: { ...existing, stream },
+        },
+      };
+    }),
+
+  setParticipantMedia: (userId, media) =>
+    set((state) => {
+      const existing = state.remoteParticipants[userId];
+      if (!existing) return state;
+      return {
+        remoteParticipants: {
+          ...state.remoteParticipants,
+          [userId]: { ...existing, ...media },
+        },
+      };
+    }),
+
+  setLocalMedia: (media) => set(media),
 
   toggleLocalMuted: () => {
     const { localStream, localMuted } = get();
@@ -182,24 +312,11 @@ export const useCallStore = create<CallState>((set, get) => ({
     })),
 
   reset: () => {
-    settleStreams(get().localStream, get().remoteStream);
-    set({
-      status: "idle",
-      role: null,
-      callId: null,
-      type: null,
-      conversationId: null,
-      peerId: null,
-      peerName: null,
-      startedAt: null,
-      endReason: null,
-      localStream: null,
-      remoteStream: null,
-      localMuted: false,
-      cameraOff: false,
-      isConnecting: false,
-      pending: false,
-      autoAction: null,
-    });
+    const state = get();
+    stopStream(state.localStream);
+    Object.values(state.remoteParticipants).forEach((participant) =>
+      stopStream(participant.stream)
+    );
+    set({ ...idleState() });
   },
 }));

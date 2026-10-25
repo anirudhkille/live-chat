@@ -44,6 +44,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
         onDecline={calls.rejectCall}
         onCancel={calls.cancelOutgoing}
         onHangup={calls.hangup}
+        onToggleMute={calls.toggleMute}
+        onToggleCamera={calls.toggleCamera}
         onClose={handleClose}
       />
     </CallActionsContext.Provider>

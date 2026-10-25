@@ -26,3 +26,22 @@ export const findUsersByIds = (ids) => {
     select: { id: true, name: true, avatar: true },
   });
 };
+
+export const findConversationForCall = (conversationId) => {
+  return prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: {
+      id: true,
+      isGroup: true,
+      name: true,
+      participants: {
+        select: {
+          userId: true,
+          user: {
+            select: { id: true, name: true, pushNotifications: true },
+          },
+        },
+      },
+    },
+  });
+};
