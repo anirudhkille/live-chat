@@ -6,7 +6,7 @@ import { ArrowLeft, Info, Users } from "lucide-react";
 import { socket } from "@/lib/socket";
 import { useSocketEvents } from "@/hooks/useSocketEvents";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar } from "@/components/ui/avatar";
 import { MessageList } from "@/features/conversations/components/message-list";
 import { MessageInput } from "@/features/conversations/components/message-input";
@@ -179,19 +179,26 @@ export default function ChatThreadPage({
               size="xs"
             />
           ) : (
-            <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-md">
-              <Spinner size="xs" className="text-muted-foreground" />
-            </div>
+            <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
           )}
           <div className="min-w-0">
-            <p className="text-foreground truncate text-sm font-medium">
-              {loadingConversation ? "Loading..." : otherUserName}
-            </p>
-            <p className="text-muted-foreground text-xs">
-              {conversation?.isGroup
-                ? `${conversation.participants?.length ?? 0} members`
-                : status}
-            </p>
+            {loadingConversation ? (
+              <>
+                <Skeleton className="h-3.5 w-24" />
+                <Skeleton className="mt-1.5 h-2.5 w-16" />
+              </>
+            ) : (
+              <>
+                <p className="text-foreground truncate text-sm font-medium">
+                  {otherUserName}
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  {conversation?.isGroup
+                    ? `${conversation.participants?.length ?? 0} members`
+                    : status}
+                </p>
+              </>
+            )}
           </div>
         </div>
         {conversation?.isGroup ? (

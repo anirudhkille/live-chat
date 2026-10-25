@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Phone } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/empty-state";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useSocketEvents } from "@/hooks/useSocketEvents";
 import { useAuthStore } from "@/store/auth-store";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,27 @@ function groupCalls(calls: CallLog[]): CallGroup[] {
     else groups.push({ key, label: dayLabel(call.startedAt), items: [call] });
   }
   return groups;
+}
+
+function CallListSkeleton() {
+  return (
+    <div aria-hidden="true">
+      <Skeleton className="mx-3 mt-3 mb-1.5 h-2.5 w-12" />
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} className="flex items-center gap-3 px-3 py-2.5">
+          <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <Skeleton className="h-3.5 w-2/5" />
+              <Skeleton className="h-2.5 w-8 shrink-0" />
+            </div>
+            <Skeleton className="h-3 w-24" />
+          </div>
+          <Skeleton className="h-8 w-8 shrink-0 rounded-md" />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function CallList({
@@ -77,11 +98,7 @@ export function CallList({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {isLoading && (
-          <div className="flex items-center justify-center p-6">
-            <Spinner size="sm" className="text-muted-foreground h-5 w-5" />
-          </div>
-        )}
+        {isLoading && <CallListSkeleton />}
 
         {isError && (
           <div className="text-muted-foreground flex flex-col items-center justify-center gap-1 p-6 text-center">
