@@ -74,7 +74,8 @@ export function CallList({
     "call:unavailable": refresh,
     "call:pending-expired": refresh,
     "call:pending-timed-out": refresh,
-    "call:accepted": refresh,
+    "call:participants": refresh,
+    "call:participant-joined": refresh,
   });
 
   const groups = useMemo(() => groupCalls(calls ?? []), [calls]);
