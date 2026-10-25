@@ -581,6 +581,12 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
 
       if (participant.state === PARTICIPANT_STATE.ringing) {
         markMissed(call, socket.userId);
+        for (const other of joinedListExcept(call, socket.userId)) {
+          emitToUserRef(other.userId, "call:rejected", {
+            callId: call.callId,
+            userId: socket.userId,
+          });
+        }
         if (shouldEndCall(call)) endCall(call, "declined");
         return;
       }
@@ -705,6 +711,13 @@ export const handleCallDisconnect = async (userId) => {
 
     if (participant.state === PARTICIPANT_STATE.ringing) {
       markMissed(call, userId);
+      for (const other of joinedParticipants(call)) {
+        if (other.userId === userId || !emitToUserRef) continue;
+        emitToUserRef(other.userId, "call:rejected", {
+          callId,
+          userId,
+        });
+      }
     } else {
       markLeft(call, userId);
       const participants = publicParticipants(call);
