@@ -19,7 +19,6 @@ import {
   getParticipant,
   isJoined,
   countJoined,
-  countRinging,
   joinedParticipants,
   markJoined,
   markDeclined,
@@ -102,8 +101,19 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
       const record = getCall(call.callId);
       if (!record) return;
       record.timeout = null;
+
       if (countJoined(record) < 2) {
         endCall(record, "timedOut");
+        return;
+      }
+
+      for (const participant of record.participants.values()) {
+        if (participant.state !== PARTICIPANT_STATE.ringing) continue;
+        markMissed(record, participant.userId);
+        emitToUserRef(participant.userId, "call:ended", {
+          callId: record.callId,
+          reason: "timedOut",
+        });
       }
     }, RING_TIMEOUT_MS);
   };
@@ -432,10 +442,6 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
     if (!participant || participant.state !== PARTICIPANT_STATE.ringing) return;
 
     markJoined(call, socket.userId, socket.id);
-    if (countJoined(call) >= 2 && call.timeout) {
-      clearTimeout(call.timeout);
-      call.timeout = null;
-    }
 
     const participants = publicParticipants(call);
     send(socket.id, "call:participants", {
@@ -628,8 +634,6 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
 
       if (shouldEndCall(call)) {
         endCall(call, "ended");
-      } else if (countJoined(call) < 2 && countRinging(call) > 0) {
-        armRingTimeout(call);
       }
       return;
     }
