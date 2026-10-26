@@ -178,6 +178,7 @@ export const useCallStore = create<CallState>((set, get) => ({
       conversationName: conversationName ?? null,
       pending: pending ?? false,
       isConnecting: true,
+      autoAction: get().autoAction,
     }),
 
   markConnecting: () => set({ isConnecting: true }),
