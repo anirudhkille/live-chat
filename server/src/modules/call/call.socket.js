@@ -38,6 +38,17 @@ const pendingTimers = new Map();
 let emitToUserRef = null;
 const getCall = (callId) => (callId ? calls.get(callId) : undefined);
 
+const buildRingPayload = (call) => ({
+  callId: call.callId,
+  type: call.type,
+  conversationId: call.conversationId,
+  conversationName: call.conversationName,
+  callerId: call.callerId,
+  callerName: call.callerName,
+  isGroup: call.isGroup,
+  participants: publicParticipants(call),
+});
+
 const findCallForUser = (userId) => {
   for (const call of calls.values()) {
     const participant = getParticipant(call, userId);
@@ -202,6 +213,12 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
     const offlineTargets = reachableTargets.filter(
       (participant) => !isUserOnline(participant.userId),
     );
+    const pushTargets = offlineTargets.filter(
+      (participant) => participant.user?.pushNotifications,
+    );
+    const silentTargets = offlineTargets.filter(
+      (participant) => !participant.user?.pushNotifications,
+    );
 
     if (
       !isGroup &&
@@ -315,7 +332,7 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
       return;
     }
 
-    if (onlineTargets.length === 0) {
+    if (onlineTargets.length === 0 && pushTargets.length === 0) {
       const emptyCall = createCall({
         callId: resolvedCallId,
         type,
@@ -360,14 +377,14 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
       socketId: socket.id,
     });
 
-    for (const participant of onlineTargets) {
+    for (const participant of [...onlineTargets, ...pushTargets]) {
       addParticipant(call, {
         userId: participant.userId,
         name: participant.user?.name ?? null,
         state: PARTICIPANT_STATE.ringing,
       });
     }
-    for (const participant of [...offlineTargets, ...busyTargets]) {
+    for (const participant of [...busyTargets, ...silentTargets]) {
       addParticipant(call, {
         userId: participant.userId,
         name: participant.user?.name ?? null,
@@ -378,21 +395,23 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
     calls.set(call.callId, call);
     armRingTimeout(call);
 
-    const participants = publicParticipants(call);
-    const ringPayload = {
-      callId: call.callId,
-      type: call.type,
-      conversationId: call.conversationId,
-      conversationName: call.conversationName,
-      callerId: call.callerId,
-      callerName: call.callerName,
-      isGroup: call.isGroup,
-      participants,
-    };
+    const ringPayload = buildRingPayload(call);
 
     socket.emit("call:initiated", ringPayload);
     for (const participant of onlineTargets) {
       emitToUserRef(participant.userId, "call:ringing", ringPayload);
+    }
+
+    for (const participant of pushTargets) {
+      void pushService.sendCallNotification({
+        userId: participant.userId,
+        callerName: resolvedCallerName,
+        conversationId,
+        callType: type,
+        callId: call.callId,
+        isGroup: call.isGroup,
+        conversationName: call.conversationName,
+      });
     }
 
     logger.info(
@@ -673,6 +692,16 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
         muted: Boolean(muted),
         cameraOff: Boolean(cameraOff),
       });
+    }
+  });
+
+  socket.on("call:sync", () => {
+    for (const call of calls.values()) {
+      const participant = getParticipant(call, socket.userId);
+      if (!participant || participant.state !== PARTICIPANT_STATE.ringing) {
+        continue;
+      }
+      socket.emit("call:ringing", buildRingPayload(call));
     }
   });
 

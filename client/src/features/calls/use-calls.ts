@@ -372,6 +372,13 @@ export function useCalls() {
   useEffect(() => {
     const currentCallId = () => callIdRef.current;
 
+    const handleConnect = () => {
+      socket.emit("call:sync");
+    };
+
+    if (socket.connected) socket.emit("call:sync");
+    socket.on("connect", handleConnect);
+
     const handleInitiated = (payload: {
       callId: string;
       participants: ServerParticipant[];
@@ -612,6 +619,7 @@ export function useCalls() {
     socket.on("call:pending-expired", handlePendingExpired);
 
     return () => {
+      socket.off("connect", handleConnect);
       socket.off("call:initiated", handleInitiated);
       socket.off("call:ringing", handleRinging);
       socket.off("call:participants", handleParticipants);
@@ -651,11 +659,7 @@ export function useCalls() {
     const unsubscribe = useCallStore.subscribe((state) => {
       const action = state.autoAction;
       if (!action) return;
-      if (
-        state.status !== "incoming" ||
-        state.callId !== action.callId ||
-        !state.pending
-      ) {
+      if (state.status !== "incoming" || state.callId !== action.callId) {
         return;
       }
       useCallStore.getState().clearAutoAction();

@@ -173,16 +173,26 @@ export const sendCallNotification = async ({
   conversationId,
   callType,
   callId,
+  isGroup = false,
+  conversationName = null,
 }) => {
+  const kind = callType === "video" ? "video" : "voice";
+  const caller = callerName || "Someone";
   const payload = {
     type: "call",
-    title: `Incoming ${callType === "video" ? "video" : "voice"} call`,
-    body: `${callerName || "Someone"} is calling you`,
+    title: isGroup ? `Incoming group ${kind} call` : `Incoming ${kind} call`,
+    body: isGroup
+      ? `${caller} started a ${kind} call${
+          conversationName ? ` in ${conversationName}` : ""
+        }`
+      : `${caller} is calling you`,
     url: `/chats/${conversationId}`,
     conversationId,
     callId,
     callType,
     callerName: callerName ?? null,
+    isGroup,
+    conversationName: conversationName ?? null,
   };
 
   await sendToSubscriptions(userId, payload, { TTL: 120, urgency: "high" });
