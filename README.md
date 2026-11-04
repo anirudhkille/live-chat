@@ -81,6 +81,7 @@ npm run dev                  # http://localhost:3000
 | `GOOGLE_CLIENT_SECRET`                                    | Google OAuth client secret                           |
 | `GOOGLE_CALLBACK_URL`                                     | Google OAuth redirect URL                            |
 | `CLIENT_URL`                                              | Frontend origin, used for OAuth redirects            |
+| `SERVER_URL`                                              | Public base URL of the API server (used for email assets like the logo) |
 | `RESEND_API_KEY`                                           | Resend API key for sending OTP emails                |
 | `EMAIL_FROM`                                               | Sender address for OTP emails (default `onboarding@resend.dev`) |
 | `R2_ACCOUNT_ID`                                            | Cloudflare R2 account ID                             |

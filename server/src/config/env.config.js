@@ -16,6 +16,7 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string(),
   GOOGLE_CALLBACK_URL: z.string(),
   CLIENT_URL: z.string(),
+  SERVER_URL: z.string().default("http://localhost:8080"),
   RESEND_API_KEY: z.string(),
   EMAIL_FROM: z.string().default("onboarding@resend.dev"),
   R2_ACCOUNT_ID: z.string(),

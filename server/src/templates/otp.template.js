@@ -1,4 +1,7 @@
+import { env } from "../config/env.config.js";
+
 export const otpTemplate = (otp) => {
+  const logoUrl = `${env.SERVER_URL}/logo.svg`;
   return `
   <!DOCTYPE html>
   <html>
@@ -44,7 +47,14 @@ export const otpTemplate = (otp) => {
                     font-weight: bold;
                   "
                 >
-                  Live Chat
+                  <img
+                    src="${logoUrl}"
+                    alt="Live Chat"
+                    width="48"
+                    height="48"
+                    style="display: block; margin: 0 auto 8px auto;"
+                  />
+                  <span style="vertical-align: middle;">Live Chat</span>
                 </td>
               </tr>
 
@@ -102,7 +112,7 @@ export const otpTemplate = (otp) => {
                     font-size: 12px;
                   "
                 >
-                  © ${new Date().getFullYear()} BasketFlow
+                  © ${new Date().getFullYear()} Live Chat
                 </td>
               </tr>
             </table>

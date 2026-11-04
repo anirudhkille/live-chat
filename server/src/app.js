@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { errorHandler } from "./middleware/error.middleware.js";
 import attachmentRoutes from "./modules/attachment/attachment.route.js";
 import authRoutes from "./modules/auth/auth.route.js";
@@ -48,6 +50,9 @@ app.get("/api/health", (req, res) => {
     timeStamp: Date.now(),
   });
 });
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+app.use(express.static(path.join(__dirname, "..", "public")));
 
 app.use("/api/attachment", attachmentRoutes);
 app.use("/api/auth", authRoutes);
