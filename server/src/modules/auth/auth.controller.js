@@ -27,17 +27,21 @@ export const verifyLoginOtp = asyncHandler(async (req, res) => {
 
   setRefreshCookie(res, refreshToken);
 
-  sendResponse(res, 200, "Logged in successfully", { user, accessToken });
+  sendResponse(res, 200, "Logged in successfully", {
+    user,
+    accessToken,
+    refreshToken,
+  });
 });
 
 export const refreshToken = asyncHandler(async (req, res) => {
-  const { accessToken, refreshToken } = await authService.refreshToken(
-    req.cookies.refreshToken,
-  );
+  const incomingToken = req.cookies?.refreshToken || req.body?.refreshToken;
+  const { accessToken, refreshToken } =
+    await authService.refreshToken(incomingToken);
 
   setRefreshCookie(res, refreshToken);
 
-  sendResponse(res, 200, "Token refreshed", { accessToken });
+  sendResponse(res, 200, "Token refreshed", { accessToken, refreshToken });
 });
 
 export const logout = asyncHandler(async (req, res) => {
