@@ -41,7 +41,7 @@ export const loginUser = async (email) => {
     throw new AppError(429, "Please wait before requesting another OTP");
   }
 
-  const user = await userRepository.upsertByEmail(email);
+  await userRepository.upsertByEmail(email);
 
   const otp = generateOtp();
 

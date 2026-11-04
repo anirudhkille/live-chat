@@ -31,7 +31,7 @@ A full-stack real-time chat application with OTP and Google authentication, dire
 - A PostgreSQL database
 - A Redis instance
 - A Cloudflare R2 bucket (for avatars, conversation photos, and message attachments)
-- An SMTP provider (for sending OTP emails)
+- A Resend account (for sending OTP emails)
 - A VAPID key pair (for web push — generate via `npx web-push generate-vapid-keys`)
 
 ## Getting Started
@@ -81,7 +81,8 @@ npm run dev                  # http://localhost:3000
 | `GOOGLE_CLIENT_SECRET`                                    | Google OAuth client secret                           |
 | `GOOGLE_CALLBACK_URL`                                     | Google OAuth redirect URL                            |
 | `CLIENT_URL`                                              | Frontend origin, used for OAuth redirects            |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_EMAIL`, `SMTP_PASSWORD`   | SMTP credentials for sending OTP emails               |
+| `RESEND_API_KEY`                                           | Resend API key for sending OTP emails                |
+| `EMAIL_FROM`                                               | Sender address for OTP emails (default `onboarding@resend.dev`) |
 | `R2_ACCOUNT_ID`                                            | Cloudflare R2 account ID                             |
 | `R2_ACCESS_KEY_ID`                                         | R2 API access key                                    |
 | `R2_SECRET_ACCESS_KEY`                                     | R2 API secret key                                    |
