@@ -3,7 +3,7 @@ import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpac
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { messageApi } from "@/features/conversations/api/message-api";
+import { messageApi } from "@/features/conversations/api/conversation-api";
 import type { Message } from "@/types/api";
 
 export default function ChatScreen() {
