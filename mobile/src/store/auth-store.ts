@@ -9,7 +9,11 @@ type AuthState = {
   refreshToken: string | null;
   user: User | null;
   hasHydrated: boolean;
-  setSession: (session: { token: string; refreshToken?: string; user?: User }) => void;
+  setSession: (session: {
+    token: string;
+    refreshToken?: string;
+    user?: User;
+  }) => void;
   setToken: (token: string) => void;
   setRefreshToken: (refreshToken: string) => void;
   setUser: (user: User) => void;
@@ -39,7 +43,11 @@ export const useAuthStore = create<AuthState>()(
     {
       name: "live-chat.auth",
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({ token: state.token, refreshToken: state.refreshToken, user: state.user }),
+      partialize: (state) => ({
+        token: state.token,
+        refreshToken: state.refreshToken,
+        user: state.user,
+      }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
       },

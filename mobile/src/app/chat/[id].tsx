@@ -1,6 +1,14 @@
 import { useState } from "react";
-import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import {
+  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { messageApi } from "@/features/conversations/api/conversation-api";
@@ -8,7 +16,6 @@ import type { Message } from "@/types/api";
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
   const qc = useQueryClient();
   const [text, setText] = useState("");
 
@@ -43,7 +50,7 @@ export default function ChatScreen() {
         <ActivityIndicator style={{ marginTop: 24 }} />
       ) : (
         <FlatList
-          data={[...(messages ?? [])].reverse()}
+          data={[...(messages ?? [])].toReversed()}
           keyExtractor={(m) => m.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
@@ -68,10 +75,34 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   list: { padding: 12 },
-  bubble: { padding: 10, backgroundColor: "#f3f4f6", borderRadius: 8, marginBottom: 8, alignSelf: "flex-start", maxWidth: "80%" },
+  bubble: {
+    padding: 10,
+    backgroundColor: "#f3f4f6",
+    borderRadius: 8,
+    marginBottom: 8,
+    alignSelf: "flex-start",
+    maxWidth: "80%",
+  },
   content: { fontSize: 14 },
-  inputRow: { flexDirection: "row", padding: 8, borderTopWidth: 1, borderTopColor: "#eee" },
-  input: { flex: 1, borderWidth: 1, borderColor: "#ddd", borderRadius: 8, padding: 10, marginRight: 8 },
-  sendBtn: { backgroundColor: "#111827", paddingHorizontal: 16, borderRadius: 8, justifyContent: "center" },
+  inputRow: {
+    flexDirection: "row",
+    padding: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+  },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 10,
+    marginRight: 8,
+  },
+  sendBtn: {
+    backgroundColor: "#111827",
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    justifyContent: "center",
+  },
   sendText: { color: "#fff", fontWeight: "600" },
 });

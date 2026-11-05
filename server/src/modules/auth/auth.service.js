@@ -145,8 +145,8 @@ export const updateUserProfile = async (userId, body) => {
   return userRepository.updateById(userId, { name });
 };
 
-export const getGoogleAuthURL = () => {
-  return googleAuthUrl();
+export const getGoogleAuthURL = (redirect) => {
+  return googleAuthUrl(redirect);
 };
 
 export const googleLogin = async (code) => {

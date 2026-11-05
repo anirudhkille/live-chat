@@ -25,6 +25,11 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 24, backgroundColor: "#fff" },
   title: { fontSize: 24, fontWeight: "700", marginBottom: 24 },
-  button: { backgroundColor: "#dc2626", padding: 14, borderRadius: 8, alignItems: "center" },
+  button: {
+    backgroundColor: "#dc2626",
+    padding: 14,
+    borderRadius: 8,
+    alignItems: "center",
+  },
   buttonText: { color: "#fff", fontWeight: "600" },
 });

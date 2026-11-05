@@ -22,7 +22,19 @@
     },
     "plugins": [
       "expo-router",
-      "expo-status-bar"
-    ]
+      "expo-status-bar",
+      "expo-web-browser"
+    ],
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "42710b9a-c6f4-4f6e-bff7-1b3512a9e7d4"
+      }
+    },
+    "owner": "anirudhkille"
   }
 }

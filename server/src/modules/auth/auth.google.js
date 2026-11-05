@@ -3,7 +3,9 @@ import { env } from "../../config/env.config.js";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
 
-export const getGoogleAuthURL = () => {
+export const getGoogleAuthURL = (redirect) => {
+  const safeRedirect =
+    typeof redirect === "string" && redirect ? redirect : env.CLIENT_URL;
   const params = new URLSearchParams({
     client_id: env.GOOGLE_CLIENT_ID,
     redirect_uri: env.GOOGLE_CALLBACK_URL,
@@ -11,6 +13,7 @@ export const getGoogleAuthURL = () => {
     scope: "openid email profile",
     access_type: "offline",
     prompt: "consent",
+    state: encodeURIComponent(safeRedirect),
   });
 
   return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;

@@ -3,7 +3,10 @@ import { sendResponse } from "../../utils/response.js";
 import * as pushService from "./push.service.js";
 
 export const subscribe = asyncHandler(async (req, res) => {
-  const subscription = await pushService.saveSubscription(req.user.id, req.body);
+  const subscription = await pushService.saveSubscription(
+    req.user.id,
+    req.body,
+  );
   sendResponse(res, 200, "Push subscription saved", subscription);
 });
 
@@ -16,4 +19,14 @@ export const vapidKey = asyncHandler(async (req, res) => {
   sendResponse(res, 200, "VAPID public key", {
     publicKey: pushService.getPublicKey(),
   });
+});
+
+export const registerExpoToken = asyncHandler(async (req, res) => {
+  const token = await pushService.saveExpoToken(req.user.id, req.body?.token);
+  sendResponse(res, 200, "Expo push token saved", token);
+});
+
+export const unregisterExpoToken = asyncHandler(async (req, res) => {
+  await pushService.removeExpoToken(req.user.id, req.body?.token);
+  sendResponse(res, 200, "Expo push token removed");
 });

@@ -56,16 +56,32 @@ export const updateProfile = asyncHandler(async (req, res) => {
   sendResponse(res, 200, "Profile updated", { user });
 });
 
+const isAllowedRedirect = (redirect) => {
+  if (typeof redirect !== "string" || !redirect) return false;
+  if (redirect.startsWith(env.CLIENT_URL)) return true;
+  if (redirect.startsWith("livechat://")) return true;
+  return false;
+};
+
 export const googleAuth = asyncHandler(async (req, res) => {
-  const url = authService.getGoogleAuthURL();
+  const redirect = isAllowedRedirect(req.query.redirect)
+    ? req.query.redirect
+    : env.CLIENT_URL;
+  const url = authService.getGoogleAuthURL(redirect);
   res.redirect(url);
 });
 
 export const googleCallback = asyncHandler(async (req, res) => {
-  const { code } = req.query;
+  const { code, state } = req.query;
+
+  const requestedRedirect = isAllowedRedirect(
+    typeof state === "string" ? decodeURIComponent(state) : "",
+  )
+    ? decodeURIComponent(state)
+    : env.CLIENT_URL;
 
   if (!code) {
-    return res.redirect(`${env.CLIENT_URL}/login?error=google_auth_failed`);
+    return res.redirect(`${requestedRedirect}/login?error=google_auth_failed`);
   }
 
   const { user, accessToken, refreshToken } =
@@ -80,6 +96,6 @@ export const googleCallback = asyncHandler(async (req, res) => {
     avatar: user.avatar,
   };
 
-  const redirectURL = `${env.CLIENT_URL}/auth/callback?accessToken=${accessToken}&user=${encodeURIComponent(JSON.stringify(userData))}`;
+  const redirectURL = `${requestedRedirect}/auth/callback?accessToken=${accessToken}${requestedRedirect.startsWith("livechat://") ? `&refreshToken=${encodeURIComponent(refreshToken)}` : ""}&user=${encodeURIComponent(JSON.stringify(userData))}`;
   res.redirect(redirectURL);
 });

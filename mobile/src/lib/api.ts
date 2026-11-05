@@ -33,9 +33,7 @@ export const api = axios.create({
 
 api.interceptors.request.use((config) => {
   if (!API_BASE_URL) {
-    return Promise.reject(
-      new Error("EXPO_PUBLIC_API_URL is not set."),
-    );
+    return Promise.reject(new Error("EXPO_PUBLIC_API_URL is not set."));
   }
 
   const token = useAuthStore.getState().token;
@@ -83,10 +81,9 @@ api.interceptors.response.use(
 
       try {
         const refreshToken = authStore.refreshToken;
-        const response = await api.post<{ data: { accessToken: string; refreshToken?: string } }>(
-          "/auth/refresh",
-          refreshToken ? { refreshToken } : undefined,
-        );
+        const response = await api.post<{
+          data: { accessToken: string; refreshToken?: string };
+        }>("/auth/refresh", refreshToken ? { refreshToken } : undefined);
         const newAccessToken = response.data.data.accessToken;
         if (response.data.data.refreshToken) {
           authStore.setRefreshToken(response.data.data.refreshToken);

@@ -27,3 +27,37 @@ export const getSubscriptionsByUserIds = (userIds) => {
     orderBy: { createdAt: "desc" },
   });
 };
+
+export const upsertExpoPushToken = ({ userId, token }) => {
+  return prisma.expoPushToken.upsert({
+    where: { token },
+    update: { userId },
+    create: { userId, token },
+  });
+};
+
+export const deleteExpoPushToken = (userId, token) => {
+  return prisma.expoPushToken.deleteMany({
+    where: { userId, token },
+  });
+};
+
+export const deleteExpoPushTokenByToken = (token) => {
+  return prisma.expoPushToken.deleteMany({
+    where: { token },
+  });
+};
+
+export const getExpoPushTokensByUserId = (userId) => {
+  return prisma.expoPushToken.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+  });
+};
+
+export const getExpoPushTokensByUserIds = (userIds) => {
+  return prisma.expoPushToken.findMany({
+    where: { userId: { in: userIds } },
+    orderBy: { createdAt: "desc" },
+  });
+};

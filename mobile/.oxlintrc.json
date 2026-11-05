@@ -1,0 +1,14 @@
+{
+  "plugins": ["typescript", "react", "react-hooks", "unicorn"],
+  "categories": {
+    "correctness": "warn",
+    "suspicious": "warn"
+  },
+  "rules": {
+    "no-unused-vars": "warn",
+    "react/react-in-jsx-scope": "off",
+    "eslint/no-underscore-dangle": "off",
+    "react/style-prop-object": "off"
+  },
+  "ignorePatterns": ["node_modules", "dist", ".expo"]
+}

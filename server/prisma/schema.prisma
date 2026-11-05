@@ -37,6 +37,7 @@ model User {
   messages     Message[]
   reads        MessageRead[]
   pushSubscriptions PushSubscription[]
+  expoPushTokens   ExpoPushToken[]
   reactions    MessageReaction[]
   key          UserKey?
   conversationKeys ConversationKey[]
@@ -160,6 +161,17 @@ model PushSubscription {
   id        String   @id @default(cuid())
   endpoint  String   @unique
   keys      Json     // { p256dh, auth }
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+
+  @@index([userId, createdAt])
+}
+
+model ExpoPushToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id])

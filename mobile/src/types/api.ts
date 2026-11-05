@@ -155,7 +155,7 @@ export function normalizeUser(raw: unknown): User | null {
 
 export function getApiErrorMessage(
   error: unknown,
-  fallback = "Something went wrong"
+  fallback = "Something went wrong",
 ): string {
   if (
     error &&

@@ -1,7 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+import { useAuthStore } from "@/store/auth-store";
+import { registerExpoPushToken } from "@/features/push-notifications/register";
 
 export default function RootLayout() {
   const [queryClient] = useState(
@@ -12,6 +15,14 @@ export default function RootLayout() {
         },
       }),
   );
+
+  const token = useAuthStore((s) => s.token);
+
+  useEffect(() => {
+    if (token) {
+      registerExpoPushToken().catch(() => {});
+    }
+  }, [token]);
 
   return (
     <QueryClientProvider client={queryClient}>
