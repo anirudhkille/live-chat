@@ -1,0 +1,32 @@
+{
+  "cli": {
+    "version": ">= 25.2.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://localhost:8080/api"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.live-chat.anirudhkille.com/api",
+        "EXPO_PUBLIC_SOCKET_URL": "https://api.live-chat.anirudhkille.com"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.live-chat.anirudhkille.com/api",
+        "EXPO_PUBLIC_SOCKET_URL": "https://api.live-chat.anirudhkille.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -12,10 +12,13 @@ import { useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { messageApi } from "@/features/conversations/api/conversation-api";
+import { useAppTheme } from "@/theme/use-app-theme";
 import type { Message } from "@/types/api";
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { palette } = useAppTheme();
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const qc = useQueryClient();
   const [text, setText] = useState("");
 
@@ -47,7 +50,7 @@ export default function ChatScreen() {
   return (
     <View style={styles.container}>
       {isLoading ? (
-        <ActivityIndicator style={{ marginTop: 24 }} />
+        <ActivityIndicator style={{ marginTop: 24 }} color={palette.text} />
       ) : (
         <FlatList
           data={[...(messages ?? [])].toReversed()}
@@ -72,37 +75,40 @@ export default function ChatScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  list: { padding: 12 },
-  bubble: {
-    padding: 10,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 8,
-    marginBottom: 8,
-    alignSelf: "flex-start",
-    maxWidth: "80%",
-  },
-  content: { fontSize: 14 },
-  inputRow: {
-    flexDirection: "row",
-    padding: 8,
-    borderTopWidth: 1,
-    borderTopColor: "#eee",
-  },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 10,
-    marginRight: 8,
-  },
-  sendBtn: {
-    backgroundColor: "#111827",
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    justifyContent: "center",
-  },
-  sendText: { color: "#fff", fontWeight: "600" },
-});
+const createStyles = (palette: ReturnType<typeof useAppTheme>["palette"]) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: palette.background },
+    list: { padding: 12 },
+    bubble: {
+      padding: 10,
+      backgroundColor: palette.surface,
+      borderRadius: 8,
+      marginBottom: 8,
+      alignSelf: "flex-start",
+      maxWidth: "80%",
+    },
+    content: { fontSize: 14, color: palette.text },
+    inputRow: {
+      flexDirection: "row",
+      padding: 8,
+      borderTopWidth: 1,
+      borderTopColor: palette.divider,
+    },
+    input: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: palette.border,
+      borderRadius: 8,
+      padding: 10,
+      marginRight: 8,
+      color: palette.text,
+      backgroundColor: palette.surfaceMuted,
+    },
+    sendBtn: {
+      backgroundColor: palette.primary,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      justifyContent: "center",
+    },
+    sendText: { color: palette.primaryText, fontWeight: "600" },
+  });

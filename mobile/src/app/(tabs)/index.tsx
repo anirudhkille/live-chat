@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -10,10 +11,13 @@ import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { conversationApi } from "@/features/conversations/api/conversation-api";
+import { useAppTheme } from "@/theme/use-app-theme";
 import type { Conversation } from "@/types/api";
 
 export default function ConversationsScreen() {
   const router = useRouter();
+  const { palette } = useAppTheme();
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const { data, isLoading, error } = useQuery({
     queryKey: ["conversations"],
     queryFn: conversationApi.list,
@@ -22,7 +26,7 @@ export default function ConversationsScreen() {
   if (isLoading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <ActivityIndicator color={palette.text} />
       </View>
     );
   }
@@ -30,7 +34,7 @@ export default function ConversationsScreen() {
   if (error) {
     return (
       <View style={styles.center}>
-        <Text>Failed to load conversations</Text>
+        <Text style={styles.text}>Failed to load conversations</Text>
       </View>
     );
   }
@@ -55,14 +59,22 @@ export default function ConversationsScreen() {
       keyExtractor={(item) => item.id}
       renderItem={renderItem}
       contentContainerStyle={styles.list}
+      style={styles.container}
     />
   );
 }
 
-const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  list: { padding: 8 },
-  row: { padding: 16, borderBottomWidth: 1, borderBottomColor: "#eee" },
-  name: { fontSize: 16, fontWeight: "600" },
-  preview: { fontSize: 13, color: "#666", marginTop: 4 },
-});
+const createStyles = (palette: ReturnType<typeof useAppTheme>["palette"]) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: palette.background },
+    center: { flex: 1, alignItems: "center", justifyContent: "center" },
+    list: { padding: 8, backgroundColor: palette.background },
+    row: {
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.divider,
+    },
+    name: { fontSize: 16, fontWeight: "600", color: palette.text },
+    preview: { fontSize: 13, color: palette.textMuted, marginTop: 4 },
+    text: { color: palette.textMuted },
+  });

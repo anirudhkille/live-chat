@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Alert,
   StyleSheet,
@@ -12,9 +12,12 @@ import * as WebBrowser from "expo-web-browser";
 
 import { authApi } from "@/features/auth/api/auth-api";
 import { useAuthStore } from "@/store/auth-store";
+import { useAppTheme } from "@/theme/use-app-theme";
 import { API_BASE_URL } from "@/lib/env";
 
 export default function LoginScreen() {
+  const { palette } = useAppTheme();
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -54,13 +57,11 @@ export default function LoginScreen() {
         const user = userParam ? JSON.parse(userParam) : null;
         if (user && !user.id && user._id) user.id = user._id;
         if (accessToken) {
-          useAuthStore
-            .getState()
-            .setSession({
-              token: accessToken,
-              refreshToken: refreshToken ?? undefined,
-              user,
-            });
+          useAuthStore.getState().setSession({
+            token: accessToken,
+            refreshToken: refreshToken ?? undefined,
+            user,
+          });
           router.replace("/(tabs)");
           return;
         }
@@ -78,7 +79,7 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Live Chat</Text>
-      <Text style={styles.subtitle}>Sign in with your email</Text>
+      <Text style={styles.subtitle}>Log in with your email</Text>
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -107,44 +108,48 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 24,
-    backgroundColor: "#fff",
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
-    marginBottom: 24,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  button: {
-    backgroundColor: "#111827",
-    padding: 14,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  buttonText: { color: "#fff", fontWeight: "600" },
-  googleButton: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#ddd",
-    marginTop: 12,
-  },
-  googleButtonText: { color: "#111", fontWeight: "600" },
-});
+const createStyles = (palette: ReturnType<typeof useAppTheme>["palette"]) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      justifyContent: "center",
+      padding: 24,
+      backgroundColor: palette.background,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: "700",
+      textAlign: "center",
+      marginBottom: 8,
+      color: palette.text,
+    },
+    subtitle: {
+      fontSize: 14,
+      color: palette.textMuted,
+      textAlign: "center",
+      marginBottom: 24,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: palette.border,
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 16,
+      color: palette.text,
+      backgroundColor: palette.surfaceMuted,
+    },
+    button: {
+      backgroundColor: palette.primary,
+      padding: 14,
+      borderRadius: 8,
+      alignItems: "center",
+    },
+    buttonText: { color: palette.primaryText, fontWeight: "600" },
+    googleButton: {
+      backgroundColor: palette.background,
+      borderWidth: 1,
+      borderColor: palette.border,
+      marginTop: 12,
+    },
+    googleButtonText: { color: palette.text, fontWeight: "600" },
+  });
