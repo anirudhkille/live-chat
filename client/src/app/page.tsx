@@ -116,7 +116,7 @@ export default function LandingPage() {
             href="/login"
             className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
           >
-            Sign in
+            Log in
           </Link>
           <ThemeToggle />
         </div>
@@ -190,7 +190,7 @@ export default function LandingPage() {
               <KeyRound className="h-5 w-5" aria-hidden="true" />
             </div>
             <h2 className="text-foreground text-2xl font-medium tracking-tight text-balance sm:text-3xl">
-              Sign in with your email or Google
+              Log in with your email or Google
             </h2>
             <p className="text-muted-foreground max-w-xl text-sm text-pretty">
               No passwords to create. Verify your email with a one-time code and
