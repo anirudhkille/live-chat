@@ -9,8 +9,13 @@ import {
   updateProfile,
   googleAuth,
   googleCallback,
+  googleMobileLogin,
 } from "./auth.controller.js";
-import { sendLoginOtpSchema, verifyLoginOtpSchema } from "./auth.schema.js";
+import {
+  sendLoginOtpSchema,
+  verifyLoginOtpSchema,
+  googleMobileLoginSchema,
+} from "./auth.schema.js";
 import { authenticate } from "../../middleware/auth.middleware.js";
 
 const router = express.Router();
@@ -38,6 +43,12 @@ router.post(
   logout,
 );
 router.patch("/profile", authenticate, updateProfile);
+router.post(
+  "/google/mobile",
+  rateLimit({ windowMs: 60 * 1000, max: 10, keyPrefix: "google-mobile" }),
+  validate(googleMobileLoginSchema),
+  googleMobileLogin,
+);
 router.get("/google", googleAuth);
 router.get("/google/callback", googleCallback);
 

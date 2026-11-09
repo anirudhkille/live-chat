@@ -34,6 +34,19 @@ export const verifyLoginOtp = asyncHandler(async (req, res) => {
   });
 });
 
+export const googleMobileLogin = asyncHandler(async (req, res) => {
+  const { user, accessToken, refreshToken } =
+    await authService.googleLoginWithIdToken(req.body.idToken);
+
+  setRefreshCookie(res, refreshToken);
+
+  sendResponse(res, 200, "Logged in successfully", {
+    user,
+    accessToken,
+    refreshToken,
+  });
+});
+
 export const refreshToken = asyncHandler(async (req, res) => {
   const incomingToken = req.cookies?.refreshToken || req.body?.refreshToken;
   const { accessToken, refreshToken } =

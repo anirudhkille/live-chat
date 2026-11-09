@@ -1,7 +1,11 @@
+import { OAuth2Client } from "google-auth-library";
+
 import { env } from "../../config/env.config.js";
+import { AppError } from "../../utils/AppError.js";
 
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
+const googleClient = new OAuth2Client(env.GOOGLE_CLIENT_ID);
 
 export const getGoogleAuthURL = (redirect) => {
   const safeRedirect =
@@ -52,4 +56,29 @@ export const getGoogleUser = async (accessToken) => {
   }
 
   return response.json();
+};
+
+export const verifyGoogleIdToken = async (idToken) => {
+  let ticket;
+
+  try {
+    ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: env.GOOGLE_CLIENT_ID,
+    });
+  } catch {
+    throw new AppError(401, "Invalid Google token");
+  }
+
+  const payload = ticket.getPayload();
+
+  if (!payload?.email || !payload.email_verified) {
+    throw new AppError(401, "Google account email is not verified");
+  }
+
+  return {
+    email: payload.email,
+    name: payload.name,
+    avatar: payload.picture,
+  };
 };
