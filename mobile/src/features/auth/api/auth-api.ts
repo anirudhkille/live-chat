@@ -24,6 +24,13 @@ export const authApi = {
     );
     return data.data;
   },
+  googleLogin: async (idToken: string) => {
+    const { data } = await api.post<ApiResponse<LoginResponse>>(
+      "/auth/google/mobile",
+      { idToken },
+    );
+    return data.data;
+  },
   refresh: async () => {
     const { data } =
       await api.get<ApiResponse<{ accessToken: string }>>("/auth/refresh");

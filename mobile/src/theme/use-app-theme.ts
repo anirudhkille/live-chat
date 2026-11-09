@@ -2,6 +2,7 @@ import { useColorScheme } from "react-native";
 
 export type ThemePalette = {
   background: string;
+  card: string;
   surface: string;
   surfaceMuted: string;
   text: string;
@@ -15,6 +16,7 @@ export type ThemePalette = {
 
 const light: ThemePalette = {
   background: "#fff",
+  card: "#fff",
   surface: "#f3f4f6",
   surfaceMuted: "#f9fafb",
   text: "#111827",
@@ -28,6 +30,7 @@ const light: ThemePalette = {
 
 const dark: ThemePalette = {
   background: "#0f172a",
+  card: "#1e293b",
   surface: "#1f2937",
   surfaceMuted: "#111827",
   text: "#f9fafb",

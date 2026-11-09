@@ -33,6 +33,7 @@ export async function registerExpoPushToken(): Promise<string | null> {
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("default", {
       name: "default",
+      // eslint-disable-next-line import/namespace
       importance: Notifications.AndroidImportance.MAX,
     });
   }

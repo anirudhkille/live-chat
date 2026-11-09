@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { useAuthStore } from "@/store/auth-store";
 import { registerExpoPushToken } from "@/features/push-notifications/register";
+import { useAppTheme } from "@/theme/use-app-theme";
 
 export default function RootLayout() {
   const [queryClient] = useState(
@@ -17,6 +18,7 @@ export default function RootLayout() {
   );
 
   const token = useAuthStore((s) => s.token);
+  const { scheme, palette } = useAppTheme();
 
   useEffect(() => {
     if (token) {
@@ -26,8 +28,25 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <StatusBar style="auto" />
-      <Stack screenOptions={{ headerShown: false }} />
+      <StatusBar style={scheme === "dark" ? "light" : "dark"} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: palette.background },
+        }}
+      >
+        <Stack.Screen
+          name="chat/[id]"
+          options={{
+            headerShown: true,
+            title: "Chat",
+            headerStyle: { backgroundColor: palette.background },
+            headerTintColor: palette.text,
+            headerTitleStyle: { color: palette.text, fontWeight: "600" },
+            headerShadowVisible: false,
+          }}
+        />
+      </Stack>
     </QueryClientProvider>
   );
 }
