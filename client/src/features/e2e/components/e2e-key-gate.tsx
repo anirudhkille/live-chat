@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useUserKey } from "@/features/e2e/hooks/useUserKey";
 import { useE2EIdentity } from "@/features/e2e/hooks/useE2EIdentity";
+import { isPasskeyRecoveryBlob } from "@/lib/crypto/recovery";
 import { E2ERecoveryBanner } from "./e2e-recovery-banner";
 
 export function E2EKeyGate() {
@@ -18,10 +19,13 @@ export function E2EKeyGate() {
     loading: keysLoading,
     setup,
     restore,
+    restoreWithPasskey,
     isSettingUp,
     isRestoring,
+    isRestoringWithPasskey,
     setupError,
     restoreError,
+    passkeyRestoreError,
   } = useE2EIdentity();
 
   const provisioningRef = useRef(false);
@@ -89,19 +93,30 @@ export function E2EKeyGate() {
   if (keys) return null;
 
   if (userKey.recoveryBlob) {
+    const passkeyBlob = isPasskeyRecoveryBlob(userKey.recoveryBlob)
+      ? userKey.recoveryBlob
+      : null;
+
     return (
       <E2ERecoveryBanner
-        onRestore={(passphrase) =>
+        onRestore={(passphrase) => {
+          if (passkeyBlob) return;
           restore({
             passphrase,
             recoveryBlob: userKey.recoveryBlob as Parameters<
               typeof restore
             >[0]["recoveryBlob"],
-          })
+          });
+        }}
+        onRestorePasskey={
+          passkeyBlob ? () => restoreWithPasskey(passkeyBlob) : undefined
         }
+        usePasskey={Boolean(passkeyBlob)}
         onReset={(passphrase) => setup(passphrase)}
-        isPending={isRestoring || isSettingUp}
-        error={(restoreError ?? setupError) as Error | null}
+        isPending={isRestoring || isSettingUp || isRestoringWithPasskey}
+        error={
+          (passkeyRestoreError ?? restoreError ?? setupError) as Error | null
+        }
       />
     );
   }

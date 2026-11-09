@@ -3,6 +3,7 @@ import {
   deriveIdentityKeys,
   type IdentityKeys,
 } from "@/lib/crypto/identity";
+import { createPasskeyRecovery, type PasskeyUser } from "@/lib/crypto/passkey";
 import { buildRecoveryBlob } from "@/lib/crypto/recovery";
 import { dbGet, dbSet } from "@/lib/crypto/storage";
 
@@ -35,6 +36,17 @@ export async function buildRecoveryBlobForKeys(
   keys: IdentityKeys
 ) {
   return buildRecoveryBlob(passphrase, {
+    masterSeed: keys.masterSeed,
+    privateKey: keys.privateKey,
+    publicKey: keys.publicKey,
+  });
+}
+
+export async function buildPasskeyRecoveryBlobForKeys(
+  user: PasskeyUser,
+  keys: IdentityKeys
+) {
+  return createPasskeyRecovery(user, {
     masterSeed: keys.masterSeed,
     privateKey: keys.privateKey,
     publicKey: keys.publicKey,
