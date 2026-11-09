@@ -14,6 +14,15 @@ import {
 } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import {
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioPlayer,
+  useAudioPlayerStatus,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from "expo-audio";
 import { File } from "expo-file-system";
 import {
   useInfiniteQuery,
@@ -48,6 +57,7 @@ type PendingAttachment = {
   fileSize: number;
   width?: number;
   height?: number;
+  duration?: string;
   status: "uploading" | "ready" | "error";
   attachment: Attachment | null;
   error?: string;
@@ -95,6 +105,62 @@ function getAttachmentImageSize(width?: number | null, height?: number | null) {
   };
 }
 
+function formatDurationMillis(durationMillis: number) {
+  const totalSeconds = Math.max(0, Math.round(durationMillis / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function formatDurationSeconds(seconds: number) {
+  return formatDurationMillis(Math.max(0, seconds) * 1000);
+}
+
+function parseDurationLabel(value?: string | null) {
+  if (!value) return 0;
+  const [minutes, seconds] = value.split(":").map(Number);
+  if (!Number.isFinite(minutes) || !Number.isFinite(seconds)) return 0;
+  return minutes * 60 + seconds;
+}
+
+function getVoiceFileInfo(uri: string) {
+  const path = uri.split(/[?#]/)[0].toLowerCase();
+
+  if (path.endsWith(".webm")) {
+    return { contentType: "audio/webm", extension: "webm" };
+  }
+  if (path.endsWith(".ogg") || path.endsWith(".opus")) {
+    return { contentType: "audio/ogg", extension: "ogg" };
+  }
+  if (path.endsWith(".mp3") || path.endsWith(".mpeg")) {
+    return { contentType: "audio/mpeg", extension: "mp3" };
+  }
+  if (path.endsWith(".wav")) {
+    return { contentType: "audio/wav", extension: "wav" };
+  }
+  if (path.endsWith(".aac")) {
+    return { contentType: "audio/aac", extension: "aac" };
+  }
+  if (path.endsWith(".m4a") || path.endsWith(".mp4")) {
+    return { contentType: "audio/mp4", extension: "m4a" };
+  }
+
+  if (Platform.OS === "web") {
+    return { contentType: "audio/webm", extension: "webm" };
+  }
+  return { contentType: "audio/mp4", extension: "m4a" };
+}
+
+function deleteRecordingFile(uri?: string | null) {
+  if (!uri) return;
+  try {
+    const file = new File(uri);
+    if (file.exists) file.delete();
+  } catch {
+    // Cached recordings can be cleaned up by the OS later if this fails.
+  }
+}
+
 type MessagesData = InfiniteData<Message[], string | undefined>;
 
 type MessageEvent = {
@@ -131,6 +197,12 @@ export default function ChatScreen() {
   >([]);
   const [typingUsers, setTypingUsers] = useState<Record<string, boolean>>({});
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const voiceRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(voiceRecorder, 250);
+  const [recordingActive, setRecordingActive] = useState(false);
+  const [startingRecording, setStartingRecording] = useState(false);
+  const [finalizingRecording, setFinalizingRecording] = useState(false);
 
   const uploadingAttachments = pendingAttachments.some(
     (attachment) => attachment.status === "uploading",
@@ -308,6 +380,18 @@ export default function ChatScreen() {
     };
   }, [id]);
 
+  useEffect(() => {
+    return () => {
+      if (voiceRecorder.isRecording) {
+        void voiceRecorder.stop().catch(() => undefined);
+      }
+      void setAudioModeAsync({
+        playsInSilentMode: true,
+        allowsRecording: false,
+      }).catch(() => undefined);
+    };
+  }, [voiceRecorder]);
+
   const sendMutation = useMutation({
     mutationFn: (input: {
       content: string;
@@ -389,6 +473,7 @@ export default function ChatScreen() {
         fileSize: pending.fileSize,
         width: pending.width,
         height: pending.height,
+        duration: pending.duration,
       });
       setPendingAttachments((attachments) =>
         attachments.map((item) =>
@@ -483,6 +568,137 @@ export default function ChatScreen() {
     } catch {
       Alert.alert("Could not attach image", "Please try again.");
     }
+  };
+
+  const startRecording = async () => {
+    if (!id || editing || startingRecording || recordingActive) return;
+
+    if (pendingAttachments.length >= MAX_ATTACHMENTS) {
+      Alert.alert(
+        "Attachment limit",
+        `You can attach up to ${MAX_ATTACHMENTS} files per message.`,
+      );
+      return;
+    }
+
+    setStartingRecording(true);
+    try {
+      const permission = await requestRecordingPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          "Microphone permission needed",
+          "Allow microphone access to record voice notes.",
+        );
+        return;
+      }
+
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        allowsRecording: true,
+      });
+      await voiceRecorder.prepareToRecordAsync();
+      voiceRecorder.record();
+      setRecordingActive(true);
+    } catch {
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        allowsRecording: false,
+      }).catch(() => undefined);
+      Alert.alert("Could not start recording", "Please try again.");
+    } finally {
+      setStartingRecording(false);
+    }
+  };
+
+  const finishRecording = async (shouldAttach: boolean) => {
+    if (!recordingActive || finalizingRecording) return;
+
+    setFinalizingRecording(true);
+    const recorderStatus = voiceRecorder.getStatus();
+    const durationMillis = Math.max(
+      recorderStatus.durationMillis,
+      recorderState.durationMillis,
+    );
+    let recordingUri = recorderStatus.url ?? voiceRecorder.uri;
+
+    try {
+      await voiceRecorder.stop();
+      recordingUri = voiceRecorder.uri ?? recorderStatus.url ?? recordingUri;
+    } catch {
+      Alert.alert("Recording error", "Could not finish the voice note.");
+    }
+
+    await setAudioModeAsync({
+      playsInSilentMode: true,
+      allowsRecording: false,
+    }).catch(() => undefined);
+
+    if (!shouldAttach) {
+      deleteRecordingFile(recordingUri);
+      setRecordingActive(false);
+      setFinalizingRecording(false);
+      return;
+    }
+
+    if (!recordingUri) {
+      Alert.alert("Voice note unavailable", "Please try recording again.");
+      setRecordingActive(false);
+      setFinalizingRecording(false);
+      return;
+    }
+
+    let fileSize = recorderStatus.fileSize;
+    try {
+      fileSize = new File(recordingUri).size || fileSize;
+    } catch {
+      // Fall back to the recorder-reported size.
+    }
+    const { contentType, extension } = getVoiceFileInfo(recordingUri);
+    if (!fileSize) {
+      deleteRecordingFile(recordingUri);
+      Alert.alert("Voice note unavailable", "The recording could not be read.");
+      setRecordingActive(false);
+      setFinalizingRecording(false);
+      return;
+    }
+
+    if (fileSize > MAX_ATTACHMENT_SIZE) {
+      deleteRecordingFile(recordingUri);
+      Alert.alert(
+        "Voice note too large",
+        "Voice notes must be 5MB or smaller. Try a shorter recording.",
+      );
+      setRecordingActive(false);
+      setFinalizingRecording(false);
+      return;
+    }
+
+    if (pendingAttachments.length >= MAX_ATTACHMENTS) {
+      deleteRecordingFile(recordingUri);
+      Alert.alert(
+        "Attachment limit",
+        `You can attach up to ${MAX_ATTACHMENTS} files per message.`,
+      );
+      setRecordingActive(false);
+      setFinalizingRecording(false);
+      return;
+    }
+
+    const pending: PendingAttachment = {
+      id: createPendingId(),
+      uri: recordingUri,
+      fileName: `voice-${Date.now()}.${extension}`,
+      contentType,
+      fileSize,
+      duration: formatDurationMillis(durationMillis),
+      status: "uploading",
+      attachment: null,
+    };
+
+    setPendingAttachments((attachments) => [...attachments, pending]);
+    setRecordingActive(false);
+    setFinalizingRecording(false);
+    void uploadPendingAttachment(pending);
   };
 
   const handleSend = () => {
@@ -607,21 +823,35 @@ export default function ChatScreen() {
 
             {item.attachments?.length ? (
               <View style={styles.attachments}>
-                {item.attachments.map((attachment) =>
-                  attachment.type === "IMAGE" ? (
-                    <Image
-                      key={attachment.id}
-                      source={{ uri: attachment.url }}
-                      style={[
-                        styles.attachmentImage,
-                        getAttachmentImageSize(
-                          attachment.width,
-                          attachment.height,
-                        ),
-                      ]}
-                      resizeMode="cover"
-                    />
-                  ) : (
+                {item.attachments.map((attachment) => {
+                  if (attachment.type === "IMAGE") {
+                    return (
+                      <Image
+                        key={attachment.id}
+                        source={{ uri: attachment.url }}
+                        style={[
+                          styles.attachmentImage,
+                          getAttachmentImageSize(
+                            attachment.width,
+                            attachment.height,
+                          ),
+                        ]}
+                        resizeMode="cover"
+                      />
+                    );
+                  }
+
+                  if (attachment.type === "AUDIO") {
+                    return (
+                      <AudioAttachmentBubble
+                        key={attachment.id}
+                        attachment={attachment}
+                        styles={styles}
+                      />
+                    );
+                  }
+
+                  return (
                     <View key={attachment.id} style={styles.fileAttachment}>
                       <Text style={styles.fileAttachmentIcon}>📄</Text>
                       <View style={styles.fileAttachmentBody}>
@@ -638,8 +868,8 @@ export default function ChatScreen() {
                         ) : null}
                       </View>
                     </View>
-                  ),
-                )}
+                  );
+                })}
               </View>
             ) : null}
 
@@ -812,7 +1042,9 @@ export default function ChatScreen() {
                 />
               ) : (
                 <View style={styles.attachmentThumb}>
-                  <Text style={styles.attachmentThumbIcon}>📄</Text>
+                  <Text style={styles.attachmentThumbIcon}>
+                    {attachment.contentType.startsWith("audio/") ? "🎤" : "📄"}
+                  </Text>
                 </View>
               )}
               <View style={styles.attachmentChipBody}>
@@ -829,7 +1061,11 @@ export default function ChatScreen() {
                   {attachment.status === "uploading"
                     ? "Uploading…"
                     : attachment.status === "ready"
-                      ? formatFileSize(attachment.fileSize)
+                      ? attachment.duration
+                        ? `${attachment.duration} • ${formatFileSize(
+                            attachment.fileSize,
+                          )}`
+                        : formatFileSize(attachment.fileSize)
                       : (attachment.error ?? "Upload failed")}
                 </Text>
               </View>
@@ -845,45 +1081,117 @@ export default function ChatScreen() {
         </View>
       ) : null}
 
-      <View style={styles.inputRow}>
-        <TouchableOpacity
-          style={[
-            styles.attachButton,
-            (editing ||
+      {recordingActive ? (
+        <View style={styles.recordingBar}>
+          <TouchableOpacity
+            style={[
+              styles.recordingCancelButton,
+              finalizingRecording && styles.attachButtonDisabled,
+            ]}
+            onPress={() => {
+              void finishRecording(false);
+            }}
+            disabled={finalizingRecording}
+            accessibilityLabel="Cancel voice note"
+          >
+            <Text style={styles.recordingCancelText}>Cancel</Text>
+          </TouchableOpacity>
+          <View style={styles.recordingStatus}>
+            <View style={styles.recordingDot} />
+            <Text style={styles.recordingTime}>
+              {formatDurationMillis(recorderState.durationMillis)}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.recordingSendButton,
+              finalizingRecording && styles.attachButtonDisabled,
+            ]}
+            onPress={() => {
+              void finishRecording(true);
+            }}
+            disabled={finalizingRecording}
+            accessibilityLabel="Stop and attach voice note"
+          >
+            {finalizingRecording ? (
+              <ActivityIndicator color={palette.primaryText} size="small" />
+            ) : (
+              <Text style={styles.recordingSendText}>Stop</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.inputRow}>
+          <TouchableOpacity
+            style={[
+              styles.attachButton,
+              (editing ||
+                startingRecording ||
+                sendMutation.isPending ||
+                pendingAttachments.length >= MAX_ATTACHMENTS) &&
+                styles.attachButtonDisabled,
+            ]}
+            onPress={() => {
+              void pickAttachments();
+            }}
+            disabled={
+              !!editing ||
+              startingRecording ||
               sendMutation.isPending ||
-              pendingAttachments.length >= MAX_ATTACHMENTS) &&
-              styles.attachButtonDisabled,
-          ]}
-          onPress={() => {
-            void pickAttachments();
-          }}
-          disabled={
-            !!editing ||
-            sendMutation.isPending ||
-            pendingAttachments.length >= MAX_ATTACHMENTS
-          }
-          accessibilityLabel="Attach image"
-        >
-          <Text style={styles.attachText}>+</Text>
-        </TouchableOpacity>
-        <TextInput
-          style={styles.input}
-          placeholder={editing ? "Edit message" : "Message"}
-          placeholderTextColor={palette.textMuted}
-          value={text}
-          onChangeText={handleChangeText}
-          multiline
-        />
-        <TouchableOpacity
-          style={[styles.sendButton, sendDisabled && styles.sendButtonDisabled]}
-          onPress={handleSend}
-          disabled={sendDisabled}
-        >
-          <Text style={styles.sendText}>
-            {editing ? "Save" : sendMutation.isPending ? "…" : "Send"}
-          </Text>
-        </TouchableOpacity>
-      </View>
+              pendingAttachments.length >= MAX_ATTACHMENTS
+            }
+            accessibilityLabel="Attach image"
+          >
+            <Text style={styles.attachText}>+</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.attachButton,
+              (editing ||
+                startingRecording ||
+                sendMutation.isPending ||
+                pendingAttachments.length >= MAX_ATTACHMENTS) &&
+                styles.attachButtonDisabled,
+            ]}
+            onPress={() => {
+              void startRecording();
+            }}
+            disabled={
+              !!editing ||
+              startingRecording ||
+              sendMutation.isPending ||
+              pendingAttachments.length >= MAX_ATTACHMENTS
+            }
+            accessibilityLabel="Record voice note"
+          >
+            {startingRecording ? (
+              <ActivityIndicator color={palette.text} size="small" />
+            ) : (
+              <Text style={styles.micText}>🎤</Text>
+            )}
+          </TouchableOpacity>
+          <TextInput
+            style={styles.input}
+            placeholder={editing ? "Edit message" : "Message"}
+            placeholderTextColor={palette.textMuted}
+            value={text}
+            onChangeText={handleChangeText}
+            multiline
+          />
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              sendDisabled && styles.sendButtonDisabled,
+            ]}
+            onPress={handleSend}
+            disabled={sendDisabled}
+          >
+            <Text style={styles.sendText}>
+              {editing ? "Save" : sendMutation.isPending ? "…" : "Send"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -943,6 +1251,44 @@ const createStyles = (palette: Palette) =>
       fontWeight: "600",
     },
     fileAttachmentSize: { color: palette.textMuted, fontSize: 11 },
+    audioAttachment: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      minWidth: 200,
+      padding: 8,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: palette.divider,
+      backgroundColor: palette.surfaceMuted,
+    },
+    audioPlayButton: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: palette.primary,
+    },
+    audioPlayIcon: {
+      color: palette.primaryText,
+      fontSize: 12,
+      fontWeight: "700",
+    },
+    audioBody: { flex: 1, gap: 4 },
+    audioName: { color: palette.text, fontSize: 12, fontWeight: "600" },
+    audioProgressTrack: {
+      height: 3,
+      borderRadius: 2,
+      overflow: "hidden",
+      backgroundColor: palette.border,
+    },
+    audioProgressFill: {
+      height: 3,
+      borderRadius: 2,
+      backgroundColor: palette.textMuted,
+    },
+    audioDuration: { color: palette.textMuted, fontSize: 10 },
     metaRow: {
       flexDirection: "row",
       justifyContent: "flex-end",
@@ -1072,6 +1418,63 @@ const createStyles = (palette: Palette) =>
       fontWeight: "500",
       lineHeight: 26,
     },
+    micText: { fontSize: 17 },
+    recordingBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderTopWidth: 1,
+      borderTopColor: palette.divider,
+      backgroundColor: palette.surfaceMuted,
+    },
+    recordingCancelButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: palette.border,
+      backgroundColor: palette.background,
+    },
+    recordingCancelText: {
+      color: palette.text,
+      fontSize: 13,
+      fontWeight: "600",
+    },
+    recordingStatus: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+    },
+    recordingDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: palette.danger,
+    },
+    recordingTime: {
+      color: palette.text,
+      fontSize: 14,
+      fontWeight: "600",
+      fontVariant: ["tabular-nums"],
+    },
+    recordingSendButton: {
+      minWidth: 68,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 10,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: palette.primary,
+    },
+    recordingSendText: {
+      color: palette.primaryText,
+      fontSize: 13,
+      fontWeight: "600",
+    },
     inputRow: {
       flexDirection: "row",
       alignItems: "flex-end",
@@ -1113,3 +1516,79 @@ const createStyles = (palette: Palette) =>
     },
     emptyText: { color: palette.textMuted, fontSize: 14 },
   });
+
+function AudioAttachmentBubble({
+  attachment,
+  styles,
+}: {
+  attachment: Attachment;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  const player = useAudioPlayer(attachment.url, { updateInterval: 250 });
+  const status = useAudioPlayerStatus(player);
+
+  useEffect(() => {
+    return () => {
+      try {
+        player.pause();
+        player.remove();
+      } catch {
+        // The player may already be released by expo-audio on unmount.
+      }
+    };
+  }, [player]);
+
+  const storedDuration = parseDurationLabel(attachment.duration);
+  const duration = status.duration > 0 ? status.duration : storedDuration;
+  const position =
+    duration > 0 ? Math.min(status.currentTime, duration) : status.currentTime;
+  const progress = duration > 0 ? Math.min(1, position / duration) : 0;
+  const durationLabel = status.playing
+    ? `${formatDurationSeconds(position)} / ${formatDurationSeconds(duration)}`
+    : formatDurationSeconds(duration);
+
+  const togglePlayback = () => {
+    if (status.playing) {
+      player.pause();
+      return;
+    }
+
+    if (
+      status.didJustFinish ||
+      (duration > 0 && status.currentTime >= duration - 0.25)
+    ) {
+      void player
+        .seekTo(0)
+        .then(() => player.play())
+        .catch(() => undefined);
+      return;
+    }
+
+    player.play();
+  };
+
+  return (
+    <View style={styles.audioAttachment}>
+      <TouchableOpacity
+        style={styles.audioPlayButton}
+        onPress={togglePlayback}
+        accessibilityLabel={
+          status.playing ? "Pause voice note" : "Play voice note"
+        }
+      >
+        <Text style={styles.audioPlayIcon}>{status.playing ? "❚❚" : "▶"}</Text>
+      </TouchableOpacity>
+      <View style={styles.audioBody}>
+        <Text style={styles.audioName} numberOfLines={1}>
+          {attachment.fileName}
+        </Text>
+        <View style={styles.audioProgressTrack}>
+          <View
+            style={[styles.audioProgressFill, { width: `${progress * 100}%` }]}
+          />
+        </View>
+        <Text style={styles.audioDuration}>{durationLabel}</Text>
+      </View>
+    </View>
+  );
+}
