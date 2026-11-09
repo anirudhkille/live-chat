@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -12,6 +13,8 @@ import {
   View,
 } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
+import { File } from "expo-file-system";
 import {
   useInfiniteQuery,
   useMutation,
@@ -20,6 +23,7 @@ import {
   type InfiniteData,
 } from "@tanstack/react-query";
 
+import { attachmentApi } from "@/features/attachments/api/attachment-api";
 import {
   conversationApi,
   messageApi,
@@ -27,10 +31,69 @@ import {
 import { socket } from "@/lib/socket";
 import { useAuthStore } from "@/store/auth-store";
 import { useAppTheme } from "@/theme/use-app-theme";
-import type { Message } from "@/types/api";
+import { getApiErrorMessage, type Attachment, type Message } from "@/types/api";
 
 const PAGE_SIZE = 30;
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+const MAX_ATTACHMENTS = 4;
+const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024;
+const MAX_IMAGE_WIDTH = 220;
+const MAX_IMAGE_HEIGHT = 220;
+
+type PendingAttachment = {
+  id: string;
+  uri: string;
+  fileName: string;
+  contentType: string;
+  fileSize: number;
+  width?: number;
+  height?: number;
+  status: "uploading" | "ready" | "error";
+  attachment: Attachment | null;
+  error?: string;
+};
+
+function createPendingId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function getImageContentType(asset: ImagePicker.ImagePickerAsset) {
+  if (asset.mimeType) return asset.mimeType;
+  const name = (asset.fileName ?? asset.uri).toLowerCase();
+  if (name.endsWith(".png")) return "image/png";
+  if (name.endsWith(".webp")) return "image/webp";
+  if (name.endsWith(".heic") || name.endsWith(".heif")) return "image/heic";
+  return "image/jpeg";
+}
+
+function getAssetFileSize(asset: ImagePicker.ImagePickerAsset) {
+  if (asset.fileSize && asset.fileSize > 0) return asset.fileSize;
+  try {
+    return new File(asset.uri).size;
+  } catch {
+    return 0;
+  }
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
+}
+
+function getAttachmentImageSize(width?: number | null, height?: number | null) {
+  const sourceWidth = width && width > 0 ? width : MAX_IMAGE_WIDTH;
+  const sourceHeight = height && height > 0 ? height : MAX_IMAGE_HEIGHT;
+  const scale = Math.min(
+    MAX_IMAGE_WIDTH / sourceWidth,
+    MAX_IMAGE_HEIGHT / sourceHeight,
+    1,
+  );
+  return {
+    width: Math.round(sourceWidth * scale),
+    height: Math.round(sourceHeight * scale),
+  };
+}
 
 type MessagesData = InfiniteData<Message[], string | undefined>;
 
@@ -63,8 +126,24 @@ export default function ChatScreen() {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pendingAttachments, setPendingAttachments] = useState<
+    PendingAttachment[]
+  >([]);
   const [typingUsers, setTypingUsers] = useState<Record<string, boolean>>({});
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const uploadingAttachments = pendingAttachments.some(
+    (attachment) => attachment.status === "uploading",
+  );
+  const readyAttachmentIds = useMemo(
+    () =>
+      pendingAttachments.flatMap((attachment) =>
+        attachment.status === "ready" && attachment.attachment
+          ? [attachment.attachment.id]
+          : [],
+      ),
+    [pendingAttachments],
+  );
 
   const { data: conversation } = useQuery({
     queryKey: ["conversation", id],
@@ -230,12 +309,20 @@ export default function ChatScreen() {
   }, [id]);
 
   const sendMutation = useMutation({
-    mutationFn: (input: { content: string; replyToId?: string }) =>
-      messageApi.send(id!, input.content, { replyToId: input.replyToId }),
+    mutationFn: (input: {
+      content: string;
+      replyToId?: string;
+      attachmentIds?: string[];
+    }) =>
+      messageApi.send(id!, input.content, {
+        replyToId: input.replyToId,
+        attachmentIds: input.attachmentIds,
+      }),
     onSuccess: (message) => {
       addMessageToCache(message);
       setText("");
       setReplyTo(null);
+      setPendingAttachments([]);
     },
     onError: () => Alert.alert("Message not sent", "Please try again."),
   });
@@ -287,16 +374,135 @@ export default function ChatScreen() {
     }
   };
 
+  const removePendingAttachment = (pendingId: string) => {
+    setPendingAttachments((attachments) =>
+      attachments.filter((attachment) => attachment.id !== pendingId),
+    );
+  };
+
+  const uploadPendingAttachment = async (pending: PendingAttachment) => {
+    try {
+      const attachment = await attachmentApi.upload({
+        uri: pending.uri,
+        contentType: pending.contentType,
+        fileName: pending.fileName,
+        fileSize: pending.fileSize,
+        width: pending.width,
+        height: pending.height,
+      });
+      setPendingAttachments((attachments) =>
+        attachments.map((item) =>
+          item.id === pending.id
+            ? { ...item, status: "ready", attachment, error: undefined }
+            : item,
+        ),
+      );
+    } catch (error) {
+      setPendingAttachments((attachments) =>
+        attachments.map((item) =>
+          item.id === pending.id
+            ? {
+                ...item,
+                status: "error",
+                error: getApiErrorMessage(error, "Upload failed"),
+              }
+            : item,
+        ),
+      );
+    }
+  };
+
+  const pickAttachments = async () => {
+    if (!id || editing) return;
+
+    const remaining = MAX_ATTACHMENTS - pendingAttachments.length;
+    if (remaining <= 0) {
+      Alert.alert(
+        "Attachment limit",
+        `You can attach up to ${MAX_ATTACHMENTS} files per message.`,
+      );
+      return;
+    }
+
+    try {
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          "Permission needed",
+          "Allow photo library access to attach images.",
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsMultipleSelection: true,
+        selectionLimit: remaining,
+        quality: 0.8,
+      });
+      if (result.canceled) return;
+
+      const next: PendingAttachment[] = [];
+      let skippedForSize = 0;
+
+      for (const asset of result.assets.slice(0, remaining)) {
+        const fileSize = getAssetFileSize(asset);
+        if (!fileSize || fileSize > MAX_ATTACHMENT_SIZE) {
+          skippedForSize += 1;
+          continue;
+        }
+
+        next.push({
+          id: createPendingId(),
+          uri: asset.uri,
+          fileName: asset.fileName ?? asset.uri.split("/").pop() ?? "image.jpg",
+          contentType: getImageContentType(asset),
+          fileSize,
+          width: asset.width || undefined,
+          height: asset.height || undefined,
+          status: "uploading",
+          attachment: null,
+        });
+      }
+
+      if (skippedForSize > 0) {
+        Alert.alert(
+          "File too large",
+          `Each attachment must be 5MB or smaller. ${skippedForSize} file${
+            skippedForSize === 1 ? " was" : "s were"
+          } skipped.`,
+        );
+      }
+      if (!next.length) return;
+
+      setPendingAttachments((attachments) => [...attachments, ...next]);
+      next.forEach((pending) => {
+        void uploadPendingAttachment(pending);
+      });
+    } catch {
+      Alert.alert("Could not attach image", "Please try again.");
+    }
+  };
+
   const handleSend = () => {
     const content = text.trim();
-    if (!content || !id) return;
+    if (!id) return;
 
     if (editing) {
+      if (!content) return;
       editMutation.mutate({ messageId: editing.id, content });
       return;
     }
 
-    sendMutation.mutate({ content, replyToId: replyTo?.id });
+    if (uploadingAttachments) return;
+    if (!content && readyAttachmentIds.length === 0) return;
+
+    sendMutation.mutate({
+      content,
+      replyToId: replyTo?.id,
+      attachmentIds: readyAttachmentIds,
+    });
   };
 
   const startReply = (message: Message) => {
@@ -309,6 +515,7 @@ export default function ChatScreen() {
     setReplyTo(null);
     setEditing(message);
     setSelectedId(null);
+    setPendingAttachments([]);
     setText(message.content);
   };
 
@@ -342,6 +549,12 @@ export default function ChatScreen() {
   const typingLabel = typingNames.length
     ? `${typingNames.join(", ")} ${typingNames.length === 1 ? "is" : "are"} typing…`
     : null;
+
+  const sendDisabled = editing
+    ? !text.trim() || editMutation.isPending
+    : (!text.trim() && readyAttachmentIds.length === 0) ||
+      uploadingAttachments ||
+      sendMutation.isPending;
 
   const renderMessage = ({ item }: { item: Message }) => {
     const own = item.senderId === currentUserId;
@@ -392,15 +605,55 @@ export default function ChatScreen() {
               </View>
             ) : null}
 
-            <Text
-              style={[
-                styles.content,
-                own && styles.contentOwn,
-                item.deletedAt && styles.deletedContent,
-              ]}
-            >
-              {item.deletedAt ? "This message was deleted" : item.content}
-            </Text>
+            {item.attachments?.length ? (
+              <View style={styles.attachments}>
+                {item.attachments.map((attachment) =>
+                  attachment.type === "IMAGE" ? (
+                    <Image
+                      key={attachment.id}
+                      source={{ uri: attachment.url }}
+                      style={[
+                        styles.attachmentImage,
+                        getAttachmentImageSize(
+                          attachment.width,
+                          attachment.height,
+                        ),
+                      ]}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View key={attachment.id} style={styles.fileAttachment}>
+                      <Text style={styles.fileAttachmentIcon}>📄</Text>
+                      <View style={styles.fileAttachmentBody}>
+                        <Text
+                          style={styles.fileAttachmentName}
+                          numberOfLines={1}
+                        >
+                          {attachment.fileName}
+                        </Text>
+                        {attachment.fileSize > 0 ? (
+                          <Text style={styles.fileAttachmentSize}>
+                            {formatFileSize(attachment.fileSize)}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  ),
+                )}
+              </View>
+            ) : null}
+
+            {item.deletedAt || item.content ? (
+              <Text
+                style={[
+                  styles.content,
+                  own && styles.contentOwn,
+                  item.deletedAt && styles.deletedContent,
+                ]}
+              >
+                {item.deletedAt ? "This message was deleted" : item.content}
+              </Text>
+            ) : null}
 
             <View style={styles.metaRow}>
               {edited ? <Text style={styles.meta}>edited</Text> : null}
@@ -547,7 +800,72 @@ export default function ChatScreen() {
         </View>
       ) : null}
 
+      {pendingAttachments.length > 0 ? (
+        <View style={styles.attachmentStrip}>
+          {pendingAttachments.map((attachment) => (
+            <View key={attachment.id} style={styles.attachmentChip}>
+              {attachment.contentType.startsWith("image/") ? (
+                <Image
+                  source={{ uri: attachment.uri }}
+                  style={styles.attachmentThumb}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={styles.attachmentThumb}>
+                  <Text style={styles.attachmentThumbIcon}>📄</Text>
+                </View>
+              )}
+              <View style={styles.attachmentChipBody}>
+                <Text style={styles.attachmentChipName} numberOfLines={1}>
+                  {attachment.fileName}
+                </Text>
+                <Text
+                  style={[
+                    styles.attachmentChipStatus,
+                    attachment.status === "error" && styles.attachmentChipError,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {attachment.status === "uploading"
+                    ? "Uploading…"
+                    : attachment.status === "ready"
+                      ? formatFileSize(attachment.fileSize)
+                      : (attachment.error ?? "Upload failed")}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => removePendingAttachment(attachment.id)}
+                hitSlop={8}
+                accessibilityLabel={`Remove ${attachment.fileName}`}
+              >
+                <Text style={styles.attachmentRemove}>×</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       <View style={styles.inputRow}>
+        <TouchableOpacity
+          style={[
+            styles.attachButton,
+            (editing ||
+              sendMutation.isPending ||
+              pendingAttachments.length >= MAX_ATTACHMENTS) &&
+              styles.attachButtonDisabled,
+          ]}
+          onPress={() => {
+            void pickAttachments();
+          }}
+          disabled={
+            !!editing ||
+            sendMutation.isPending ||
+            pendingAttachments.length >= MAX_ATTACHMENTS
+          }
+          accessibilityLabel="Attach image"
+        >
+          <Text style={styles.attachText}>+</Text>
+        </TouchableOpacity>
         <TextInput
           style={styles.input}
           placeholder={editing ? "Edit message" : "Message"}
@@ -557,17 +875,9 @@ export default function ChatScreen() {
           multiline
         />
         <TouchableOpacity
-          style={[
-            styles.sendButton,
-            (!text.trim() ||
-              sendMutation.isPending ||
-              editMutation.isPending) &&
-              styles.sendButtonDisabled,
-          ]}
+          style={[styles.sendButton, sendDisabled && styles.sendButtonDisabled]}
           onPress={handleSend}
-          disabled={
-            !text.trim() || sendMutation.isPending || editMutation.isPending
-          }
+          disabled={sendDisabled}
         >
           <Text style={styles.sendText}>
             {editing ? "Save" : sendMutation.isPending ? "…" : "Send"}
@@ -610,6 +920,29 @@ const createStyles = (palette: Palette) =>
     content: { color: palette.text, fontSize: 15, lineHeight: 20 },
     contentOwn: { color: palette.primaryText },
     deletedContent: { fontStyle: "italic", opacity: 0.7 },
+    attachments: { gap: 6 },
+    attachmentImage: {
+      borderRadius: 10,
+      backgroundColor: palette.surfaceMuted,
+    },
+    fileAttachment: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      padding: 8,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: palette.divider,
+      backgroundColor: palette.surfaceMuted,
+    },
+    fileAttachmentIcon: { fontSize: 18 },
+    fileAttachmentBody: { flex: 1, gap: 2 },
+    fileAttachmentName: {
+      color: palette.text,
+      fontSize: 13,
+      fontWeight: "600",
+    },
+    fileAttachmentSize: { color: palette.textMuted, fontSize: 11 },
     metaRow: {
       flexDirection: "row",
       justifyContent: "flex-end",
@@ -677,6 +1010,68 @@ const createStyles = (palette: Palette) =>
     },
     composerContextText: { color: palette.textMuted, fontSize: 12 },
     cancel: { color: palette.primary, fontSize: 12, fontWeight: "600" },
+    attachmentStrip: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingTop: 8,
+      backgroundColor: palette.background,
+      borderTopWidth: 1,
+      borderTopColor: palette.divider,
+    },
+    attachmentChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      maxWidth: "100%",
+      padding: 6,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: palette.border,
+      backgroundColor: palette.surfaceMuted,
+    },
+    attachmentThumb: {
+      width: 40,
+      height: 40,
+      borderRadius: 6,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: palette.surface,
+    },
+    attachmentThumbIcon: { fontSize: 18 },
+    attachmentChipBody: { flexShrink: 1, gap: 2 },
+    attachmentChipName: {
+      color: palette.text,
+      fontSize: 12,
+      fontWeight: "600",
+      maxWidth: 150,
+    },
+    attachmentChipStatus: { color: palette.textMuted, fontSize: 10 },
+    attachmentChipError: { color: palette.danger },
+    attachmentRemove: {
+      color: palette.textMuted,
+      fontSize: 18,
+      fontWeight: "600",
+      paddingHorizontal: 2,
+    },
+    attachButton: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: palette.border,
+      backgroundColor: palette.surfaceMuted,
+    },
+    attachButtonDisabled: { opacity: 0.45 },
+    attachText: {
+      color: palette.text,
+      fontSize: 22,
+      fontWeight: "500",
+      lineHeight: 26,
+    },
     inputRow: {
       flexDirection: "row",
       alignItems: "flex-end",
