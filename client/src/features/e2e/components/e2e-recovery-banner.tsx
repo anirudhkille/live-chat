@@ -10,11 +10,15 @@ type Mode = "restore" | "reset";
 export function E2ERecoveryBanner({
   onRestore,
   onReset,
+  onRestorePasskey,
+  usePasskey = false,
   isPending,
   error,
 }: {
   onRestore: (passphrase: string) => void;
   onReset: (passphrase?: string) => void;
+  onRestorePasskey?: () => void;
+  usePasskey?: boolean;
   isPending: boolean;
   error: Error | null;
 }) {
@@ -53,7 +57,34 @@ export function E2ERecoveryBanner({
 
   return (
     <div className="bg-muted border-b p-3">
-      {mode === "restore" ? (
+      {usePasskey && mode === "restore" ? (
+        <>
+          <p className="text-sm font-medium">Restore encryption keys</p>
+          <p className="text-muted-foreground text-xs">
+            Use the passkey saved on this device to unlock encrypted messages.
+            No passphrase needed.
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <Button
+              type="button"
+              disabled={isPending || !onRestorePasskey}
+              onClick={onRestorePasskey}
+            >
+              {isPending ? "Restoring..." : "Restore with passkey"}
+            </Button>
+            <button
+              type="button"
+              onClick={() => switchMode("reset")}
+              className="text-destructive text-xs hover:underline"
+            >
+              Reset keys
+            </button>
+          </div>
+          {error && (
+            <p className="text-destructive mt-2 text-xs">{error.message}</p>
+          )}
+        </>
+      ) : mode === "restore" ? (
         <>
           <p className="text-sm font-medium">Restore encryption keys</p>
           <p className="text-muted-foreground text-xs">
@@ -74,72 +105,76 @@ export function E2ERecoveryBanner({
         </>
       )}
 
-      <div className="mt-2 grid gap-2">
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <Label htmlFor="e2e-recovery-passphrase" className="sr-only">
-              {mode === "restore" ? "Recovery passphrase" : "New passphrase"}
-            </Label>
-            <Input
-              id="e2e-recovery-passphrase"
-              type="password"
-              value={passphrase}
-              onChange={(e) => setPassphrase(e.target.value)}
-              placeholder={
-                mode === "restore"
-                  ? "Recovery passphrase"
-                  : "Optional passphrase"
+      {!(usePasskey && mode === "restore") && (
+        <div className="mt-2 grid gap-2">
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <Label htmlFor="e2e-recovery-passphrase" className="sr-only">
+                {mode === "restore" ? "Recovery passphrase" : "New passphrase"}
+              </Label>
+              <Input
+                id="e2e-recovery-passphrase"
+                type="password"
+                value={passphrase}
+                onChange={(e) => setPassphrase(e.target.value)}
+                placeholder={
+                  mode === "restore"
+                    ? "Recovery passphrase"
+                    : "Optional passphrase"
+                }
+                disabled={isPending}
+              />
+            </div>
+            <Button
+              type="button"
+              variant={mode === "reset" ? "destructive" : "default"}
+              disabled={
+                isPending ||
+                resetMismatch ||
+                (mode === "restore" && !passphrase)
               }
-              disabled={isPending}
-            />
+              onClick={handleSubmit}
+            >
+              {isPending
+                ? mode === "reset"
+                  ? "Resetting..."
+                  : "Restoring..."
+                : mode === "reset"
+                  ? showResetConfirm
+                    ? "Confirm reset"
+                    : "Reset keys"
+                  : "Restore"}
+            </Button>
           </div>
-          <Button
-            type="button"
-            variant={mode === "reset" ? "destructive" : "default"}
-            disabled={
-              isPending || resetMismatch || (mode === "restore" && !passphrase)
-            }
-            onClick={handleSubmit}
-          >
-            {isPending
-              ? mode === "reset"
-                ? "Resetting..."
-                : "Restoring..."
-              : mode === "reset"
-                ? showResetConfirm
-                  ? "Confirm reset"
-                  : "Reset keys"
-                : "Restore"}
-          </Button>
+
+          {mode === "reset" && showResetConfirm && (
+            <div className="grid gap-2">
+              <Label htmlFor="e2e-confirm-passphrase" className="sr-only">
+                Confirm new passphrase
+              </Label>
+              <Input
+                id="e2e-confirm-passphrase"
+                type="password"
+                value={confirmPassphrase}
+                onChange={(e) => setConfirmPassphrase(e.target.value)}
+                placeholder="Confirm new passphrase"
+                disabled={isPending}
+              />
+              <p className="text-destructive text-xs">
+                This will replace your existing keys. Previous encrypted
+                messages cannot be recovered.
+              </p>
+            </div>
+          )}
         </div>
+      )}
 
-        {mode === "reset" && showResetConfirm && (
-          <div className="grid gap-2">
-            <Label htmlFor="e2e-confirm-passphrase" className="sr-only">
-              Confirm new passphrase
-            </Label>
-            <Input
-              id="e2e-confirm-passphrase"
-              type="password"
-              value={confirmPassphrase}
-              onChange={(e) => setConfirmPassphrase(e.target.value)}
-              placeholder="Confirm new passphrase"
-              disabled={isPending}
-            />
-            <p className="text-destructive text-xs">
-              This will replace your existing keys. Previous encrypted messages
-              cannot be recovered.
-            </p>
-          </div>
-        )}
-      </div>
-
-      {error && (
+      {error && !(usePasskey && mode === "restore") && (
         <p className="text-destructive mt-2 text-xs">{error.message}</p>
       )}
 
       <div className="mt-2 flex items-center gap-2 text-xs">
-        {mode === "restore" ? (
+        {mode === "restore" && !usePasskey ? (
           <>
             <span className="text-muted-foreground">
               Don&apos;t remember it?
@@ -152,15 +187,15 @@ export function E2ERecoveryBanner({
               Reset keys
             </button>
           </>
-        ) : (
+        ) : mode === "reset" ? (
           <button
             type="button"
             onClick={() => switchMode("restore")}
             className="text-link hover:underline"
           >
-            I remember my passphrase
+            {usePasskey ? "Back" : "I remember my passphrase"}
           </button>
-        )}
+        ) : null}
       </div>
     </div>
   );

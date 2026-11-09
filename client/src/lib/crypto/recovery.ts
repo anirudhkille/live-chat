@@ -16,9 +16,21 @@ export type RecoveryPayload = {
   publicKey: string;
 };
 
-export type RecoveryBlob = {
+export type PassphraseRecoveryBlob = {
   version: number;
+  method?: "passphrase";
   iterations: number;
+  salt: string;
+  data: string;
+  publicKey: string;
+};
+
+export type RecoveryBlob = PassphraseRecoveryBlob | PasskeyRecoveryBlob;
+
+export type PasskeyRecoveryBlob = {
+  version: number;
+  method: "passkey-prf";
+  credentialId: string;
   salt: string;
   data: string;
   publicKey: string;
@@ -26,6 +38,42 @@ export type RecoveryBlob = {
 
 export type RecoveryResult =
   { ok: true; keys: RecoveryPayload } | { ok: false; error: string };
+
+export function isPasskeyRecoveryBlob(
+  blob: unknown
+): blob is PasskeyRecoveryBlob {
+  if (!blob || typeof blob !== "object") {
+    return false;
+  }
+
+  const value = blob as Record<string, unknown>;
+
+  return (
+    value.method === "passkey-prf" &&
+    typeof value.credentialId === "string" &&
+    typeof value.salt === "string" &&
+    typeof value.data === "string" &&
+    typeof value.publicKey === "string"
+  );
+}
+
+export function isPassphraseRecoveryBlob(
+  blob: unknown
+): blob is PassphraseRecoveryBlob {
+  if (!blob || typeof blob !== "object") {
+    return false;
+  }
+
+  const value = blob as Record<string, unknown>;
+
+  return (
+    value.method !== "passkey-prf" &&
+    typeof value.iterations === "number" &&
+    typeof value.salt === "string" &&
+    typeof value.data === "string" &&
+    typeof value.publicKey === "string"
+  );
+}
 
 /**
  * Encrypt the key bundle with a passphrase-derived key. The resulting blob can
@@ -42,6 +90,7 @@ export async function buildRecoveryBlob(
   const ciphertext = await aesEncrypt(kek, JSON.stringify(payload), iv);
   return {
     version: 1,
+    method: "passphrase",
     iterations: PBKDF2_ITERATIONS,
     salt: bytesToBase64(salt),
     data: bytesToBase64(new Uint8Array([...iv, ...ciphertext])),
@@ -53,6 +102,13 @@ export async function restoreFromBlob(
   passphrase: string,
   blob: RecoveryBlob
 ): Promise<RecoveryResult> {
+  if (isPasskeyRecoveryBlob(blob)) {
+    return {
+      ok: false,
+      error: "This account uses passkey recovery instead of a passphrase.",
+    };
+  }
+
   try {
     const salt = base64ToBytes(blob.salt);
     const kek = await pbkdf2(
