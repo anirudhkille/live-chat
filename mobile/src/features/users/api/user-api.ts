@@ -4,7 +4,7 @@ import type { ApiResponse, User, UserPreferences } from "@/types/api";
 export const userApi = {
   search: async (query: string) => {
     const { data } = await api.get<ApiResponse<User[]>>(`/user/search`, {
-      params: { q: query },
+      params: { search: query, limit: 30 },
     });
     return data.data;
   },

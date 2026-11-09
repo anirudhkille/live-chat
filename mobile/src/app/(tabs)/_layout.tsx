@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import type { ColorValue } from "react-native";
+import { TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
 
 import { useAppTheme } from "@/theme/use-app-theme";
 
@@ -19,6 +20,22 @@ function ChatsIcon({ color, size }: TabIconProps) {
 function SettingsIcon({ color, size }: TabIconProps) {
   return (
     <Ionicons name="settings-outline" color={color as string} size={size} />
+  );
+}
+
+function NewGroupButton() {
+  const router = useRouter();
+  const { palette } = useAppTheme();
+
+  return (
+    <TouchableOpacity
+      style={{ paddingHorizontal: 16 }}
+      onPress={() => router.push("/group/new")}
+      accessibilityLabel="Create group"
+      accessibilityRole="button"
+    >
+      <Ionicons name="people-outline" size={24} color={palette.text} />
+    </TouchableOpacity>
   );
 }
 
@@ -52,7 +69,11 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="index"
-        options={{ title: "Chats", tabBarIcon: ChatsIcon }}
+        options={{
+          title: "Chats",
+          tabBarIcon: ChatsIcon,
+          headerRight: NewGroupButton,
+        }}
       />
       <Tabs.Screen
         name="settings"

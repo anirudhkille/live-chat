@@ -12,7 +12,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import {
   RecordingPresets,
@@ -179,6 +180,27 @@ type TypingEvent = {
   userId: string;
   isTyping?: boolean;
 };
+
+function GroupInfoHeaderButton() {
+  const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { palette } = useAppTheme();
+
+  return (
+    <TouchableOpacity
+      style={{ paddingHorizontal: 16 }}
+      onPress={() => router.push(`/group/${id}`)}
+      accessibilityLabel="Group info"
+      accessibilityRole="button"
+    >
+      <Ionicons
+        name="information-circle-outline"
+        size={24}
+        color={palette.text}
+      />
+    </TouchableOpacity>
+  );
+}
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -970,7 +992,14 @@ export default function ChatScreen() {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <Stack.Screen options={{ title: conversation?.name ?? "Chat" }} />
+      <Stack.Screen
+        options={{
+          title: conversation?.name ?? "Chat",
+          headerRight: conversation?.isGroup
+            ? GroupInfoHeaderButton
+            : undefined,
+        }}
+      />
 
       {messagesQuery.isLoading ? (
         <View style={styles.center}>

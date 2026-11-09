@@ -46,6 +46,28 @@ export default function RootLayout() {
             headerShadowVisible: false,
           }}
         />
+        <Stack.Screen
+          name="group/new"
+          options={{
+            headerShown: true,
+            title: "New group",
+            headerStyle: { backgroundColor: palette.background },
+            headerTintColor: palette.text,
+            headerTitleStyle: { color: palette.text, fontWeight: "600" },
+            headerShadowVisible: false,
+          }}
+        />
+        <Stack.Screen
+          name="group/[id]"
+          options={{
+            headerShown: true,
+            title: "Group info",
+            headerStyle: { backgroundColor: palette.background },
+            headerTintColor: palette.text,
+            headerTitleStyle: { color: palette.text, fontWeight: "600" },
+            headerShadowVisible: false,
+          }}
+        />
       </Stack>
     </QueryClientProvider>
   );
