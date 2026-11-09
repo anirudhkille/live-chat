@@ -1,5 +1,9 @@
 import { useColorScheme } from "react-native";
 
+import { useThemeStore } from "./theme-store";
+
+export type { ThemePreference } from "./theme-store";
+
 export type ThemePalette = {
   background: string;
   card: string;
@@ -43,7 +47,17 @@ const dark: ThemePalette = {
 };
 
 export function useAppTheme() {
-  const scheme = useColorScheme();
-  const palette = scheme === "dark" ? dark : light;
-  return { scheme: scheme ?? "light", palette };
+  const systemScheme = useColorScheme();
+  const preference = useThemeStore((state) => state.preference);
+  const setPreference = useThemeStore((state) => state.setPreference);
+
+  const resolvedScheme: "light" | "dark" =
+    preference === "system" ? (systemScheme ?? "light") : preference;
+
+  return {
+    scheme: resolvedScheme,
+    preference,
+    setPreference,
+    palette: resolvedScheme === "dark" ? dark : light,
+  };
 }

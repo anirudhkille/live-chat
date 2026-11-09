@@ -68,6 +68,50 @@ export default function RootLayout() {
             headerShadowVisible: false,
           }}
         />
+        <Stack.Screen
+          name="settings/profile"
+          options={{
+            headerShown: true,
+            title: "Edit profile",
+            headerStyle: { backgroundColor: palette.background },
+            headerTintColor: palette.text,
+            headerTitleStyle: { color: palette.text, fontWeight: "600" },
+            headerShadowVisible: false,
+          }}
+        />
+        <Stack.Screen
+          name="settings/appearance"
+          options={{
+            headerShown: true,
+            title: "Appearance",
+            headerStyle: { backgroundColor: palette.background },
+            headerTintColor: palette.text,
+            headerTitleStyle: { color: palette.text, fontWeight: "600" },
+            headerShadowVisible: false,
+          }}
+        />
+        <Stack.Screen
+          name="settings/notifications"
+          options={{
+            headerShown: true,
+            title: "Notifications",
+            headerStyle: { backgroundColor: palette.background },
+            headerTintColor: palette.text,
+            headerTitleStyle: { color: palette.text, fontWeight: "600" },
+            headerShadowVisible: false,
+          }}
+        />
+        <Stack.Screen
+          name="search"
+          options={{
+            headerShown: true,
+            title: "New chat",
+            headerStyle: { backgroundColor: palette.background },
+            headerTintColor: palette.text,
+            headerTitleStyle: { color: palette.text, fontWeight: "600" },
+            headerShadowVisible: false,
+          }}
+        />
       </Stack>
     </QueryClientProvider>
   );

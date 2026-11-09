@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { ColorValue } from "react-native";
-import { TouchableOpacity } from "react-native";
+import { TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs, useRouter } from "expo-router";
 
@@ -23,19 +23,29 @@ function SettingsIcon({ color, size }: TabIconProps) {
   );
 }
 
-function NewGroupButton() {
+function ChatsHeaderActions() {
   const router = useRouter();
   const { palette } = useAppTheme();
 
   return (
-    <TouchableOpacity
-      style={{ paddingHorizontal: 16 }}
-      onPress={() => router.push("/group/new")}
-      accessibilityLabel="Create group"
-      accessibilityRole="button"
-    >
-      <Ionicons name="people-outline" size={24} color={palette.text} />
-    </TouchableOpacity>
+    <View style={{ flexDirection: "row", alignItems: "center" }}>
+      <TouchableOpacity
+        style={{ paddingLeft: 16, paddingRight: 8 }}
+        onPress={() => router.push("/search")}
+        accessibilityLabel="Search for people"
+        accessibilityRole="button"
+      >
+        <Ionicons name="search-outline" size={24} color={palette.text} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={{ paddingLeft: 8, paddingRight: 16 }}
+        onPress={() => router.push("/group/new")}
+        accessibilityLabel="Create group"
+        accessibilityRole="button"
+      >
+        <Ionicons name="people-outline" size={24} color={palette.text} />
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -72,7 +82,7 @@ export default function TabsLayout() {
         options={{
           title: "Chats",
           tabBarIcon: ChatsIcon,
-          headerRight: NewGroupButton,
+          headerRight: ChatsHeaderActions,
         }}
       />
       <Tabs.Screen

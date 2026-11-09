@@ -1,5 +1,12 @@
+import { File, UploadType } from "expo-file-system";
+
 import { api } from "@/lib/api";
 import type { ApiResponse, User, UserPreferences } from "@/types/api";
+
+export type AvatarUploadInput = {
+  uri: string;
+  contentType: string;
+};
 
 export const userApi = {
   search: async (query: string) => {
@@ -31,6 +38,23 @@ export const userApi = {
       key,
     });
     return data.data;
+  },
+  uploadAvatar: async ({ uri, contentType }: AvatarUploadInput) => {
+    const { uploadUrl, key } = await userApi.getAvatarUploadUrl(contentType);
+
+    const file = new File(uri);
+    const result = await file.upload(uploadUrl, {
+      httpMethod: "PUT",
+      uploadType: UploadType.BINARY_CONTENT,
+      mimeType: contentType,
+      headers: { "Content-Type": contentType },
+    });
+
+    if (result.status < 200 || result.status >= 300) {
+      throw new Error(`Upload failed with status ${result.status}`);
+    }
+
+    return userApi.confirmAvatar(key);
   },
   getWallpaperUploadUrl: async (contentType: string) => {
     const { data } = await api.post<

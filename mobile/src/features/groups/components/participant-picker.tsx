@@ -11,7 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 
 import { userApi } from "@/features/users/api/user-api";
-import { UserAvatar } from "@/features/groups/components/user-avatar";
+import { UserSearchRow } from "@/features/users/components/user-search-row";
 import { useAppTheme } from "@/theme/use-app-theme";
 import type { User } from "@/types/api";
 
@@ -89,39 +89,15 @@ export function ParticipantPicker({
         <Text style={styles.hint}>No people found for “{debouncedQuery}”.</Text>
       ) : (
         <View style={styles.results}>
-          {results.map((user) => {
-            const selected = selectedIds.includes(user.id);
-            return (
-              <TouchableOpacity
-                key={user.id}
-                style={styles.row}
-                onPress={() => onToggle(user)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: selected }}
-              >
-                <UserAvatar
-                  uri={user.avatar}
-                  name={user.name ?? user.email}
-                  size={40}
-                />
-                <View style={styles.rowBody}>
-                  <Text style={styles.name} numberOfLines={1}>
-                    {user.name ?? user.email}
-                  </Text>
-                  {user.name ? (
-                    <Text style={styles.email} numberOfLines={1}>
-                      {user.email}
-                    </Text>
-                  ) : null}
-                </View>
-                <Ionicons
-                  name={selected ? "checkmark-circle" : "ellipse-outline"}
-                  size={24}
-                  color={selected ? palette.primary : palette.textMuted}
-                />
-              </TouchableOpacity>
-            );
-          })}
+          {results.map((user) => (
+            <UserSearchRow
+              key={user.id}
+              user={user}
+              selected={selectedIds.includes(user.id)}
+              showSelection
+              onPress={() => onToggle(user)}
+            />
+          ))}
         </View>
       )}
     </View>
@@ -162,17 +138,4 @@ const createStyles = (palette: ReturnType<typeof useAppTheme>["palette"]) =>
       borderRadius: 10,
       overflow: "hidden",
     },
-    row: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: palette.divider,
-      backgroundColor: palette.background,
-    },
-    rowBody: { flex: 1, gap: 2 },
-    name: { color: palette.text, fontSize: 15, fontWeight: "600" },
-    email: { color: palette.textMuted, fontSize: 12 },
   });

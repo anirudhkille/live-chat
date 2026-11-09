@@ -36,4 +36,11 @@ export const authApi = {
       await api.get<ApiResponse<{ accessToken: string }>>("/auth/refresh");
     return data.data.accessToken;
   },
+  updateProfile: async (name: string) => {
+    const { data } = await api.patch<ApiResponse<{ user: User }>>(
+      "/auth/profile",
+      { name },
+    );
+    return data.data.user;
+  },
 };
