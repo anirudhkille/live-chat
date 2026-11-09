@@ -3,7 +3,10 @@ import { env } from "./config/env.config.js";
 
 const IDENTITY_HEADERS = ["forwarded", "-ip", "remote-", "via", "-user"];
 
-if (env.SENTRY_DSN) {
+export const isSentryEnabled =
+  env.NODE_ENV === "production" && Boolean(env.SENTRY_DSN);
+
+if (isSentryEnabled) {
   Sentry.init({
     dsn: env.SENTRY_DSN,
     environment: env.NODE_ENV,
