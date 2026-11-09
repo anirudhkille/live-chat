@@ -12,6 +12,7 @@ import {
   getGoogleAuthURL as googleAuthUrl,
   getGoogleTokens,
   getGoogleUser,
+  verifyGoogleIdToken,
 } from "./auth.google.js";
 import { logger } from "../../config/logger.js";
 
@@ -145,8 +146,8 @@ export const updateUserProfile = async (userId, body) => {
   return userRepository.updateById(userId, { name });
 };
 
-export const getGoogleAuthURL = () => {
-  return googleAuthUrl();
+export const getGoogleAuthURL = (redirect) => {
+  return googleAuthUrl(redirect);
 };
 
 export const googleLogin = async (code) => {
@@ -159,6 +160,24 @@ export const googleLogin = async (code) => {
 
   if (!user.name && name) {
     user = await userRepository.updateById(user.id, { name });
+  }
+
+  const session = await issueSession(user.id);
+
+  return { user, ...session };
+};
+
+export const googleLoginWithIdToken = async (idToken) => {
+  const { email, name, avatar } = await verifyGoogleIdToken(idToken);
+
+  let user = await userRepository.upsertByEmail(email);
+
+  const updates = {};
+  if (!user.name && name) updates.name = name;
+  if (!user.avatar && avatar) updates.avatar = avatar;
+
+  if (Object.keys(updates).length > 0) {
+    user = await userRepository.updateById(user.id, updates);
   }
 
   const session = await issueSession(user.id);
