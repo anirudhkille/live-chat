@@ -100,7 +100,7 @@ export default function SettingsPage() {
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
         title="Log out?"
-        description="You'll need to sign in again to access your chats."
+        description="You'll need to log in again to access your chats."
         footer={
           <>
             <Button variant="outline" onClick={() => setConfirmOpen(false)}>

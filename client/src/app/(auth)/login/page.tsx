@@ -4,7 +4,7 @@ import AuthLayout from "@/features/auth/components/auth-layout";
 import { GoogleLogin } from "@/features/auth/components/google-login";
 import { LoginForm } from "@/features/auth/components/login-form";
 
-export const metadata: Metadata = { title: "Sign in · Live Chat" };
+export const metadata: Metadata = { title: "Log in · Live Chat" };
 
 type LoginPageProps = {
   searchParams: Promise<{ error?: string }>;
