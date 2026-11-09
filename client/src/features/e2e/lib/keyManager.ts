@@ -8,13 +8,37 @@ import { buildRecoveryBlob } from "@/lib/crypto/recovery";
 import { dbGet, dbSet } from "@/lib/crypto/storage";
 
 const KEY_STORAGE_KEY = "identity-keys";
+const IDENTITY_MARKER_KEY = "live-chat.keys-initialized";
+
+function markIdentityInitialized() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(IDENTITY_MARKER_KEY, "1");
+  } catch {
+    // Best effort only.
+  }
+}
+
+export function hasLocalIdentityMarker(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(IDENTITY_MARKER_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export async function loadIdentityKeys(): Promise<IdentityKeys | null> {
-  return dbGet<IdentityKeys>(KEY_STORAGE_KEY);
+  const keys = await dbGet<IdentityKeys>(KEY_STORAGE_KEY);
+  if (keys) {
+    markIdentityInitialized();
+  }
+  return keys;
 }
 
 export async function saveIdentityKeys(keys: IdentityKeys): Promise<void> {
   await dbSet(KEY_STORAGE_KEY, keys);
+  markIdentityInitialized();
 }
 
 export async function createAndUploadIdentity(passphrase?: string) {
