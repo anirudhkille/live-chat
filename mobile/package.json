@@ -13,6 +13,7 @@
     "axios": "^1.21.0",
     "expo": "~58.0.23",
     "expo-audio": "~58.0.11",
+    "expo-build-properties": "~58.0.12",
     "expo-constants": "~58.0.15",
     "expo-crypto": "~58.0.7",
     "expo-dev-client": "~58.0.18",

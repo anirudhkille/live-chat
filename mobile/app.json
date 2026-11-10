@@ -40,6 +40,14 @@
         {
           "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone to record voice notes."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraProguardRules": "-keep class org.webrtc.** { *; }\n-dontwarn org.webrtc.**\n-keep class com.oney.** { *; }\n-dontwarn com.oney.**"
+          }
+        }
       ]
     ],
     "extra": {
