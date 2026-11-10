@@ -1,0 +1,44 @@
+# EAS reads this from the Git repository root.
+# Keep the root .gitignore rules, then exclude everything the mobile build does not need.
+
+# Dependencies
+node_modules
+**/node_modules
+
+# Environment files
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Build output
+dist
+**/dist
+.next
+**/.next
+.expo
+**/.expo
+
+# Generated native projects
+android
+ios
+**/android
+**/ios
+
+# VCS and repository tooling
+.git
+.worktrees
+.github
+.husky
+docs
+docker-compose.yml
+
+# Other packages in this repository
+client
+server
+
+# Build artifacts and logs
+*.log
+*.apk
+*.aab
+*.ipa
