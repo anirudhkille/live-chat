@@ -9,10 +9,20 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.anirudhkille.livechat",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to use your camera for video calls.",
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use your microphone for voice and video calls."
+      }
     },
     "android": {
       "package": "com.anirudhkille.livechat",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
+        "ACCESS_NETWORK_STATE"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/android-icon-foreground.png"

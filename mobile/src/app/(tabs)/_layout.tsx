@@ -17,6 +17,10 @@ function ChatsIcon({ color, size }: TabIconProps) {
   );
 }
 
+function CallsIcon({ color, size }: TabIconProps) {
+  return <Ionicons name="call-outline" color={color as string} size={size} />;
+}
+
 function SettingsIcon({ color, size }: TabIconProps) {
   return (
     <Ionicons name="settings-outline" color={color as string} size={size} />
@@ -84,6 +88,10 @@ export default function TabsLayout() {
           tabBarIcon: ChatsIcon,
           headerRight: ChatsHeaderActions,
         }}
+      />
+      <Tabs.Screen
+        name="calls"
+        options={{ title: "Calls", tabBarIcon: CallsIcon }}
       />
       <Tabs.Screen
         name="settings"

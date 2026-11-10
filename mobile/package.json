@@ -28,6 +28,7 @@
     "react-native": "0.88.1",
     "react-native-safe-area-context": "~5.11.1",
     "react-native-screens": "~4.30.1",
+    "react-native-webrtc": "^155.0.1",
     "socket.io-client": "^4.8.4",
     "zod": "^4.6.7",
     "zustand": "^5.0.16"

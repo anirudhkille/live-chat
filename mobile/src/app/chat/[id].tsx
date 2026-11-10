@@ -34,6 +34,10 @@ import {
 } from "@tanstack/react-query";
 
 import { attachmentApi } from "@/features/attachments/api/attachment-api";
+import { CallButtons } from "@/features/calls/call-buttons";
+import { useCallActions } from "@/features/calls/call-provider";
+import { useCallStore } from "@/features/calls/call-store";
+import type { CallType } from "@/features/calls/types";
 import {
   conversationApi,
   messageApi,
@@ -196,24 +200,58 @@ type TypingEvent = {
   isTyping?: boolean;
 };
 
-function GroupInfoHeaderButton() {
+function ChatHeaderActions() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { palette } = useAppTheme();
+  const calls = useCallActions();
+  const callStatus = useCallStore((state) => state.status);
+  const { data: conversation } = useQuery({
+    queryKey: ["conversation", id],
+    queryFn: () => conversationApi.getById(id!),
+    enabled: !!id,
+  });
+
+  const handleStartCall = useCallback(
+    (type: CallType) => {
+      if (!id || !conversation) return;
+      calls.startCall({
+        type,
+        conversationId: id,
+        peerId: conversation.isGroup ? null : conversation.otherUserId,
+        peerName: conversation.isGroup
+          ? null
+          : (conversation.name ?? conversation.email ?? null),
+        isGroup: conversation.isGroup,
+        conversationName: conversation.isGroup
+          ? (conversation.name ?? "Group call")
+          : null,
+      });
+    },
+    [calls, conversation, id],
+  );
 
   return (
-    <TouchableOpacity
-      style={{ paddingHorizontal: 16 }}
-      onPress={() => router.push(`/group/${id}`)}
-      accessibilityLabel="Group info"
-      accessibilityRole="button"
-    >
-      <Ionicons
-        name="information-circle-outline"
-        size={24}
-        color={palette.text}
+    <View style={{ flexDirection: "row", alignItems: "center" }}>
+      <CallButtons
+        disabled={callStatus !== "idle" || !conversation}
+        onStart={handleStartCall}
       />
-    </TouchableOpacity>
+      {conversation?.isGroup ? (
+        <TouchableOpacity
+          style={{ paddingHorizontal: 16 }}
+          onPress={() => router.push(`/group/${id}`)}
+          accessibilityLabel="Group info"
+          accessibilityRole="button"
+        >
+          <Ionicons
+            name="information-circle-outline"
+            size={24}
+            color={palette.text}
+          />
+        </TouchableOpacity>
+      ) : null}
+    </View>
   );
 }
 
@@ -1111,9 +1149,7 @@ export default function ChatScreen() {
       <Stack.Screen
         options={{
           title: conversation?.name ?? "Chat",
-          headerRight: conversation?.isGroup
-            ? GroupInfoHeaderButton
-            : undefined,
+          headerRight: ChatHeaderActions,
         }}
       />
 
