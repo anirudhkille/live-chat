@@ -14,6 +14,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-row";
+import { useE2EIdentity } from "@/features/e2e/hooks/use-e2e-identity";
 import { UserAvatar } from "@/features/groups/components/user-avatar";
 import { useAuthStore } from "@/store/auth-store";
 import { useAppTheme, type ThemePreference } from "@/theme/use-app-theme";
@@ -30,6 +31,23 @@ export default function SettingsScreen() {
   const styles = useMemo(() => createStyles(palette), [palette]);
   const user = useAuthStore((s) => s.user);
   const clearSession = useAuthStore((s) => s.clearSession);
+  const { status: e2eStatus } = useE2EIdentity();
+
+  const e2eDescription =
+    e2eStatus === "ready"
+      ? "End-to-end encryption is active for direct messages on this device."
+      : e2eStatus === "loading"
+        ? "Checking encryption keys…"
+        : e2eStatus === "server-key-missing-local"
+          ? "Your encryption keys exist on another device. Direct messages stay unencrypted here until you restore them from the web app."
+          : "Encryption setup is unavailable. Messages will continue to send unencrypted.";
+
+  const e2eValue =
+    e2eStatus === "ready"
+      ? "Active"
+      : e2eStatus === "loading"
+        ? "Checking"
+        : "Plaintext";
 
   const onLogout = () => {
     Alert.alert(
@@ -99,7 +117,8 @@ export default function SettingsScreen() {
         <SettingsRow
           icon="shield-checkmark-outline"
           label="Security & encryption"
-          description="Security and encryption settings are managed on the web app."
+          description={e2eDescription}
+          value={e2eValue}
           showDivider={false}
         />
       </SettingsSection>

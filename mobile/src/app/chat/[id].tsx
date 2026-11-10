@@ -38,10 +38,25 @@ import {
   conversationApi,
   messageApi,
 } from "@/features/conversations/api/conversation-api";
+import {
+  DECRYPTION_FAILED_TEXT,
+  DECRYPTION_PENDING_TEXT,
+  useDecryptedMessages,
+  type DisplayMessage,
+} from "@/features/e2e/hooks/use-decrypted-messages";
+import { useE2EIdentity } from "@/features/e2e/hooks/use-e2e-identity";
+import { usePeerPublicKey } from "@/features/e2e/hooks/use-peer-public-key";
+import { deriveConversationKey } from "@/lib/crypto/conversation-key";
+import { encryptMessage } from "@/lib/crypto/messaging";
 import { socket } from "@/lib/socket";
 import { useAuthStore } from "@/store/auth-store";
 import { useAppTheme } from "@/theme/use-app-theme";
-import { getApiErrorMessage, type Attachment, type Message } from "@/types/api";
+import {
+  getApiErrorMessage,
+  type Attachment,
+  type CipherMeta,
+  type Message,
+} from "@/types/api";
 
 const PAGE_SIZE = 30;
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
@@ -245,6 +260,34 @@ export default function ChatScreen() {
     enabled: !!id,
   });
 
+  const { keys: identityKeys, status: e2eStatus } = useE2EIdentity();
+  const peerId = conversation?.isGroup
+    ? null
+    : (conversation?.otherUserId ?? null);
+  const peerKeyQuery = usePeerPublicKey(peerId);
+  const peerPublicKey = peerKeyQuery.data ?? null;
+  const e2ePlaintextNotice = conversation?.isGroup
+    ? null
+    : e2eStatus === "server-key-missing-local"
+      ? "Your encryption keys aren't on this device. Messages here will be sent unencrypted."
+      : e2eStatus === "error"
+        ? "Encryption couldn't be initialized. Messages here will be sent unencrypted."
+        : null;
+
+  const conversationKey = useMemo(() => {
+    if (!identityKeys || !peerPublicKey || !id) return null;
+
+    try {
+      return deriveConversationKey({
+        privateKey: identityKeys.privateKey,
+        peerPublicKey,
+        conversationId: id,
+      });
+    } catch {
+      return null;
+    }
+  }, [id, identityKeys, peerPublicKey]);
+
   const messagesQuery = useInfiniteQuery({
     queryKey: ["messages", id],
     queryFn: ({ pageParam }) =>
@@ -262,6 +305,11 @@ export default function ChatScreen() {
     () => messagesQuery.data?.pages.flatMap((page) => page) ?? [],
     [messagesQuery.data],
   );
+  const displayMessages = useDecryptedMessages({
+    conversationId: id,
+    peerId,
+    messages,
+  });
   const newestMessageId = messages[0]?.id;
 
   const addMessageToCache = useCallback(
@@ -417,10 +465,12 @@ export default function ChatScreen() {
   const sendMutation = useMutation({
     mutationFn: (input: {
       content: string;
+      cipherMeta?: CipherMeta;
       replyToId?: string;
       attachmentIds?: string[];
     }) =>
       messageApi.send(id!, input.content, {
+        cipherMeta: input.cipherMeta,
         replyToId: input.replyToId,
         attachmentIds: input.attachmentIds,
       }),
@@ -723,21 +773,70 @@ export default function ChatScreen() {
     void uploadPendingAttachment(pending);
   };
 
-  const handleSend = () => {
-    const content = text.trim();
+  const encryptForConversation = async (plaintext: string) => {
+    if (!identityKeys || !id || !peerId) return null;
+
+    let recipientPublicKey = peerPublicKey;
+    if (
+      !recipientPublicKey &&
+      (peerKeyQuery.isPending || peerKeyQuery.isFetching)
+    ) {
+      try {
+        const result = await peerKeyQuery.refetch();
+        recipientPublicKey = result.data ?? null;
+      } catch {
+        recipientPublicKey = null;
+      }
+    }
+
+    if (!recipientPublicKey) return null;
+
+    const key =
+      conversationKey ??
+      deriveConversationKey({
+        privateKey: identityKeys.privateKey,
+        peerPublicKey: recipientPublicKey,
+        conversationId: id,
+      });
+
+    return encryptMessage(key, plaintext);
+  };
+
+  const handleSend = async () => {
+    const rawContent = text.trim();
     if (!id) return;
 
     if (editing) {
-      if (!content) return;
-      editMutation.mutate({ messageId: editing.id, content });
+      if (!rawContent) return;
+      editMutation.mutate({ messageId: editing.id, content: rawContent });
       return;
     }
 
     if (uploadingAttachments) return;
-    if (!content && readyAttachmentIds.length === 0) return;
+    if (!rawContent && readyAttachmentIds.length === 0) return;
+
+    let content = rawContent;
+    let cipherMeta: CipherMeta | undefined;
+
+    if (rawContent && identityKeys && peerId) {
+      try {
+        const encrypted = await encryptForConversation(rawContent);
+        if (encrypted) {
+          content = encrypted.content;
+          cipherMeta = encrypted.cipherMeta;
+        }
+      } catch {
+        Alert.alert(
+          "Message not sent",
+          "Could not encrypt this message. Please try again.",
+        );
+        return;
+      }
+    }
 
     sendMutation.mutate({
       content,
+      cipherMeta,
       replyToId: replyTo?.id,
       attachmentIds: readyAttachmentIds,
     });
@@ -750,6 +849,14 @@ export default function ChatScreen() {
   };
 
   const startEdit = (message: Message) => {
+    if (message.cipherMeta) {
+      Alert.alert(
+        "Encrypted message",
+        "Editing encrypted messages isn't supported on this device yet.",
+      );
+      return;
+    }
+
     setReplyTo(null);
     setEditing(message);
     setSelectedId(null);
@@ -794,7 +901,7 @@ export default function ChatScreen() {
       uploadingAttachments ||
       sendMutation.isPending;
 
-  const renderMessage = ({ item }: { item: Message }) => {
+  const renderMessage = ({ item }: { item: DisplayMessage }) => {
     const own = item.senderId === currentUserId;
     const selected = selectedId === item.id;
     const reactionCounts = (item.reactions ?? []).reduce<
@@ -809,6 +916,12 @@ export default function ChatScreen() {
     }, {});
     const edited =
       item.updatedAt && item.updatedAt !== item.createdAt && !item.deletedAt;
+    const messageText =
+      item.decryptionState === "failed"
+        ? DECRYPTION_FAILED_TEXT
+        : item.decryptionState === "pending"
+          ? DECRYPTION_PENDING_TEXT
+          : item.content;
 
     return (
       <View style={[styles.messageRow, own && styles.messageRowOwn]}>
@@ -895,15 +1008,16 @@ export default function ChatScreen() {
               </View>
             ) : null}
 
-            {item.deletedAt || item.content ? (
+            {item.deletedAt || messageText ? (
               <Text
                 style={[
                   styles.content,
                   own && styles.contentOwn,
                   item.deletedAt && styles.deletedContent,
+                  item.decryptionState && styles.decryptionPlaceholder,
                 ]}
               >
-                {item.deletedAt ? "This message was deleted" : item.content}
+                {item.deletedAt ? "This message was deleted" : messageText}
               </Text>
             ) : null}
 
@@ -969,9 +1083,11 @@ export default function ChatScreen() {
                 </TouchableOpacity>
                 {own && !item.deletedAt ? (
                   <>
-                    <TouchableOpacity onPress={() => startEdit(item)}>
-                      <Text style={styles.actionText}>Edit</Text>
-                    </TouchableOpacity>
+                    {!item.cipherMeta ? (
+                      <TouchableOpacity onPress={() => startEdit(item)}>
+                        <Text style={styles.actionText}>Edit</Text>
+                      </TouchableOpacity>
+                    ) : null}
                     <TouchableOpacity onPress={() => confirmDelete(item)}>
                       <Text style={[styles.actionText, styles.danger]}>
                         Delete
@@ -1001,13 +1117,19 @@ export default function ChatScreen() {
         }}
       />
 
+      {e2ePlaintextNotice ? (
+        <View style={styles.e2eNotice}>
+          <Text style={styles.e2eNoticeText}>{e2ePlaintextNotice}</Text>
+        </View>
+      ) : null}
+
       {messagesQuery.isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator color={palette.primary} />
         </View>
       ) : (
         <FlatList
-          data={messages}
+          data={displayMessages}
           inverted
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
@@ -1212,7 +1334,9 @@ export default function ChatScreen() {
               styles.sendButton,
               sendDisabled && styles.sendButtonDisabled,
             ]}
-            onPress={handleSend}
+            onPress={() => {
+              void handleSend();
+            }}
             disabled={sendDisabled}
           >
             <Text style={styles.sendText}>
@@ -1231,6 +1355,14 @@ const createStyles = (palette: Palette) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: palette.background },
     center: { flex: 1, alignItems: "center", justifyContent: "center" },
+    e2eNotice: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.divider,
+      backgroundColor: palette.surfaceMuted,
+    },
+    e2eNoticeText: { color: palette.textMuted, fontSize: 12, lineHeight: 16 },
     list: { padding: 12, gap: 8 },
     messageRow: { flexDirection: "row", justifyContent: "flex-start" },
     messageRowOwn: { justifyContent: "flex-end" },
@@ -1257,6 +1389,7 @@ const createStyles = (palette: Palette) =>
     content: { color: palette.text, fontSize: 15, lineHeight: 20 },
     contentOwn: { color: palette.primaryText },
     deletedContent: { fontStyle: "italic", opacity: 0.7 },
+    decryptionPlaceholder: { fontStyle: "italic", opacity: 0.7 },
     attachments: { gap: 6 },
     attachmentImage: {
       borderRadius: 10,

@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 
 import { useAuthStore } from "@/store/auth-store";
+import { E2EIdentityBootstrap } from "@/features/e2e/components/e2e-identity-bootstrap";
 import { registerExpoPushToken } from "@/features/push-notifications/register";
 import { useAppTheme } from "@/theme/use-app-theme";
 
@@ -29,6 +30,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
+      <E2EIdentityBootstrap />
       <Stack
         screenOptions={{
           headerShown: false,
