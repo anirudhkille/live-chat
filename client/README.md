@@ -81,4 +81,4 @@ src/
 
 - `npm run dev` — dev server
 - `npm run build` / `npm start` — production build & serve
-- `npm run lint` — ESLint
+- `npm run lint` - Oxlint
