@@ -12,8 +12,8 @@ Expo (SDK 58) React Native client mirroring the web client features.
 ## Env
 Create `.env` (or `app.config` extra) with:
 ```
-EXPO_PUBLIC_API_URL=https://api.live-chat.anirudhkille.com
-EXPO_PUBLIC_SOCKET_URL=https://api.live-chat.anirudhkille.com
+EXPO_PUBLIC_API_URL=https://live-chat-api.anirudhkille.com/api
+EXPO_PUBLIC_SOCKET_URL=https://live-chat-api.anirudhkille.com
 ```
 
 ## Structure

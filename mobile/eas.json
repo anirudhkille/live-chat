@@ -14,15 +14,15 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.live-chat.anirudhkille.com/api",
-        "EXPO_PUBLIC_SOCKET_URL": "https://api.live-chat.anirudhkille.com"
+        "EXPO_PUBLIC_API_URL": "https://live-chat-api.anirudhkille.com/api",
+        "EXPO_PUBLIC_SOCKET_URL": "https://live-chat-api.anirudhkille.com"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.live-chat.anirudhkille.com/api",
-        "EXPO_PUBLIC_SOCKET_URL": "https://api.live-chat.anirudhkille.com"
+        "EXPO_PUBLIC_API_URL": "https://live-chat-api.anirudhkille.com/api",
+        "EXPO_PUBLIC_SOCKET_URL": "https://live-chat-api.anirudhkille.com"
       }
     }
   },
