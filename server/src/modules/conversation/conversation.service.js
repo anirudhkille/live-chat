@@ -259,3 +259,50 @@ export const removeGroupParticipant = async (
 
   return { removed: targetUserId };
 };
+
+export const leaveGroup = async (conversationId, userId) => {
+  const conversation = await conversationRepository.getById(conversationId);
+  if (!conversation || !conversation.isGroup) {
+    throw new AppError(404, "Group not found");
+  }
+
+  const participant = conversation.participants.find(
+    (p) => p.userId === userId,
+  );
+  if (!participant) {
+    throw new AppError(403, "You are not a member of this group");
+  }
+
+  const remaining = conversation.participants.filter(
+    (p) => p.userId !== userId,
+  );
+
+  if (remaining.length === 0) {
+    removeUserFromConversation(userId, conversationId);
+    await conversationRepository.deleteById(conversationId);
+    return { left: true, deleted: true };
+  }
+
+  await conversationRepository.removeParticipant(conversationId, userId);
+  removeUserFromConversation(userId, conversationId);
+
+  if (
+    participant.role === "admin" &&
+    !remaining.some((p) => p.role === "admin")
+  ) {
+    await conversationRepository.updateParticipantRole(
+      conversationId,
+      remaining[0].userId,
+      "admin",
+    );
+  }
+
+  emitToConversation(conversationId, "conversation-updated", {
+    conversationId,
+  });
+  if (isUserOnline(userId)) {
+    emitToUser(userId, "removed-from-group", { conversationId });
+  }
+
+  return { left: true, deleted: false };
+};

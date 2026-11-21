@@ -90,3 +90,11 @@ export const removeGroupParticipant = asyncHandler(async (req, res) => {
   );
   sendResponse(res, 200, "Member removed from group", result);
 });
+
+export const leaveGroup = asyncHandler(async (req, res) => {
+  const result = await conversationService.leaveGroup(
+    req.params.id,
+    req.user.id,
+  );
+  sendResponse(res, 200, "Left group", result);
+});
