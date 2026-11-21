@@ -106,7 +106,13 @@ const sendToExpoTokens = async (tokens, payload, options) => {
       conversationId: payload.conversationId,
       callId: payload.callId,
       type: payload.type,
+      callType: payload.callType,
+      callerName: payload.callerName,
+      isGroup: payload.isGroup,
+      conversationName: payload.conversationName,
     },
+    categoryId: payload.type === "call" ? "call" : undefined,
+    channelId: "default",
     sound: "default",
     priority:
       options?.urgency === "high" || options?.priority === "high"

@@ -187,3 +187,10 @@ export const removeParticipant = (conversationId, userId) => {
     where: { conversationId, userId },
   });
 };
+
+export const updateParticipantRole = (conversationId, userId, role) => {
+  return prisma.conversationParticipant.updateMany({
+    where: { conversationId, userId },
+    data: { role },
+  });
+};

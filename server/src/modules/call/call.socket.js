@@ -787,6 +787,10 @@ export const handleCallDisconnect = async (userId) => {
   try {
     const pending = await getPendingCallsForUser(userId);
     for (const record of pending) {
+      // Keep incoming pending calls alive for the callee after a disconnect so a
+      // notification tap can reconnect and recover the call within the TTL.
+      if (record.callerId !== userId) continue;
+
       clearPendingTimer(record.callId);
       await deletePendingCall(record.callId, record.calleeId);
       const otherId =

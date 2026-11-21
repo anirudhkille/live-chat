@@ -12,6 +12,7 @@ import {
   getGroupParticipants,
   addGroupParticipants,
   removeGroupParticipant,
+  leaveGroup,
 } from "./conversation.controller.js";
 import { validate } from "../../middleware/validate.middleware.js";
 import {
@@ -27,12 +28,21 @@ const router = Router();
 router.use(authenticate);
 
 router.post("/group", validate(createGroupSchema), createGroup);
-router.post("/group/photo-url", validate(groupPhotoUrlSchema), getGroupPhotoUploadUrl);
+router.post(
+  "/group/photo-url",
+  validate(groupPhotoUrlSchema),
+  getGroupPhotoUploadUrl,
+);
 router.post("/", validate(createConversationSchema), createOrGetConversation);
 router.get("/", getConversations);
 router.get("/:id/participants", getGroupParticipants);
-router.post("/:id/participants", validate(addGroupParticipantsSchema), addGroupParticipants);
+router.post(
+  "/:id/participants",
+  validate(addGroupParticipantsSchema),
+  addGroupParticipants,
+);
 router.delete("/:id/participants/:userId", removeGroupParticipant);
+router.delete("/:id/leave", leaveGroup);
 router.patch("/:id", validate(updateGroupSchema), updateGroup);
 router.delete("/:id", deleteGroup);
 router.get("/:id/with-messages", getConversationWithMessages);
