@@ -8,6 +8,7 @@ import {
 } from "@/lib/socket";
 import { useAuthStore } from "@/store/auth-store";
 import { useCallStore, type CallEndReason, type CallType } from "./call-store";
+import { isCallEventForCall } from "./lib/call-guards";
 
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
@@ -225,6 +226,7 @@ export function useCalls() {
       const { conversationId } = useCallStore.getState();
       if (conversationId) leaveConversationRoom(conversationId);
       resetConnection();
+      useCallStore.getState().clearAutoAction();
       useCallStore.getState().endCall(reason);
     },
     [resetConnection]
@@ -567,8 +569,13 @@ export function useCalls() {
       endCallFlow("timedOut");
     };
 
-    const handleUnavailable = (payload: { reason?: string }) => {
-      if (useCallStore.getState().status !== "outgoing") return;
+    const handleUnavailable = (payload?: {
+      callId?: string;
+      reason?: string;
+    }) => {
+      const state = useCallStore.getState();
+      if (!isCallEventForCall(payload, currentCallId())) return;
+      if (state.status !== "outgoing") return;
       endCallFlow(mapUnavailableReason(payload?.reason));
     };
 
@@ -599,11 +606,13 @@ export function useCalls() {
       });
     };
 
-    const handlePendingTimedOut = () => {
+    const handlePendingTimedOut = (payload?: { callId?: string }) => {
+      if (!isCallEventForCall(payload, currentCallId())) return;
       endCallFlow("pendingTimedOut");
     };
 
-    const handlePendingExpired = () => {
+    const handlePendingExpired = (payload?: { callId?: string }) => {
+      if (!isCallEventForCall(payload, currentCallId())) return;
       endCallFlow("timedOut");
     };
 

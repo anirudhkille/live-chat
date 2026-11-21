@@ -8,6 +8,10 @@ import {
 } from "./crypto";
 
 const PBKDF2_ITERATIONS = 310_000;
+// Restoring a blob controls the work factor. Clamp it so a hostile blob can't
+// pin the main thread for minutes with an enormous iteration count.
+const MIN_PBKDF2_ITERATIONS = 50_000;
+const MAX_PBKDF2_ITERATIONS = 2_000_000;
 const SALT_BYTES = 16;
 
 export type RecoveryPayload = {
@@ -111,11 +115,14 @@ export async function restoreFromBlob(
 
   try {
     const salt = base64ToBytes(blob.salt);
-    const kek = await pbkdf2(
-      passphrase,
-      salt,
-      blob.iterations || PBKDF2_ITERATIONS
+    const requested = Number.isFinite(blob.iterations)
+      ? blob.iterations
+      : PBKDF2_ITERATIONS;
+    const iterations = Math.min(
+      MAX_PBKDF2_ITERATIONS,
+      Math.max(MIN_PBKDF2_ITERATIONS, requested)
     );
+    const kek = await pbkdf2(passphrase, salt, iterations);
     const raw = base64ToBytes(blob.data);
     const iv = raw.subarray(0, 12);
     const ciphertext = raw.subarray(12);

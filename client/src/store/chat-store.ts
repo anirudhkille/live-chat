@@ -22,6 +22,7 @@ type ChatState = {
   setDraft: (conversationId: string, text: string) => void;
   clearDraft: (conversationId: string) => void;
   setReplyTo: (conversationId: string, target: ReplyTarget | null) => void;
+  reset: () => void;
 };
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -42,4 +43,6 @@ export const useChatStore = create<ChatState>((set) => ({
     set((state) => ({
       replies: { ...state.replies, [conversationId]: target },
     })),
+
+  reset: () => set({ drafts: {}, replies: {} }),
 }));

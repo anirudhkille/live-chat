@@ -26,12 +26,11 @@ export const markMessagesRead = asyncHandler(async (req, res) => {
 
 export const updateMessage = asyncHandler(async (req, res) => {
   const { messageId } = req.params;
-  const { content } = req.body;
-  const message = await messageService.updateMessage(
-    req.user.id,
-    messageId,
+  const { content, cipherMeta } = req.body;
+  const message = await messageService.updateMessage(req.user.id, messageId, {
     content,
-  );
+    cipherMeta,
+  });
   sendResponse(res, 200, "Message updated", message);
 });
 

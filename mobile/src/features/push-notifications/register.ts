@@ -5,6 +5,12 @@ import { Platform } from "react-native";
 
 import { api } from "@/lib/api";
 
+let registeredPushToken: string | null = null;
+
+export function getRegisteredPushToken(): string | null {
+  return registeredPushToken;
+}
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -47,9 +53,13 @@ export async function registerExpoPushToken(): Promise<string | null> {
 
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("default", {
-      name: "default",
+      name: "Default",
       // eslint-disable-next-line import/namespace
       importance: Notifications.AndroidImportance.MAX,
+      sound: "default",
+      vibrationPattern: [0, 250, 250, 250],
+      enableVibrate: true,
+      enableLights: true,
     });
   }
 
@@ -64,5 +74,12 @@ export async function registerExpoPushToken(): Promise<string | null> {
 
   const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
   await api.post("/push/expo-token", { token });
+  registeredPushToken = token;
   return token;
+}
+
+export function forgetRegisteredPushToken(token?: string | null) {
+  if (!token || registeredPushToken === token) {
+    registeredPushToken = null;
+  }
 }

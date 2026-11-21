@@ -303,6 +303,7 @@ export const useCallStore = create<CallState>((set, get) => ({
       endReason: reason,
       isConnecting: false,
       startedAt: state.startedAt ?? Date.now(),
+      autoAction: null,
     })),
 
   reset: () => {

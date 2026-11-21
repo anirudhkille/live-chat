@@ -7,11 +7,19 @@ export type LoginResponse = {
   user: User;
 };
 
+/**
+ * Native clients must identify themselves so the server includes the rotated
+ * refresh token in JSON. Web clients receive it only as an httpOnly cookie.
+ */
+const MOBILE_HEADERS = { "X-Client": "mobile" } as const;
+
 export const authApi = {
   sendOtp: async (email: string) => {
-    const { data } = await api.post<ApiResponse<null>>("/auth/send-login-otp", {
-      email,
-    });
+    const { data } = await api.post<ApiResponse<null>>(
+      "/auth/send-login-otp",
+      { email },
+      { headers: MOBILE_HEADERS },
+    );
     return data;
   },
   verifyOtp: async (email: string, otp: string) => {
@@ -21,6 +29,7 @@ export const authApi = {
         email,
         otp,
       },
+      { headers: MOBILE_HEADERS },
     );
     return data.data;
   },
@@ -28,13 +37,21 @@ export const authApi = {
     const { data } = await api.post<ApiResponse<LoginResponse>>(
       "/auth/google/mobile",
       { idToken },
+      { headers: MOBILE_HEADERS },
     );
     return data.data;
   },
-  refresh: async () => {
-    const { data } =
-      await api.get<ApiResponse<{ accessToken: string }>>("/auth/refresh");
-    return data.data.accessToken;
+  /**
+   * Completes the OAuth deep-link flow (`livechat://auth/callback?code=...`).
+   * The server consumes the one-time code and returns both tokens.
+   */
+  exchangeGoogleCode: async (code: string) => {
+    const { data } = await api.post<ApiResponse<LoginResponse>>(
+      "/auth/google/exchange",
+      { code, client: "mobile" },
+      { headers: MOBILE_HEADERS },
+    );
+    return data.data;
   },
   updateProfile: async (name: string) => {
     const { data } = await api.patch<ApiResponse<{ user: User }>>(

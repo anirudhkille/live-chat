@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { env } from "../../config/env.config.js";
 import { AppError } from "../../utils/AppError.js";
 import {
+  deleteObject,
   generatePresignedUploadUrl,
   getObjectMetadata,
 } from "../storage/storage.service.js";
@@ -61,7 +62,12 @@ export async function confirmAttachmentUpload(userId, data) {
   if (fileSize > MAX_SIZE) {
     throw new AppError(400, "File too large");
   }
-  if (!key.startsWith(`attachments/${userId}/`)) {
+  const prefix = `attachments/${userId}/`;
+  if (!key.startsWith(prefix) || key.includes("..")) {
+    throw new AppError(403, "Invalid upload key");
+  }
+  const objectName = key.slice(prefix.length);
+  if (!objectName || objectName.includes("/")) {
     throw new AppError(403, "Invalid upload key");
   }
 
@@ -72,7 +78,12 @@ export async function confirmAttachmentUpload(userId, data) {
     throw new AppError(404, "Uploaded file not found");
   }
   if ((metadata.ContentLength ?? 0) !== fileSize) {
+    await deleteObject(key).catch(() => {});
     throw new AppError(400, "Upload size does not match declared size");
+  }
+  if (metadata.ContentType && metadata.ContentType !== contentType) {
+    await deleteObject(key).catch(() => {});
+    throw new AppError(400, "Upload content type does not match declared type");
   }
 
   const url = `${env.R2_PUBLIC_URL}/${key}`;

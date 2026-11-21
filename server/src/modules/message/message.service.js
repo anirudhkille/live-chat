@@ -7,7 +7,10 @@ import { logger } from "../../config/logger.js";
 import { AppError } from "../../utils/AppError.js";
 import * as messageRepository from "./message.repository.js";
 import * as conversationRepository from "../conversation/conversation.repository.js";
+import * as attachmentRepository from "../attachment/attachment.repository.js";
+import * as userRepository from "../user/user.repository.js";
 import * as pushService from "../push/push.service.js";
+import { validateAttachmentClaim } from "../attachment/attachment.ownership.js";
 import { toMessageResponse } from "./message.mapper.js";
 
 const assertParticipant = async (conversationId, userId) => {
@@ -53,7 +56,11 @@ const assertCanModify = (message, userId) => {
   }
 };
 
-export const updateMessage = async (userId, messageId, content) => {
+export const updateMessage = async (
+  userId,
+  messageId,
+  { content, cipherMeta },
+) => {
   const existing = await messageRepository.findById(messageId);
   assertCanModify(existing, userId);
 
@@ -62,7 +69,17 @@ export const updateMessage = async (userId, messageId, content) => {
     throw new AppError(400, "Message content cannot be empty");
   }
 
-  const message = await messageRepository.updateMessage(messageId, trimmed);
+  if (existing.cipherMeta && cipherMeta === undefined) {
+    throw new AppError(
+      400,
+      "Encrypted messages must be re-encrypted when edited (cipherMeta is required)",
+    );
+  }
+
+  const message = await messageRepository.updateMessage(messageId, {
+    content: trimmed,
+    cipherMeta,
+  });
   emitToConversation(existing.conversationId, "message-updated", {
     conversationId: existing.conversationId,
     message: toMessageResponse(message),
@@ -86,6 +103,15 @@ export const deleteMessage = async (userId, messageId) => {
 
 export const markMessagesRead = async (userId, conversationId) => {
   await assertParticipant(conversationId, userId);
+
+  const preferences = await userRepository.findPreferencesById(userId);
+  if (preferences?.readReceipts === false) {
+    // Do not create read receipts for users who disabled them. Advance the
+    // participant's read position so unread counters still reset.
+    await messageRepository.markReadPosition(conversationId, userId);
+    return { conversationId, updatedCount: 0, readReceipts: false };
+  }
+
   const updatedCount = await messageRepository.markMessagesRead(
     conversationId,
     userId,
@@ -113,6 +139,25 @@ export const sendMessage = async (
 ) => {
   await assertParticipant(conversationId, senderId);
 
+  const uniqueAttachmentIds = Array.isArray(attachmentIds)
+    ? [...new Set(attachmentIds)]
+    : [];
+  if (uniqueAttachmentIds.length > 0) {
+    if (uniqueAttachmentIds.length !== attachmentIds.length) {
+      throw new AppError(400, "Duplicate attachment ids are not allowed");
+    }
+    const attachments =
+      await attachmentRepository.findByIds(uniqueAttachmentIds);
+    const claim = validateAttachmentClaim({
+      attachments,
+      attachmentIds: uniqueAttachmentIds,
+      senderId,
+    });
+    if (!claim.ok) {
+      throw new AppError(claim.status, claim.message);
+    }
+  }
+
   if (replyToId) {
     const parent = await messageRepository.findById(replyToId);
     if (!parent || parent.conversationId !== conversationId) {
@@ -125,7 +170,7 @@ export const sendMessage = async (
     conversationId,
     content,
     cipherMeta,
-    attachmentIds,
+    uniqueAttachmentIds,
     replyToId,
   );
 
@@ -148,7 +193,7 @@ export const sendMessage = async (
     senderId,
     conversationId,
     content,
-    attachmentIds,
+    uniqueAttachmentIds,
     isAudio,
     !!cipherMeta,
   );

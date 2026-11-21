@@ -62,7 +62,12 @@ export function useRemoveGroupParticipant(conversationId: string) {
       queryClient.invalidateQueries({
         queryKey: ["group-participants", conversationId],
       });
+      queryClient.invalidateQueries({
+        queryKey: ["conversation-with-messages", conversationId],
+      });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
+      queryClient.invalidateQueries({ queryKey: ["decrypted-preview"] });
       toast.success("Member removed");
     },
     onError: (error) => {

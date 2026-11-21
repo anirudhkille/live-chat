@@ -406,6 +406,7 @@ export function MessageList({
                   message={item.message}
                   isGroup={isGroup}
                   conversationId={conversationId}
+                  participantIds={participantIds}
                 />
               )}
             </div>

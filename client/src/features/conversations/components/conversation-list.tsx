@@ -48,7 +48,9 @@ const ConversationItem = memo(function ConversationItem({
   const lastMessagePreview = (() => {
     if (!lastMessage) return null;
     if (lastMessage.deletedAt) return "This message was deleted";
-    if (lastMessage.cipherMeta) return decryptedPreview ?? null;
+    if (lastMessage.cipherMeta) {
+      return decryptedPreview ?? "Encrypted message";
+    }
     if (lastMessage.content?.trim()) return lastMessage.content;
     const audioOnly =
       (lastMessage.attachments?.length ?? 0) > 0 &&

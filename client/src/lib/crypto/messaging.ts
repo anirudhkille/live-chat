@@ -55,8 +55,9 @@ export async function encryptMessage(
  * that recipient's public key, with a fresh random IV. The sender's own entry
  * is included so the sender can decrypt their own message.
  *
- * Returns null when no entry could be produced, so callers can fall back to
- * their existing plaintext behavior.
+ * `requiredRecipientIds` is the full current participant list. If any of those
+ * keys is missing or cannot be used, this returns null: silently omitting a
+ * member would send them a message they can never read.
  */
 export async function encryptGroupMessage(args: {
   privateKey: string;
@@ -64,9 +65,17 @@ export async function encryptGroupMessage(args: {
   currentUserId: string;
   plaintext: string;
   recipientPublicKeys: Record<string, string>;
+  requiredRecipientIds?: string[];
 }): Promise<GroupEncryptedMessage | null> {
   const content = args.plaintext ?? "";
   const entries: Record<string, GroupCipherEntry> = {};
+  const requiredIds = args.requiredRecipientIds
+    ? Array.from(new Set(args.requiredRecipientIds.filter(Boolean)))
+    : Object.keys(args.recipientPublicKeys);
+
+  for (const requiredId of requiredIds) {
+    if (!args.recipientPublicKeys[requiredId]) return null;
+  }
 
   for (const [userId, publicKey] of Object.entries(args.recipientPublicKeys)) {
     if (!userId || !publicKey) continue;
@@ -82,14 +91,16 @@ export async function encryptGroupMessage(args: {
       if (typeof iv !== "string" || !encrypted.content) continue;
       entries[userId] = { iv, content: encrypted.content };
     } catch {
-      // A malformed recipient key must not block the rest of the group.
+      // A malformed recipient key must not produce a partial envelope.
+      return null;
     }
   }
 
-  const recipientIds = Object.keys(entries);
-  if (recipientIds.length === 0) return null;
+  if (requiredIds.some((userId) => !entries[userId])) return null;
 
-  const ownEntry = entries[args.currentUserId] ?? entries[recipientIds[0]];
+  // The sender must always be able to read their own message.
+  const ownEntry = entries[args.currentUserId];
+  if (!ownEntry) return null;
 
   return {
     content: ownEntry.content,

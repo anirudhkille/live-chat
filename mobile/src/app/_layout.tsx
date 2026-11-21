@@ -1,25 +1,35 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
-import { router, Stack } from "expo-router";
+import { router, Stack, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
-import { useAuthStore } from "@/store/auth-store";
-import { useCallStore } from "@/features/calls/call-store";
 import { CallProvider } from "@/features/calls/call-provider";
+import { useCallStore } from "@/features/calls/call-store";
 import { E2EIdentityBootstrap } from "@/features/e2e/components/e2e-identity-bootstrap";
 import {
   registerExpoPushToken,
   registerNotificationCategories,
 } from "@/features/push-notifications/register";
+import { clearSharedSessionState } from "@/lib/session-cleanup";
+import { queryClient } from "@/lib/query-client";
+import { useAuthStore } from "@/store/auth-store";
 import { useAppTheme } from "@/theme/use-app-theme";
+
+const SAFE_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
+
+function isSafeId(value: unknown): value is string {
+  return typeof value === "string" && SAFE_ID_PATTERN.test(value);
+}
 
 function NotificationRouter() {
   const response = Notifications.useLastNotificationResponse();
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
+  const token = useAuthStore((state) => state.token);
   const handledRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!response) return;
+    if (!hasHydrated || !token || !response) return;
 
     const action = response.actionIdentifier;
     const key = `${response.notification.request.identifier}:${action}`;
@@ -27,9 +37,10 @@ function NotificationRouter() {
     handledRef.current = key;
 
     const data = response.notification.request.content.data ?? {};
-    const conversationId =
-      typeof data.conversationId === "string" ? data.conversationId : null;
-    const callId = typeof data.callId === "string" ? data.callId : null;
+    const conversationId = isSafeId(data.conversationId)
+      ? data.conversationId
+      : null;
+    const callId = isSafeId(data.callId) ? data.callId : null;
 
     if (callId && (action === "accept" || action === "decline")) {
       useCallStore.getState().setAutoAction({
@@ -43,23 +54,66 @@ function NotificationRouter() {
     }
 
     Notifications.clearLastNotificationResponseAsync().catch(() => {});
-  }, [response]);
+  }, [hasHydrated, response, token]);
+
+  return null;
+}
+
+/**
+ * Root-level guard for every non-auth route. This covers notification taps and
+ * deep links as well as normal navigation, because the guard reacts to the
+ * resolved segment rather than to individual screens.
+ */
+function useAuthGate() {
+  const segments = useSegments();
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
+  const token = useAuthStore((state) => state.token);
+
+  useEffect(() => {
+    if (!hasHydrated) return;
+
+    const inAuthGroup = segments[0] === "(auth)";
+
+    if (!token && !inAuthGroup) {
+      router.replace("/(auth)/login");
+    } else if (token && inAuthGroup) {
+      router.replace("/(tabs)");
+    }
+  }, [hasHydrated, segments, token]);
+}
+
+/**
+ * Clears user-scoped caches when the account behind an existing token changes,
+ * so a re-login cannot inherit the previous account's chats or call state.
+ */
+function SessionLifecycle() {
+  const token = useAuthStore((state) => state.token);
+  const userId = useAuthStore((state) => state.user?.id ?? null);
+  const previousUserId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!token) {
+      previousUserId.current = null;
+      return;
+    }
+
+    if (previousUserId.current && userId && previousUserId.current !== userId) {
+      clearSharedSessionState();
+    }
+
+    if (userId) {
+      previousUserId.current = userId;
+    }
+  }, [token, userId]);
 
   return null;
 }
 
 export default function RootLayout() {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: { retry: 1, staleTime: 30_000 },
-        },
-      }),
-  );
-
-  const token = useAuthStore((s) => s.token);
+  const token = useAuthStore((state) => state.token);
   const { scheme, palette } = useAppTheme();
+
+  useAuthGate();
 
   useEffect(() => {
     registerNotificationCategories().catch(() => {});
@@ -74,6 +128,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <NotificationRouter />
+      <SessionLifecycle />
       <CallProvider>
         <StatusBar style={scheme === "dark" ? "light" : "dark"} />
         <E2EIdentityBootstrap />

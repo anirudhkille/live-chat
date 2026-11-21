@@ -30,10 +30,9 @@ self.addEventListener("push", (event) => {
     options.tag = `call-${data.callId || "incoming"}`;
     options.renotify = true;
     options.requireInteraction = true;
-    options.actions = [
-      { action: "accept", title: "Accept" },
-      { action: "decline", title: "Decline" },
-    ];
+    // No accept/decline actions: accepting a call from a notification would
+    // bypass the in-app explicit tap (and there is no server-issued one-time
+    // action token), so tapping simply opens the app.
   }
 
   event.waitUntil(
@@ -57,12 +56,8 @@ self.addEventListener("notificationclick", (event) => {
   const data = event.notification?.data || {};
   const targetUrl = new URL(data.url || "/chats", self.location.origin);
 
-  if (data.callId && event.action === "accept") {
-    targetUrl.searchParams.set("accept-call", data.callId);
-  } else if (data.callId && event.action === "decline") {
-    targetUrl.searchParams.set("decline-call", data.callId);
-  }
-
+  // Never auto-accept/decline from a URL parameter; the user must tap the
+  // in-app button so consent is explicit.
   const href = targetUrl.href;
 
   event.waitUntil(

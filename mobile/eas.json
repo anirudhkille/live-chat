@@ -9,7 +9,8 @@
       "distribution": "internal",
       "channel": "development",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://localhost:8080/api"
+        "EXPO_PUBLIC_API_URL": "http://localhost:8080/api",
+        "EXPO_PUBLIC_SOCKET_URL": "http://localhost:8080"
       }
     },
     "preview": {

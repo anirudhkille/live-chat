@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { env } from "../../config/env.config.js";
 import { redis } from "../../config/redis.js";
 import { otpTemplate } from "../../templates/otp.template.js";
@@ -15,19 +16,44 @@ import {
   verifyGoogleIdToken,
 } from "./auth.google.js";
 import { logger } from "../../config/logger.js";
+import {
+  createOAuthCode,
+  createOAuthState,
+  isVerifiedGoogleUser,
+  normalizeGoogleEmail,
+  OAUTH_CODE_TTL_SECONDS,
+  OAUTH_STATE_TTL_SECONDS,
+} from "./auth.helpers.js";
 
 const OTP_TTL_SECONDS = 300;
 const OTP_RESEND_COOLDOWN_SECONDS = 60;
 const OTP_MAX_ATTEMPTS = 5;
 const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
+const REFRESH_TOKEN_PREFIX = "refreshToken:";
+const OAUTH_STATE_PREFIX = "oauthState:";
+const OAUTH_CODE_PREFIX = "oauthCode:";
+
+const CONSUME_SCRIPT =
+  'local value = redis.call("GET", KEYS[1]) if value then redis.call("DEL", KEYS[1]) end return value';
+
+// Atomically read and delete a key. GETDEL needs Redis 6.2+; the Lua fallback
+// keeps older deployments working while remaining atomic.
+const consumeRedisKey = async (key) => {
+  if (typeof redis.getdel === "function") {
+    return redis.getdel(key);
+  }
+
+  return redis.eval(CONSUME_SCRIPT, 1, key);
+};
 
 const issueSession = async (userId) => {
+  const jti = randomUUID();
   const accessToken = generateAccessToken(userId);
-  const refreshToken = generateRefreshToken(userId);
+  const refreshToken = generateRefreshToken(userId, jti);
 
   await redis.set(
-    `refreshToken:${userId}`,
-    refreshToken,
+    `${REFRESH_TOKEN_PREFIX}${jti}`,
+    userId,
     "EX",
     REFRESH_TOKEN_TTL_SECONDS,
   );
@@ -98,23 +124,26 @@ export const refreshToken = async (token) => {
     throw new AppError(401, "Invalid or expired token");
   }
 
-  if (!decoded._id) {
+  if (!decoded._id || typeof decoded.jti !== "string" || !decoded.jti) {
     throw new AppError(401, "Invalid token");
   }
 
-  const storedToken = await redis.get(`refreshToken:${decoded._id}`);
+  // Consuming the old jti makes refresh rotation single-use. Two concurrent
+  // requests carrying the same token cannot both succeed.
+  const storedUserId = await consumeRedisKey(
+    `${REFRESH_TOKEN_PREFIX}${decoded.jti}`,
+  );
 
-  if (!storedToken) {
-    throw new AppError(401, "Token doesn't exist");
+  if (!storedUserId) {
+    throw new AppError(401, "Session expired or revoked");
   }
 
-  if (storedToken !== token) {
-    await redis.del(`refreshToken:${decoded._id}`);
+  if (storedUserId !== decoded._id) {
     logger.error(
       { userId: decoded._id },
-      "Refresh token mismatch, session revoked",
+      "Refresh token user mismatch, session revoked",
     );
-    throw new AppError(401, "Token mismatch");
+    throw new AppError(401, "Invalid token");
   }
 
   return issueSession(decoded._id);
@@ -131,30 +160,90 @@ export const logout = async (token) => {
     return;
   }
 
-  if (decoded._id) {
-    await redis.del(`refreshToken:${decoded._id}`);
+  if (typeof decoded.jti === "string" && decoded.jti) {
+    await redis.del(`${REFRESH_TOKEN_PREFIX}${decoded.jti}`);
   }
 };
 
 export const updateUserProfile = async (userId, body) => {
   const { name } = body;
 
-  if (!name) {
+  if (typeof name !== "string" || !name.trim()) {
     throw new AppError(400, "Name is required");
   }
 
-  return userRepository.updateById(userId, { name });
+  return userRepository.updateById(userId, { name: name.trim() });
 };
 
-export const getGoogleAuthURL = (redirect) => {
-  return googleAuthUrl(redirect);
+export const getGoogleAuthURL = (state) => {
+  return googleAuthUrl(state);
+};
+
+export const createGoogleOAuthState = async (redirect) => {
+  const state = createOAuthState();
+
+  await redis.set(
+    `${OAUTH_STATE_PREFIX}${state}`,
+    redirect,
+    "EX",
+    OAUTH_STATE_TTL_SECONDS,
+  );
+
+  return state;
+};
+
+export const consumeGoogleOAuthState = async (state) => {
+  if (!state) return null;
+
+  return consumeRedisKey(`${OAUTH_STATE_PREFIX}${state}`);
+};
+
+export const createGoogleExchangeCode = async (session) => {
+  const code = createOAuthCode();
+
+  await redis.set(
+    `${OAUTH_CODE_PREFIX}${code}`,
+    JSON.stringify(session),
+    "EX",
+    OAUTH_CODE_TTL_SECONDS,
+  );
+
+  return code;
+};
+
+export const exchangeGoogleCode = async (code) => {
+  if (!code) return null;
+
+  const payload = await consumeRedisKey(`${OAUTH_CODE_PREFIX}${code}`);
+  if (!payload) return null;
+
+  try {
+    const session = JSON.parse(payload);
+
+    if (
+      !session?.user ||
+      typeof session.accessToken !== "string" ||
+      typeof session.refreshToken !== "string"
+    ) {
+      return null;
+    }
+
+    return session;
+  } catch {
+    return null;
+  }
 };
 
 export const googleLogin = async (code) => {
   const tokens = await getGoogleTokens(code);
   const googleUser = await getGoogleUser(tokens.access_token);
 
-  const { email, name } = googleUser;
+  if (!isVerifiedGoogleUser(googleUser)) {
+    throw new AppError(401, "Google account email is not verified");
+  }
+
+  const email = normalizeGoogleEmail(googleUser.email);
+  const { name } = googleUser;
 
   let user = await userRepository.upsertByEmail(email);
 

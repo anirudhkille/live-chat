@@ -38,3 +38,18 @@ export async function updateProfile(payload: {
 export async function logoutRequest(): Promise<void> {
   await api.post("/auth/logout");
 }
+
+/**
+ * Exchange the short-lived one-time code from the OAuth callback redirect for
+ * a real web session. The refresh cookie is set by the API response.
+ */
+export async function exchangeGoogleCode(
+  code: string
+): Promise<ApiResponse<AuthPayload>> {
+  const response = await api.post<ApiResponse<AuthPayload>>(
+    "/auth/google/exchange",
+    { code },
+    { withCredentials: true }
+  );
+  return response.data;
+}

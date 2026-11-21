@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -7,15 +7,16 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { conversationApi } from "@/features/conversations/api/conversation-api";
+import { DECRYPTION_PENDING_TEXT } from "@/features/e2e/hooks/use-decrypted-messages";
 import {
-  DECRYPTION_FAILED_TEXT,
-  DECRYPTION_PENDING_TEXT,
-} from "@/features/e2e/hooks/use-decrypted-messages";
-import { useDecryptedPreview } from "@/features/e2e/hooks/use-decrypted-preview";
+  ENCRYPTED_MESSAGE_PREVIEW,
+  useDecryptedPreview,
+} from "@/features/e2e/hooks/use-decrypted-preview";
+import { socket } from "@/lib/socket";
 import { useAppTheme } from "@/theme/use-app-theme";
 import type { Conversation, Message } from "@/types/api";
 
@@ -32,7 +33,9 @@ function getLastMessagePreview(
 
   if (isEncrypted) {
     if (isPreparing) return DECRYPTION_PENDING_TEXT;
-    return decryptedPreview ?? DECRYPTION_FAILED_TEXT;
+    // Missing peer/group keys are expected on a fresh device. Never describe
+    // the message as corrupt or show base64; a neutral label is safer.
+    return decryptedPreview ?? ENCRYPTED_MESSAGE_PREVIEW;
   }
 
   if (lastMessage.content?.trim()) return lastMessage.content;
@@ -57,10 +60,10 @@ function ConversationRow({
   onPress: () => void;
 }) {
   const peerId = conversation.isGroup ? null : conversation.otherUserId;
-  const { preview, isEncrypted, isPreparing } = useDecryptedPreview(
-    conversation.lastMessage,
+  const { preview, isEncrypted, isPreparing } = useDecryptedPreview({
+    message: conversation.lastMessage,
     peerId,
-  );
+  });
   const lastMessagePreview = getLastMessagePreview(
     conversation.lastMessage,
     preview,
@@ -84,12 +87,43 @@ function ConversationRow({
 
 export default function ConversationsScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { palette } = useAppTheme();
   const styles = useMemo(() => createStyles(palette), [palette]);
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, isRefetching, error, refetch } = useQuery({
     queryKey: ["conversations"],
     queryFn: conversationApi.list,
+    staleTime: 10_000,
   });
+
+  // Socket events update the inbox even while another tab or chat is open.
+  useEffect(() => {
+    const invalidate = () => {
+      void queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    };
+
+    socket.on("new-message", invalidate);
+    socket.on("message-deleted", invalidate);
+    socket.on("messages-read", invalidate);
+    socket.on("conversation-updated", invalidate);
+    socket.on("removed-from-group", invalidate);
+
+    return () => {
+      socket.off("new-message", invalidate);
+      socket.off("message-deleted", invalidate);
+      socket.off("messages-read", invalidate);
+      socket.off("conversation-updated", invalidate);
+      socket.off("removed-from-group", invalidate);
+    };
+  }, [queryClient]);
+
+  // Realtime can be suspended in the background; refresh whenever the tab is
+  // focused so the list cannot stay stale indefinitely.
+  useFocusEffect(
+    useCallback(() => {
+      void refetch();
+    }, [refetch]),
+  );
 
   if (isLoading) {
     return (
@@ -111,6 +145,8 @@ export default function ConversationsScreen() {
     <FlatList
       data={data ?? []}
       keyExtractor={(item) => item.id}
+      refreshing={isRefetching}
+      onRefresh={() => void refetch()}
       renderItem={({ item }) => (
         <ConversationRow
           conversation={item}

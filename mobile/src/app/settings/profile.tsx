@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { File } from "expo-file-system";
 import { Stack, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -42,6 +43,16 @@ function getImageContentType(asset: ImagePicker.ImagePickerAsset) {
   if (name.endsWith(".webp")) return "image/webp";
   if (name.endsWith(".heic") || name.endsWith(".heif")) return "image/heic";
   return "image/jpeg";
+}
+
+function getAssetFileSize(asset: ImagePicker.ImagePickerAsset) {
+  if (asset.fileSize && asset.fileSize > 0) return asset.fileSize;
+
+  try {
+    return new File(asset.uri).size;
+  } catch {
+    return 0;
+  }
 }
 
 export default function EditProfileScreen() {
@@ -99,6 +110,14 @@ export default function EditProfileScreen() {
       if (!asset) return;
 
       if (asset.fileSize && asset.fileSize > MAX_AVATAR_SIZE) {
+        setFormError("Choose an image that is 5MB or smaller.");
+        return;
+      }
+
+      // `fileSize` is not populated on every platform, so verify the real
+      // file size before handing the URI to the uploader.
+      const fileSize = getAssetFileSize(asset);
+      if (!fileSize || fileSize > MAX_AVATAR_SIZE) {
         setFormError("Choose an image that is 5MB or smaller.");
         return;
       }

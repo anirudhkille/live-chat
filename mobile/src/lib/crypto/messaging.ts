@@ -66,6 +66,12 @@ export async function encryptGroupMessage(args: {
   currentUserId: string;
   plaintext: string;
   recipientPublicKeys: Record<string, string>;
+  /**
+   * Every participant that must be able to read the message. When provided,
+   * the function returns null unless an entry exists for each id; callers use
+   * this to avoid sending a partial envelope.
+   */
+  requiredRecipientIds?: string[];
 }): Promise<GroupEncryptedMessage | null> {
   const content = args.plaintext ?? "";
   const entries: Record<string, GroupCipherEntry> = {};
@@ -87,6 +93,11 @@ export async function encryptGroupMessage(args: {
       // A malformed recipient key must not block the rest of the group.
     }
   }
+
+  const requiredIds = args.requiredRecipientIds
+    ? Array.from(new Set(args.requiredRecipientIds))
+    : Object.keys(args.recipientPublicKeys);
+  if (requiredIds.some((userId) => !entries[userId])) return null;
 
   const recipientIds = Object.keys(entries);
   if (recipientIds.length === 0) return null;

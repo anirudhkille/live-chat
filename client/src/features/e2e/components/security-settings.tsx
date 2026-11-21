@@ -2,9 +2,11 @@
 
 import { useState, useSyncExternalStore } from "react";
 import { ShieldCheck, ShieldAlert } from "lucide-react";
+import { sha256 } from "@noble/hashes/sha2.js";
 import { Button } from "@/components/ui/button";
 import { useUserKey } from "@/features/e2e/hooks/useUserKey";
 import { useE2EIdentity } from "@/features/e2e/hooks/useE2EIdentity";
+import { base64ToBytes } from "@/lib/crypto/crypto";
 import { isPasskeyRecoverySupported } from "@/lib/crypto/passkey";
 import {
   isPasskeyRecoveryBlob,
@@ -15,7 +17,17 @@ import { E2ERecoveryBanner } from "./e2e-recovery-banner";
 import { E2ESetupDialog } from "./e2e-setup-dialog";
 
 function fingerprint(publicKey: string): string {
-  return publicKey.slice(0, 16);
+  try {
+    const digest = sha256(base64ToBytes(publicKey));
+    const hex = Array.from(digest)
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("")
+      .slice(0, 32)
+      .toUpperCase();
+    return hex.match(/.{1,4}/g)?.join(" ") ?? hex;
+  } catch {
+    return publicKey.slice(0, 16);
+  }
 }
 
 const subscribeToNothing = () => () => {};
@@ -91,13 +103,19 @@ export function SecuritySettings() {
         <E2ERecoveryBanner
           onRestore={(passphrase) => {
             if (!passphraseBlob) return;
-            restore({ passphrase, recoveryBlob: passphraseBlob });
+            restore({ passphrase, recoveryBlob: passphraseBlob }).catch(
+              () => {}
+            );
           }}
           onRestorePasskey={
-            passkeyBlob ? () => restoreWithPasskey(passkeyBlob) : undefined
+            passkeyBlob
+              ? () => restoreWithPasskey(passkeyBlob).catch(() => {})
+              : undefined
           }
           usePasskey={Boolean(passkeyBlob)}
-          onReset={(passphrase) => setup(passphrase)}
+          onReset={(passphrase) =>
+            setup(passphrase, { confirmRotation: true }).catch(() => {})
+          }
           isPending={isRestoring || isSettingUp || isRestoringWithPasskey}
           error={passkeyRestoreError ?? restoreError ?? setupError}
         />
@@ -155,21 +173,23 @@ export function SecuritySettings() {
         </>
       )}
 
-      <E2ESetupDialog
-        open={passphraseOpen}
-        onClose={() => setPassphraseOpen(false)}
-        onSetup={(passphrase) => {
-          if (!keys) return;
-          addPassphrase({ passphrase, keys })
-            .then(() => setPassphraseOpen(false))
-            .catch(() => {});
-        }}
-        isPending={isAddingPassphrase}
-        error={(addPassphraseError ?? setupError) as Error | null}
-        title="Set up recovery passphrase"
-        description="Optional. Encrypts a copy of your keys so you can restore them on another device. We cannot reset this passphrase for you."
-        submitLabel="Save passphrase"
-      />
+      {passphraseOpen && (
+        <E2ESetupDialog
+          open={passphraseOpen}
+          onClose={() => setPassphraseOpen(false)}
+          onSetup={(passphrase) => {
+            if (!keys) return;
+            addPassphrase({ passphrase, keys })
+              .then(() => setPassphraseOpen(false))
+              .catch(() => {});
+          }}
+          isPending={isAddingPassphrase}
+          error={(addPassphraseError ?? setupError) as Error | null}
+          title="Set up recovery passphrase"
+          description="Optional. Encrypts a copy of your keys so you can restore them on another device. We cannot reset this passphrase for you."
+          submitLabel="Save passphrase"
+        />
+      )}
     </div>
   );
 }

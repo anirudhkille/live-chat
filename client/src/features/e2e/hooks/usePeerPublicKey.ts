@@ -4,6 +4,10 @@ import { getPeerPublicKey } from "../api/user-key-api";
 
 const cache = new Map<string, string>();
 
+export function clearPeerPublicKeyCache(): void {
+  cache.clear();
+}
+
 export function usePeerPublicKey(peerId: string | null) {
   return useQuery({
     queryKey: ["user-key", "peer", peerId],

@@ -62,7 +62,7 @@ function VideoTile({
         <video
           autoPlay
           playsInline
-          muted={local}
+          muted
           ref={(node) => {
             if (node) node.srcObject = stream;
           }}
@@ -87,6 +87,26 @@ function VideoTile({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Remote call audio is kept in its own permanently-mounted element, separate
+ * from the video tiles. Turning a camera off (or never rendering a video tile
+ * for a voice call) must not silence the remote participant.
+ */
+function RemoteAudio({ stream }: { stream: MediaStream | null }) {
+  return (
+    <audio
+      autoPlay
+      playsInline
+      className="hidden"
+      ref={(node) => {
+        if (node) node.srcObject = stream;
+      }}
+    >
+      <track kind="captions" />
+    </audio>
   );
 }
 
@@ -208,6 +228,12 @@ export function CallOverlay({
 
   return (
     <div className="bg-background/95 fixed inset-0 z-50 flex flex-col backdrop-blur-sm">
+      {remotes.map((participant) => (
+        <RemoteAudio
+          key={`audio-${participant.userId}`}
+          stream={participant.stream}
+        />
+      ))}
       {(status === "active" || status === "incoming") && (
         <div className="flex items-center justify-center gap-2 px-4 pt-4">
           {isGroup && (
@@ -254,6 +280,7 @@ export function CallOverlay({
               <video
                 autoPlay
                 playsInline
+                muted
                 ref={(node) => {
                   if (node) node.srcObject = remotes[0].stream;
                 }}

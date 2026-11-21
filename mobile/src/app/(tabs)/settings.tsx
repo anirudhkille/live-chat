@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -9,6 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { sha256 } from "@noble/hashes/sha2.js";
 
 import {
   SettingsRow,
@@ -16,6 +18,8 @@ import {
 } from "@/features/settings/components/settings-row";
 import { useE2EIdentity } from "@/features/e2e/hooks/use-e2e-identity";
 import { UserAvatar } from "@/features/groups/components/user-avatar";
+import { base64ToBytes } from "@/lib/crypto/crypto";
+import { logout } from "@/lib/session";
 import { useAuthStore } from "@/store/auth-store";
 import { useAppTheme, type ThemePreference } from "@/theme/use-app-theme";
 
@@ -29,27 +33,44 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { palette, preference } = useAppTheme();
   const styles = useMemo(() => createStyles(palette), [palette]);
+  const [loggingOut, setLoggingOut] = useState(false);
   const user = useAuthStore((s) => s.user);
-  const clearSession = useAuthStore((s) => s.clearSession);
-  const { status: e2eStatus } = useE2EIdentity();
+  const { status: e2eStatus, publicKey } = useE2EIdentity();
 
   const e2eDescription =
     e2eStatus === "ready"
-      ? "End-to-end encryption is active for direct messages on this device."
+      ? "End-to-end encryption is active for conversations on this device."
       : e2eStatus === "loading"
         ? "Checking encryption keys…"
         : e2eStatus === "server-key-missing-local"
-          ? "Your encryption keys exist on another device. Direct messages stay unencrypted here until you restore them from the web app."
-          : "Encryption setup is unavailable. Messages will continue to send unencrypted.";
+          ? "Your encryption keys exist on another device. Restore them from the web app before sending messages here."
+          : "Encryption setup is unavailable. Messages can't be sent until it is restored.";
 
   const e2eValue =
     e2eStatus === "ready"
       ? "Active"
       : e2eStatus === "loading"
         ? "Checking"
-        : "Plaintext";
+        : "Unavailable";
+
+  const fingerprint = useMemo(() => {
+    if (!publicKey) return null;
+
+    try {
+      const digest = sha256(base64ToBytes(publicKey));
+      const hex = Array.from(digest)
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("")
+        .toUpperCase();
+      return hex.match(/.{1,4}/g)?.join(" ") ?? hex;
+    } catch {
+      return null;
+    }
+  }, [publicKey]);
 
   const onLogout = () => {
+    if (loggingOut) return;
+
     Alert.alert(
       "Log out?",
       "You'll need to log in again to access your chats.",
@@ -59,8 +80,11 @@ export default function SettingsScreen() {
           text: "Log out",
           style: "destructive",
           onPress: () => {
-            clearSession();
-            router.replace("/(auth)/login");
+            setLoggingOut(true);
+            void logout().finally(() => {
+              setLoggingOut(false);
+              router.replace("/(auth)/login");
+            });
           },
         },
       ],
@@ -119,19 +143,34 @@ export default function SettingsScreen() {
           label="Security & encryption"
           description={e2eDescription}
           value={e2eValue}
-          showDivider={false}
+          showDivider={Boolean(fingerprint)}
         />
+        {fingerprint ? (
+          <SettingsRow
+            icon="finger-print-outline"
+            label="Key fingerprint"
+            description={`SHA-256 fingerprint of this device's public encryption key: ${fingerprint}`}
+            showDivider={false}
+          />
+        ) : null}
       </SettingsSection>
 
       <TouchableOpacity
-        style={styles.logoutButton}
+        style={[styles.logoutButton, loggingOut && styles.logoutDisabled]}
         onPress={onLogout}
+        disabled={loggingOut}
         accessibilityRole="button"
         accessibilityLabel="Log out"
         activeOpacity={0.7}
       >
-        <Ionicons name="log-out-outline" size={18} color={palette.danger} />
-        <Text style={styles.logoutText}>Log out</Text>
+        {loggingOut ? (
+          <ActivityIndicator color={palette.danger} size="small" />
+        ) : (
+          <Ionicons name="log-out-outline" size={18} color={palette.danger} />
+        )}
+        <Text style={styles.logoutText}>
+          {loggingOut ? "Logging out…" : "Log out"}
+        </Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -166,4 +205,5 @@ const createStyles = (palette: ReturnType<typeof useAppTheme>["palette"]) =>
       backgroundColor: palette.card,
     },
     logoutText: { color: palette.danger, fontSize: 15, fontWeight: "600" },
+    logoutDisabled: { opacity: 0.6 },
   });

@@ -17,6 +17,10 @@ import {
 } from "@/features/e2e/hooks/usePeerPublicKey";
 import { deriveConversationKey } from "@/lib/crypto/conversationKey";
 import { encryptGroupMessage, encryptMessage } from "@/lib/crypto/messaging";
+import {
+  getEncryptionBlocker,
+  getEncryptionReadiness,
+} from "@/features/conversations/lib/message-encryption";
 import dynamic from "next/dynamic";
 import {
   uploadAttachment,
@@ -76,12 +80,26 @@ export function MessageInput({
     [isGroup, participantIds, currentUserId]
   );
   const { publicKeys: groupPublicKeys } = usePeerPublicKeys(groupPeerIds);
-  const canEncrypt = !isGroup && !!keys && !!peerPublicKey;
-  const canEncryptGroup =
-    isGroup &&
-    !!keys &&
-    !!currentUserId &&
-    Object.keys(groupPublicKeys).length > 0;
+  const encryptionReadiness = useMemo(
+    () =>
+      getEncryptionReadiness({
+        isGroup,
+        hasKeys: !!keys,
+        currentUserId: currentUserId ?? null,
+        peerPublicKey,
+        participantIds,
+        groupPublicKeys,
+      }),
+    [
+      isGroup,
+      keys,
+      currentUserId,
+      peerPublicKey,
+      participantIds,
+      groupPublicKeys,
+    ]
+  );
+
   const typingStopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
@@ -220,42 +238,73 @@ export function MessageInput({
       return;
     }
 
-    sendingRef.current = true;
+    setSendError(null);
+
+    // Never fall back to plaintext: if there is text and encryption is not
+    // available, block the send and explain why.
+    const blocker = getEncryptionBlocker(
+      encryptionReadiness,
+      rawContent.length > 0
+    );
+    if (blocker) {
+      setSendError(blocker);
+      return;
+    }
 
     let content = rawContent;
     let cipherMeta: Record<string, unknown> | undefined;
-    setSendError(null);
 
-    try {
-      if (canEncrypt && rawContent) {
-        const conversationKey = deriveConversationKey({
-          privateKey: keys.privateKey,
-          peerPublicKey,
-          conversationId,
-        });
-        const encrypted = await encryptMessage(conversationKey, rawContent);
-        content = encrypted.content;
-        cipherMeta = encrypted.cipherMeta;
-      } else if (canEncryptGroup && rawContent && keys && currentUserId) {
-        const encrypted = await encryptGroupMessage({
-          privateKey: keys.privateKey,
-          conversationId,
-          currentUserId,
-          plaintext: rawContent,
-          recipientPublicKeys: {
-            ...groupPublicKeys,
-            [currentUserId]: keys.publicKey,
-          },
-        });
-        if (encrypted) {
+    if (rawContent) {
+      try {
+        if (isGroup) {
+          if (!keys || !currentUserId) {
+            setSendError("Encryption not ready. Try again in a moment.");
+            return;
+          }
+
+          const encrypted = await encryptGroupMessage({
+            privateKey: keys.privateKey,
+            conversationId,
+            currentUserId,
+            plaintext: rawContent,
+            recipientPublicKeys: {
+              ...groupPublicKeys,
+              [currentUserId]: keys.publicKey,
+            },
+            requiredRecipientIds: encryptionReadiness.requiredIds,
+          });
+
+          if (!encrypted) {
+            setSendError(
+              "Couldn't encrypt this message for everyone in the group. Please try again."
+            );
+            return;
+          }
+
+          content = encrypted.content;
+          cipherMeta = encrypted.cipherMeta;
+        } else {
+          if (!keys || !peerPublicKey) {
+            setSendError("Encryption not ready. Try again in a moment.");
+            return;
+          }
+
+          const conversationKey = deriveConversationKey({
+            privateKey: keys.privateKey,
+            peerPublicKey,
+            conversationId,
+          });
+          const encrypted = await encryptMessage(conversationKey, rawContent);
           content = encrypted.content;
           cipherMeta = encrypted.cipherMeta;
         }
+      } catch {
+        setSendError("Couldn't encrypt this message. Please try again.");
+        return;
       }
-    } catch (error) {
-      sendingRef.current = false;
-      throw error;
     }
+
+    sendingRef.current = true;
 
     sendMessage.mutate(
       {
@@ -294,12 +343,12 @@ export function MessageInput({
     clearDraft,
     replyTo,
     setReplyTo,
-    canEncrypt,
+    encryptionReadiness,
     keys,
     peerPublicKey,
-    canEncryptGroup,
     currentUserId,
     groupPublicKeys,
+    isGroup,
   ]);
 
   const handleKeyDown = useCallback(
@@ -348,6 +397,11 @@ export function MessageInput({
       )}
       {pickerError && (
         <p className="text-destructive px-3 pt-2 text-[11px]">{pickerError}</p>
+      )}
+      {pending.length > 0 && (
+        <p className="text-muted-foreground px-3 pt-2 text-[11px]">
+          Photos and files are not end-to-end encrypted.
+        </p>
       )}
       {sendError && (
         <p role="alert" className="text-destructive px-3 pt-2 text-[11px]">

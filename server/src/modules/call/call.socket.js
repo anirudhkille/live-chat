@@ -10,6 +10,7 @@ import {
 import * as pushService from "../push/push.service.js";
 import * as callRepository from "./call.repository.js";
 import { writeCallLog, writeCallLogsForCall } from "./call.service.js";
+import { validateInitiateCallId } from "./call.validation.js";
 import {
   MAX_CALL_PARTICIPANTS,
   RING_TIMEOUT_MS,
@@ -33,6 +34,7 @@ const CALL_TYPES = new Set(["voice", "video"]);
 
 const calls = new Map();
 const pendingTimers = new Map();
+const reservedCallIds = new Set();
 
 let emitToUserRef = null;
 const getCall = (callId) => (callId ? calls.get(callId) : undefined);
@@ -129,8 +131,9 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
     if (!CALL_TYPES.has(type) || !conversationId) return;
     if (targetUserId && targetUserId === socket.userId) return;
 
-    const resolvedCallId =
-      typeof callId === "string" && callId.length > 0 ? callId : randomUUID();
+    const clientProvidedCallId =
+      typeof callId === "string" && callId.length > 0;
+    const resolvedCallId = clientProvidedCallId ? callId : randomUUID();
 
     if (findCallForUser(socket.userId) || getCall(resolvedCallId)) {
       send(socket.id, "call:unavailable", {
@@ -143,207 +146,290 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
       return;
     }
 
-    let conversation;
+    if (reservedCallIds.has(resolvedCallId)) {
+      send(socket.id, "call:unavailable", {
+        callId: resolvedCallId,
+        conversationId,
+        targetUserId: targetUserId ?? null,
+        type,
+        reason: "busy",
+      });
+      return;
+    }
+
+    reservedCallIds.add(resolvedCallId);
     try {
-      conversation =
-        await callRepository.findConversationForCall(conversationId);
-    } catch (error) {
-      logger.error(
-        { err: error.message, conversationId },
-        "Failed to load conversation for call",
-      );
-      return;
-    }
-    if (!conversation) {
-      send(socket.id, "call:unavailable", {
-        callId: resolvedCallId,
-        conversationId,
-        targetUserId: targetUserId ?? null,
-        type,
-        reason: "unavailable",
-      });
-      return;
-    }
+      if (clientProvidedCallId) {
+        let persistedCall = null;
+        let pendingCall = null;
+        const [persistedResult, pendingResult] = await Promise.allSettled([
+          callRepository.findByCallId(resolvedCallId),
+          getPendingCall(resolvedCallId),
+        ]);
 
-    const me = conversation.participants.find(
-      (participant) => participant.userId === socket.userId,
-    );
-    if (!me) return;
+        if (persistedResult.status === "fulfilled") {
+          persistedCall = persistedResult.value;
+        } else {
+          logger.error(
+            { err: persistedResult.reason?.message, callId: resolvedCallId },
+            "Failed to validate call id against call history",
+          );
+        }
+        if (pendingResult.status === "fulfilled") {
+          pendingCall = pendingResult.value;
+        } else {
+          logger.error(
+            { err: pendingResult.reason?.message, callId: resolvedCallId },
+            "Failed to validate call id against pending calls",
+          );
+        }
 
-    const others = conversation.participants.filter(
-      (participant) => participant.userId !== socket.userId,
-    );
-    if (
-      targetUserId &&
-      !others.some((participant) => participant.userId === targetUserId)
-    ) {
-      return;
-    }
-
-    const targets = targetUserId
-      ? others.filter((participant) => participant.userId === targetUserId)
-      : others;
-
-    if (targets.length === 0) {
-      send(socket.id, "call:unavailable", {
-        callId: resolvedCallId,
-        conversationId,
-        targetUserId: targetUserId ?? null,
-        type,
-        reason: "unavailable",
-      });
-      return;
-    }
-
-    if (targets.length + 1 > MAX_CALL_PARTICIPANTS) {
-      send(socket.id, "call:unavailable", {
-        callId: resolvedCallId,
-        conversationId,
-        targetUserId: targetUserId ?? null,
-        type,
-        reason: "tooMany",
-      });
-      return;
-    }
-
-    const isGroup = targetUserId
-      ? false
-      : Boolean(conversation.isGroup || targets.length > 1);
-    const resolvedCallerName = me.user?.name ?? callerName ?? null;
-
-    const busyTargets = targets.filter(
-      (participant) => findCallForUser(participant.userId) !== null,
-    );
-    const reachableTargets = targets.filter(
-      (participant) => findCallForUser(participant.userId) === null,
-    );
-    const onlineTargets = reachableTargets.filter((participant) =>
-      isUserOnline(participant.userId),
-    );
-    const offlineTargets = reachableTargets.filter(
-      (participant) => !isUserOnline(participant.userId),
-    );
-    const pushTargets = offlineTargets.filter(
-      (participant) => participant.user?.pushNotifications,
-    );
-    const silentTargets = offlineTargets.filter(
-      (participant) => !participant.user?.pushNotifications,
-    );
-
-    if (
-      !isGroup &&
-      onlineTargets.length === 0 &&
-      offlineTargets.length === 1 &&
-      busyTargets.length === 0
-    ) {
-      const target = offlineTargets[0];
-      let canPush = false;
-      try {
-        canPush = Boolean(target.user?.pushNotifications);
-      } catch (error) {
-        logger.error(
-          { err: error.message, targetUserId: target.userId },
-          "Failed to load call target",
-        );
+        const validation = validateInitiateCallId({
+          callId: resolvedCallId,
+          activeCall: Boolean(getCall(resolvedCallId)),
+          pendingCall: Boolean(pendingCall),
+          persistedCall: Boolean(persistedCall),
+        });
+        if (!validation.ok) {
+          send(socket.id, "call:unavailable", {
+            callId: resolvedCallId,
+            conversationId,
+            targetUserId: targetUserId ?? null,
+            type,
+            reason: validation.reason,
+          });
+          return;
+        }
       }
 
-      if (!canPush) {
-        send(socket.id, "call:unavailable", {
-          callId: resolvedCallId,
-          conversationId,
-          targetUserId: target.userId,
-          type,
-          reason: "offline",
-        });
+      let conversation;
+      try {
+        conversation =
+          await callRepository.findConversationForCall(conversationId);
+      } catch (error) {
+        logger.error(
+          { err: error.message, conversationId },
+          "Failed to load conversation for call",
+        );
         return;
       }
-
-      const pending = {
-        callId: resolvedCallId,
-        type,
-        conversationId,
-        conversationName: conversation.name ?? null,
-        callerId: socket.userId,
-        callerSocketId: socket.id,
-        callerName: resolvedCallerName,
-        calleeId: target.userId,
-        status: "pending",
-        startedAt: new Date(),
-      };
-
-      try {
-        await setPendingCall(pending);
-      } catch (error) {
-        logger.error(
-          { err: error.message, callId: resolvedCallId },
-          "Failed to store pending call",
-        );
+      if (!conversation) {
         send(socket.id, "call:unavailable", {
           callId: resolvedCallId,
           conversationId,
-          targetUserId: target.userId,
+          targetUserId: targetUserId ?? null,
           type,
           reason: "unavailable",
         });
         return;
       }
 
-      clearPendingTimer(resolvedCallId);
-      pendingTimers.set(
-        resolvedCallId,
-        setTimeout(async () => {
-          pendingTimers.delete(resolvedCallId);
-          try {
-            const record = await getPendingCall(resolvedCallId);
-            if (!record || record.status !== "pending") return;
-            if (emitToUserRef) {
-              emitToUserRef(record.callerId, "call:pending-timed-out", {
-                callId: resolvedCallId,
-              });
-              emitToUserRef(record.calleeId, "call:cancelled", {
-                callId: resolvedCallId,
-              });
-            }
-            await deletePendingCall(resolvedCallId, record.calleeId);
-            writeCallLog(record, "missed");
-          } catch (error) {
-            logger.error(
-              { err: error.message, callId: resolvedCallId },
-              "Pending call timeout failed",
-            );
-          }
-        }, PENDING_CALL_TTL_MS),
+      const me = conversation.participants.find(
+        (participant) => participant.userId === socket.userId,
       );
+      if (!me) return;
 
-      send(socket.id, "call:pending", {
-        callId: resolvedCallId,
-        type,
-        conversationId,
-        targetUserId: target.userId,
-        callerName: resolvedCallerName,
-      });
+      const others = conversation.participants.filter(
+        (participant) => participant.userId !== socket.userId,
+      );
+      if (
+        targetUserId &&
+        !others.some((participant) => participant.userId === targetUserId)
+      ) {
+        return;
+      }
 
-      await pushService.sendCallNotification({
-        userId: target.userId,
-        callerName: resolvedCallerName,
-        conversationId,
-        callType: type,
-        callId: resolvedCallId,
-      });
+      const targets = targetUserId
+        ? others.filter((participant) => participant.userId === targetUserId)
+        : others;
 
-      logger.info(
-        {
+      if (targets.length === 0) {
+        send(socket.id, "call:unavailable", {
           callId: resolvedCallId,
-          callerId: socket.userId,
-          calleeId: target.userId,
-        },
-        "Pending call created",
-      );
-      return;
-    }
+          conversationId,
+          targetUserId: targetUserId ?? null,
+          type,
+          reason: "unavailable",
+        });
+        return;
+      }
 
-    if (onlineTargets.length === 0 && pushTargets.length === 0) {
-      const emptyCall = createCall({
+      if (targets.length + 1 > MAX_CALL_PARTICIPANTS) {
+        send(socket.id, "call:unavailable", {
+          callId: resolvedCallId,
+          conversationId,
+          targetUserId: targetUserId ?? null,
+          type,
+          reason: "tooMany",
+        });
+        return;
+      }
+
+      const isGroup = targetUserId
+        ? false
+        : Boolean(conversation.isGroup || targets.length > 1);
+      const resolvedCallerName = me.user?.name ?? callerName ?? null;
+
+      const busyTargets = targets.filter(
+        (participant) => findCallForUser(participant.userId) !== null,
+      );
+      const reachableTargets = targets.filter(
+        (participant) => findCallForUser(participant.userId) === null,
+      );
+      const onlineTargets = reachableTargets.filter((participant) =>
+        isUserOnline(participant.userId),
+      );
+      const offlineTargets = reachableTargets.filter(
+        (participant) => !isUserOnline(participant.userId),
+      );
+      const pushTargets = offlineTargets.filter(
+        (participant) => participant.user?.pushNotifications,
+      );
+      const silentTargets = offlineTargets.filter(
+        (participant) => !participant.user?.pushNotifications,
+      );
+
+      if (
+        !isGroup &&
+        onlineTargets.length === 0 &&
+        offlineTargets.length === 1 &&
+        busyTargets.length === 0
+      ) {
+        const target = offlineTargets[0];
+        let canPush = false;
+        try {
+          canPush = Boolean(target.user?.pushNotifications);
+        } catch (error) {
+          logger.error(
+            { err: error.message, targetUserId: target.userId },
+            "Failed to load call target",
+          );
+        }
+
+        if (!canPush) {
+          send(socket.id, "call:unavailable", {
+            callId: resolvedCallId,
+            conversationId,
+            targetUserId: target.userId,
+            type,
+            reason: "offline",
+          });
+          return;
+        }
+
+        const pending = {
+          callId: resolvedCallId,
+          type,
+          conversationId,
+          conversationName: conversation.name ?? null,
+          callerId: socket.userId,
+          callerSocketId: socket.id,
+          callerName: resolvedCallerName,
+          calleeId: target.userId,
+          status: "pending",
+          startedAt: new Date(),
+        };
+
+        try {
+          await setPendingCall(pending);
+        } catch (error) {
+          logger.error(
+            { err: error.message, callId: resolvedCallId },
+            "Failed to store pending call",
+          );
+          send(socket.id, "call:unavailable", {
+            callId: resolvedCallId,
+            conversationId,
+            targetUserId: target.userId,
+            type,
+            reason: "unavailable",
+          });
+          return;
+        }
+
+        clearPendingTimer(resolvedCallId);
+        pendingTimers.set(
+          resolvedCallId,
+          setTimeout(async () => {
+            pendingTimers.delete(resolvedCallId);
+            try {
+              const record = await getPendingCall(resolvedCallId);
+              if (!record || record.status !== "pending") return;
+              if (emitToUserRef) {
+                emitToUserRef(record.callerId, "call:pending-timed-out", {
+                  callId: resolvedCallId,
+                });
+                emitToUserRef(record.calleeId, "call:cancelled", {
+                  callId: resolvedCallId,
+                });
+              }
+              await deletePendingCall(resolvedCallId, record.calleeId);
+              writeCallLog(record, "missed");
+            } catch (error) {
+              logger.error(
+                { err: error.message, callId: resolvedCallId },
+                "Pending call timeout failed",
+              );
+            }
+          }, PENDING_CALL_TTL_MS),
+        );
+
+        send(socket.id, "call:pending", {
+          callId: resolvedCallId,
+          type,
+          conversationId,
+          targetUserId: target.userId,
+          callerName: resolvedCallerName,
+        });
+
+        await pushService.sendCallNotification({
+          userId: target.userId,
+          callerName: resolvedCallerName,
+          conversationId,
+          callType: type,
+          callId: resolvedCallId,
+        });
+
+        logger.info(
+          {
+            callId: resolvedCallId,
+            callerId: socket.userId,
+            calleeId: target.userId,
+          },
+          "Pending call created",
+        );
+        return;
+      }
+
+      if (onlineTargets.length === 0 && pushTargets.length === 0) {
+        const emptyCall = createCall({
+          callId: resolvedCallId,
+          type,
+          conversationId,
+          conversationName: conversation.name ?? null,
+          callerId: socket.userId,
+          callerName: resolvedCallerName,
+          isGroup,
+        });
+        for (const participant of targets) {
+          addParticipant(emptyCall, {
+            userId: participant.userId,
+            name: participant.user?.name ?? null,
+            state: PARTICIPANT_STATE.missed,
+          });
+        }
+        void writeCallLogsForCall(emptyCall);
+        send(socket.id, "call:unavailable", {
+          callId: resolvedCallId,
+          conversationId,
+          targetUserId: targetUserId ?? null,
+          type,
+          reason: "offline",
+        });
+        return;
+      }
+
+      const call = createCall({
         callId: resolvedCallId,
         type,
         conversationId,
@@ -352,87 +438,63 @@ export const registerCallHandlers = ({ io, socket, getOnline, emitToUser }) => {
         callerName: resolvedCallerName,
         isGroup,
       });
-      for (const participant of targets) {
-        addParticipant(emptyCall, {
+
+      addParticipant(call, {
+        userId: socket.userId,
+        name: resolvedCallerName,
+        state: PARTICIPANT_STATE.joined,
+        socketId: socket.id,
+      });
+
+      for (const participant of [...onlineTargets, ...pushTargets]) {
+        addParticipant(call, {
+          userId: participant.userId,
+          name: participant.user?.name ?? null,
+          state: PARTICIPANT_STATE.ringing,
+        });
+      }
+      for (const participant of [...busyTargets, ...silentTargets]) {
+        addParticipant(call, {
           userId: participant.userId,
           name: participant.user?.name ?? null,
           state: PARTICIPANT_STATE.missed,
         });
       }
-      void writeCallLogsForCall(emptyCall);
-      send(socket.id, "call:unavailable", {
-        callId: resolvedCallId,
-        conversationId,
-        targetUserId: targetUserId ?? null,
-        type,
-        reason: "offline",
-      });
-      return;
+
+      calls.set(call.callId, call);
+      armRingTimeout(call);
+
+      const ringPayload = buildRingPayload(call);
+
+      socket.emit("call:initiated", ringPayload);
+      for (const participant of onlineTargets) {
+        emitToUserRef(participant.userId, "call:ringing", ringPayload);
+      }
+
+      for (const participant of pushTargets) {
+        void pushService.sendCallNotification({
+          userId: participant.userId,
+          callerName: resolvedCallerName,
+          conversationId,
+          callType: type,
+          callId: call.callId,
+          isGroup: call.isGroup,
+          conversationName: call.conversationName,
+        });
+      }
+
+      logger.info(
+        {
+          callId: call.callId,
+          callerId: call.callerId,
+          isGroup: call.isGroup,
+          targets: targets.length,
+        },
+        "Call initiated",
+      );
+    } finally {
+      reservedCallIds.delete(resolvedCallId);
     }
-
-    const call = createCall({
-      callId: resolvedCallId,
-      type,
-      conversationId,
-      conversationName: conversation.name ?? null,
-      callerId: socket.userId,
-      callerName: resolvedCallerName,
-      isGroup,
-    });
-
-    addParticipant(call, {
-      userId: socket.userId,
-      name: resolvedCallerName,
-      state: PARTICIPANT_STATE.joined,
-      socketId: socket.id,
-    });
-
-    for (const participant of [...onlineTargets, ...pushTargets]) {
-      addParticipant(call, {
-        userId: participant.userId,
-        name: participant.user?.name ?? null,
-        state: PARTICIPANT_STATE.ringing,
-      });
-    }
-    for (const participant of [...busyTargets, ...silentTargets]) {
-      addParticipant(call, {
-        userId: participant.userId,
-        name: participant.user?.name ?? null,
-        state: PARTICIPANT_STATE.missed,
-      });
-    }
-
-    calls.set(call.callId, call);
-    armRingTimeout(call);
-
-    const ringPayload = buildRingPayload(call);
-
-    socket.emit("call:initiated", ringPayload);
-    for (const participant of onlineTargets) {
-      emitToUserRef(participant.userId, "call:ringing", ringPayload);
-    }
-
-    for (const participant of pushTargets) {
-      void pushService.sendCallNotification({
-        userId: participant.userId,
-        callerName: resolvedCallerName,
-        conversationId,
-        callType: type,
-        callId: call.callId,
-        isGroup: call.isGroup,
-        conversationName: call.conversationName,
-      });
-    }
-
-    logger.info(
-      {
-        callId: call.callId,
-        callerId: call.callerId,
-        isGroup: call.isGroup,
-        targets: targets.length,
-      },
-      "Call initiated",
-    );
   });
 
   socket.on("call:accept", (payload) => {

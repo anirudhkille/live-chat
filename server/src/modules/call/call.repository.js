@@ -20,6 +20,17 @@ export const findByParticipant = (userId, { status } = {}) => {
   });
 };
 
+export const findByCallId = (callId) => {
+  // Group call logs use `${callId}:${userId}` keys, so check both the exact id
+  // and ids derived from it to stop clients from reusing a broadcast id.
+  return prisma.call.findFirst({
+    where: {
+      OR: [{ callId }, { callId: { startsWith: `${callId}:` } }],
+    },
+    select: { id: true },
+  });
+};
+
 export const findUsersByIds = (ids) => {
   return prisma.user.findMany({
     where: { id: { in: ids } },

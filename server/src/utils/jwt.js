@@ -7,8 +7,8 @@ export const generateAccessToken = (_id) => {
   });
 };
 
-export const generateRefreshToken = (_id) => {
-  return jwt.sign({ _id: _id }, env.JWT_REFRESH_SECRET, {
+export const generateRefreshToken = (_id, jti) => {
+  return jwt.sign({ _id, jti }, env.JWT_REFRESH_SECRET, {
     expiresIn: "7d",
   });
 };

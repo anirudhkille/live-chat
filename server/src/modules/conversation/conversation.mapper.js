@@ -1,9 +1,10 @@
+import { toLastMessagePreview } from "../message/message.mapper.js";
+
 export const toParticipants = (participants) =>
   (participants ?? []).map((p) => ({
     id: p.userId,
     name: p.user.name,
     avatar: p.user.avatar,
-    email: p.user.email,
     role: p.role,
   }));
 
@@ -20,18 +21,19 @@ export const toConversationResponse = (conversation, userId) => {
     photoUrl: isGroup ? conversation.photoUrl : otherUser?.user?.avatar,
     email: isGroup ? null : (otherUser?.user?.email ?? null),
     otherUserId: otherUser?.userId ?? null,
-    isOnline: isGroup ? null : peerVisible ? otherUser?.user?.isOnline ?? false : false,
-    lastOnlineAt: isGroup ? null : peerVisible ? otherUser?.user?.lastOnlineAt ?? null : null,
+    isOnline: isGroup
+      ? null
+      : peerVisible
+        ? (otherUser?.user?.isOnline ?? false)
+        : false,
+    lastOnlineAt: isGroup
+      ? null
+      : peerVisible
+        ? (otherUser?.user?.lastOnlineAt ?? null)
+        : null,
     currentUserRole: me?.role ?? null,
     unreadCount: conversation._unreadCount ?? 0,
     participants: isGroup ? toParticipants(conversation.participants) : [],
-    lastMessage: lastMessage
-      ? {
-          id: lastMessage.id,
-          content: lastMessage.content,
-          createdAt: lastMessage.createdAt,
-          sender: lastMessage.sender,
-        }
-      : null,
+    lastMessage: toLastMessagePreview(lastMessage),
   };
 };

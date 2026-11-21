@@ -66,6 +66,7 @@ export type ReplyTo = {
   senderName: string | null;
   content: string | null;
   deleted: boolean;
+  encrypted?: boolean;
   preview?: string | null;
 };
 

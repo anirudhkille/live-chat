@@ -2,16 +2,61 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import * as authService from "./auth.service.js";
 import { sendResponse } from "../../utils/response.js";
 import { env } from "../../config/env.config.js";
+import { AppError } from "../../utils/AppError.js";
+import { logger } from "../../config/logger.js";
+import {
+  buildOAuthRedirectUrl,
+  buildSessionPayload,
+  getRedirectTarget,
+  getRefreshToken,
+  getWebOrigin,
+  isMobileClient,
+} from "./auth.helpers.js";
 
 const REFRESH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+const OAUTH_STATE_COOKIE = "oauthState";
+const OAUTH_STATE_COOKIE_MAX_AGE = 10 * 60 * 1000;
+
+const cookieOptions = () => ({
+  httpOnly: true,
+  secure: env.NODE_ENV === "production",
+  sameSite: "strict",
+  path: "/",
+});
 
 const setRefreshCookie = (res, refreshToken) => {
   res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    ...cookieOptions(),
     maxAge: REFRESH_COOKIE_MAX_AGE,
   });
+};
+
+const clearRefreshCookie = (res) => {
+  res.clearCookie("refreshToken", cookieOptions());
+};
+
+const setOAuthStateCookie = (res, state) => {
+  res.cookie(OAUTH_STATE_COOKIE, state, {
+    httpOnly: true,
+    secure: env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: OAUTH_STATE_COOKIE_MAX_AGE,
+  });
+};
+
+const clearOAuthStateCookie = (res) => {
+  res.clearCookie(OAUTH_STATE_COOKIE, {
+    httpOnly: true,
+    secure: env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+  });
+};
+
+const webLoginErrorRedirect = () => {
+  const origin = getWebOrigin(env.CLIENT_URL) ?? env.CLIENT_URL;
+  return `${origin}/login?error=google_auth_failed`;
 };
 
 export const sendLoginOtp = asyncHandler(async (req, res) => {
@@ -20,47 +65,56 @@ export const sendLoginOtp = asyncHandler(async (req, res) => {
 });
 
 export const verifyLoginOtp = asyncHandler(async (req, res) => {
-  const { user, accessToken, refreshToken } = await authService.verifyOtp(
-    req.body.email,
-    req.body.otp,
+  const session = await authService.verifyOtp(req.body.email, req.body.otp);
+
+  setRefreshCookie(res, session.refreshToken);
+
+  sendResponse(
+    res,
+    200,
+    "Logged in successfully",
+    buildSessionPayload(session, isMobileClient(req)),
   );
-
-  setRefreshCookie(res, refreshToken);
-
-  sendResponse(res, 200, "Logged in successfully", {
-    user,
-    accessToken,
-    refreshToken,
-  });
 });
 
 export const googleMobileLogin = asyncHandler(async (req, res) => {
-  const { user, accessToken, refreshToken } =
-    await authService.googleLoginWithIdToken(req.body.idToken);
+  const session = await authService.googleLoginWithIdToken(req.body.idToken);
 
-  setRefreshCookie(res, refreshToken);
+  setRefreshCookie(res, session.refreshToken);
 
-  sendResponse(res, 200, "Logged in successfully", {
-    user,
-    accessToken,
-    refreshToken,
-  });
+  sendResponse(
+    res,
+    200,
+    "Logged in successfully",
+    buildSessionPayload(session, isMobileClient(req)),
+  );
 });
 
 export const refreshToken = asyncHandler(async (req, res) => {
-  const incomingToken = req.cookies?.refreshToken || req.body?.refreshToken;
-  const { accessToken, refreshToken } =
-    await authService.refreshToken(incomingToken);
+  const incomingToken = getRefreshToken(req);
+  const tokens = await authService.refreshToken(incomingToken);
 
-  setRefreshCookie(res, refreshToken);
+  // Native clients keep the rotated refresh token in their secure store; web
+  // clients receive it only as an httpOnly cookie.
+  if (isMobileClient(req)) {
+    sendResponse(res, 200, "Token refreshed", {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    });
+    return;
+  }
 
-  sendResponse(res, 200, "Token refreshed", { accessToken, refreshToken });
+  setRefreshCookie(res, tokens.refreshToken);
+  sendResponse(res, 200, "Token refreshed", {
+    accessToken: tokens.accessToken,
+  });
 });
 
 export const logout = asyncHandler(async (req, res) => {
-  await authService.logout(req.cookies.refreshToken);
+  await authService.logout(getRefreshToken(req));
 
-  res.clearCookie("refreshToken");
+  clearRefreshCookie(res);
+  clearOAuthStateCookie(res);
   sendResponse(res, 200, "Logout successfully");
 });
 
@@ -69,46 +123,74 @@ export const updateProfile = asyncHandler(async (req, res) => {
   sendResponse(res, 200, "Profile updated", { user });
 });
 
-const isAllowedRedirect = (redirect) => {
-  if (typeof redirect !== "string" || !redirect) return false;
-  if (redirect.startsWith(env.CLIENT_URL)) return true;
-  if (redirect.startsWith("livechat://")) return true;
-  return false;
-};
-
 export const googleAuth = asyncHandler(async (req, res) => {
-  const redirect = isAllowedRedirect(req.query.redirect)
-    ? req.query.redirect
-    : env.CLIENT_URL;
-  const url = authService.getGoogleAuthURL(redirect);
-  res.redirect(url);
+  const redirect = getRedirectTarget(req.query.redirect, env.CLIENT_URL);
+  const state = await authService.createGoogleOAuthState(redirect);
+
+  setOAuthStateCookie(res, state);
+  res.redirect(authService.getGoogleAuthURL(state));
 });
 
 export const googleCallback = asyncHandler(async (req, res) => {
-  const { code, state } = req.query;
+  const state = typeof req.query.state === "string" ? req.query.state : "";
+  const cookieState = req.cookies?.[OAUTH_STATE_COOKIE];
+  const requestedRedirect = await authService.consumeGoogleOAuthState(state);
 
-  const requestedRedirect = isAllowedRedirect(
-    typeof state === "string" ? decodeURIComponent(state) : "",
-  )
-    ? decodeURIComponent(state)
-    : env.CLIENT_URL;
+  clearOAuthStateCookie(res);
 
-  if (!code) {
-    return res.redirect(`${requestedRedirect}/login?error=google_auth_failed`);
+  if (!state || !cookieState || state !== cookieState || !requestedRedirect) {
+    return res.redirect(webLoginErrorRedirect());
   }
 
-  const { user, accessToken, refreshToken } =
-    await authService.googleLogin(code);
+  const code = typeof req.query.code === "string" ? req.query.code : "";
+  if (!code) {
+    return res.redirect(webLoginErrorRedirect());
+  }
 
-  setRefreshCookie(res, refreshToken);
+  try {
+    const { user, accessToken, refreshToken } =
+      await authService.googleLogin(code);
 
-  const userData = {
-    _id: user.id,
-    name: user.name,
-    email: user.email,
-    avatar: user.avatar,
-  };
+    setRefreshCookie(res, refreshToken);
 
-  const redirectURL = `${requestedRedirect}/auth/callback?accessToken=${accessToken}${requestedRedirect.startsWith("livechat://") ? `&refreshToken=${encodeURIComponent(refreshToken)}` : ""}&user=${encodeURIComponent(JSON.stringify(userData))}`;
-  res.redirect(redirectURL);
+    const userData = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+    };
+
+    const exchangeCode = await authService.createGoogleExchangeCode({
+      user: userData,
+      accessToken,
+      refreshToken,
+    });
+
+    return res.redirect(buildOAuthRedirectUrl(requestedRedirect, exchangeCode));
+  } catch (error) {
+    logger.error(error);
+    clearRefreshCookie(res);
+    return res.redirect(webLoginErrorRedirect());
+  }
+});
+
+export const googleExchange = asyncHandler(async (req, res) => {
+  const session = await authService.exchangeGoogleCode(req.body.code);
+
+  if (!session) {
+    throw new AppError(401, "Invalid or expired authorization code");
+  }
+
+  const mobile = isMobileClient(req);
+
+  if (!mobile) {
+    setRefreshCookie(res, session.refreshToken);
+  }
+
+  sendResponse(
+    res,
+    200,
+    "Logged in successfully",
+    buildSessionPayload(session, mobile),
+  );
 });

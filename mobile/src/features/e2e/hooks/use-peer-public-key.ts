@@ -2,24 +2,34 @@ import { useMemo } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 
 import { userKeyApi } from "../api/user-key-api";
+import {
+  cachePeerKey,
+  clearPeerKeyCache,
+  getCachedPeerKey,
+} from "../lib/peer-key-cache";
 
-const peerKeyCache = new Map<string, string>();
+export { clearPeerKeyCache };
+
+const PEER_KEY_STALE_TIME_MS = 10 * 60 * 1000;
+
+async function fetchPeerPublicKey(peerId: string): Promise<string> {
+  const cached = getCachedPeerKey(peerId);
+  if (cached) return cached;
+
+  const { publicKey } = await userKeyApi.getPeerPublicKey(peerId);
+  cachePeerKey(peerId, publicKey);
+  return publicKey;
+}
 
 export function usePeerPublicKey(peerId: string | null) {
   return useQuery({
     queryKey: ["user-key", "peer", peerId],
-    queryFn: async () => {
+    queryFn: () => {
       if (!peerId) return null;
-
-      const cached = peerKeyCache.get(peerId);
-      if (cached) return cached;
-
-      const { publicKey } = await userKeyApi.getPeerPublicKey(peerId);
-      peerKeyCache.set(peerId, publicKey);
-      return publicKey;
+      return fetchPeerPublicKey(peerId);
     },
     enabled: Boolean(peerId),
-    staleTime: Infinity,
+    staleTime: PEER_KEY_STALE_TIME_MS,
     gcTime: 1000 * 60 * 60,
     retry: false,
   });
@@ -47,15 +57,8 @@ export function usePeerPublicKeys(ids: string[]) {
   const results = useQueries({
     queries: uniqueIds.map((peerId) => ({
       queryKey: ["user-key", "peer", peerId],
-      queryFn: async () => {
-        const cached = peerKeyCache.get(peerId);
-        if (cached) return cached;
-
-        const { publicKey } = await userKeyApi.getPeerPublicKey(peerId);
-        peerKeyCache.set(peerId, publicKey);
-        return publicKey;
-      },
-      staleTime: Infinity,
+      queryFn: () => fetchPeerPublicKey(peerId),
+      staleTime: PEER_KEY_STALE_TIME_MS,
       gcTime: 1000 * 60 * 60,
       retry: false,
     })),
@@ -71,6 +74,7 @@ export function usePeerPublicKeys(ids: string[]) {
       publicKeys,
       isPending: results.some((result) => result.isPending),
       isFetching: results.some((result) => result.isFetching),
+      isError: results.some((result) => result.isError),
     };
   }, [uniqueIds, results]);
 }

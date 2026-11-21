@@ -35,11 +35,13 @@ const MAX_GROUP_PHOTO_SIZE = 5 * 1024 * 1024;
 
 function getGroupPhotoContentType(asset: ImagePicker.ImagePickerAsset) {
   const mimeType = asset.mimeType?.toLowerCase();
+  if (mimeType === "image/heic" || mimeType === "image/heif") return null;
   if (mimeType && ALLOWED_GROUP_PHOTO_TYPES.includes(mimeType)) {
     return mimeType;
   }
 
   const name = (asset.fileName ?? asset.uri).toLowerCase();
+  if (name.endsWith(".heic") || name.endsWith(".heif")) return null;
   if (name.endsWith(".png")) return "image/png";
   if (name.endsWith(".webp")) return "image/webp";
   return "image/jpeg";
@@ -287,15 +289,23 @@ export default function GroupDetailsScreen() {
       } catch {
         // Fall back to the picker-reported size.
       }
-      if (fileSize > MAX_GROUP_PHOTO_SIZE) {
+      if (!fileSize || fileSize > MAX_GROUP_PHOTO_SIZE) {
         Alert.alert("Photo too large", "Choose an image smaller than 5MB.");
+        return;
+      }
+
+      const contentType = getGroupPhotoContentType(asset);
+      if (!contentType) {
+        Alert.alert(
+          "Unsupported photo",
+          "HEIC photos aren't supported here. Choose a JPEG, PNG, or WebP image.",
+        );
         return;
       }
 
       setPhotoUploading(true);
       setActionError(null);
 
-      const contentType = getGroupPhotoContentType(asset);
       const { uploadUrl, key } =
         await conversationApi.getGroupPhotoUploadUrl(contentType);
       const file = new File(asset.uri);

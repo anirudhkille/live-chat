@@ -128,11 +128,13 @@ export const createSocketServer = (httpServer) => {
     });
 
     socket.on("disconnect", async () => {
+      let isLastSocket = false;
       try {
         const sockets = online.get(userId);
         if (sockets) {
           sockets.delete(socket.id);
-          if (sockets.size === 0) {
+          isLastSocket = sockets.size === 0;
+          if (isLastSocket) {
             online.delete(userId);
             visibleOnline.delete(userId);
             if (socket.showOnline) {
@@ -140,6 +142,8 @@ export const createSocketServer = (httpServer) => {
               socket.broadcast.emit("user-offline", { userId });
             }
           }
+        } else {
+          isLastSocket = true;
         }
       } catch (error) {
         logger.error(
@@ -151,17 +155,21 @@ export const createSocketServer = (httpServer) => {
           userId,
         });
       } finally {
-        try {
-          await handleCallDisconnect(userId);
-        } catch (error) {
-          logger.error(
-            { err: error.message, userId },
-            "Disconnect call cleanup failed",
-          );
-          captureError(error, {
-            source: "socket.disconnect",
-            userId,
-          });
+        // Only clean up calls when this was the user's last socket: closing one
+        // of several tabs/devices must not end an ongoing call.
+        if (isLastSocket) {
+          try {
+            await handleCallDisconnect(userId);
+          } catch (error) {
+            logger.error(
+              { err: error.message, userId },
+              "Disconnect call cleanup failed",
+            );
+            captureError(error, {
+              source: "socket.disconnect",
+              userId,
+            });
+          }
         }
       }
       logger.info("User disconnected");
@@ -169,6 +177,7 @@ export const createSocketServer = (httpServer) => {
 
     socket.on("typing-conversation", (payload) => {
       const { conversationId, isTyping } = payload ?? {};
+      if (socket.typingIndicators === false) return;
       const room = conversationRoom(conversationId);
       if (!socket.rooms.has(room)) return;
       socket.to(room).emit("user-typing", {
@@ -198,6 +207,7 @@ export const createSocketServer = (httpServer) => {
 
     const canShowOnline = preferences?.showOnline ?? true;
     socket.showOnline = canShowOnline;
+    socket.typingIndicators = preferences?.typingIndicators ?? true;
 
     if (canShowOnline) {
       visibleOnline.add(userId);

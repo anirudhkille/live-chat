@@ -1,8 +1,15 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { createContext, useCallback, useContext, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  type ReactNode,
+} from "react";
 
+import { resetConversationRooms } from "@/lib/socket";
 import { useCallStore } from "./call-store";
 import { useCalls } from "./use-calls";
 
@@ -31,6 +38,15 @@ export function useCallActions() {
  */
 export function CallProvider({ children }: { children: ReactNode }) {
   const calls = useCalls();
+
+  // The provider unmounts when the authenticated shell goes away (logout or an
+  // account switch). Drop every room subscription so the next session starts
+  // clean instead of re-joining the previous user's conversations.
+  useEffect(() => {
+    return () => {
+      resetConversationRooms();
+    };
+  }, []);
 
   const handleClose = useCallback(() => {
     useCallStore.getState().reset();

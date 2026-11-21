@@ -96,7 +96,14 @@ api.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
-        authStore.clearSession();
+        // Only an explicit auth rejection ends the session. A timeout or a
+        // 5xx from the refresh endpoint is transient and must not log the
+        // user out or destroy unsaved work.
+        const refreshStatus = (refreshError as AxiosError | undefined)?.response
+          ?.status;
+        if (refreshStatus === 401 || refreshStatus === 403) {
+          authStore.clearSession();
+        }
         processQueue(null, refreshError);
         return Promise.reject(refreshError);
       } finally {

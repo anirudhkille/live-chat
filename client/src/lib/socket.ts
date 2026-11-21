@@ -42,3 +42,15 @@ socket.on("connect", () => {
     socket.emit("join-conversation", conversationId);
   }
 });
+
+/**
+ * Forget every tracked room and tell the server to leave it. Used on logout
+ * and when the call provider unmounts so listeners for the previous account
+ * can't keep receiving conversation traffic.
+ */
+export function resetConversationRooms(): void {
+  for (const conversationId of roomRefCounts.keys()) {
+    socket.emit("leave-conversation", conversationId);
+  }
+  roomRefCounts.clear();
+}

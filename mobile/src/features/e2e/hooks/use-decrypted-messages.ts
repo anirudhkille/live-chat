@@ -19,6 +19,22 @@ export type DisplayMessage = Message & {
 
 const EMPTY_IDS: string[] = [];
 
+type DecryptedEntry = {
+  plaintext: string | null;
+  fingerprint: string;
+};
+
+function getCipherFingerprint(message: Message) {
+  const cipherMeta = message.cipherMeta;
+  if (!cipherMeta) return "";
+  return [
+    cipherMeta.version,
+    cipherMeta.mode ?? "dm",
+    cipherMeta.iv,
+    message.content,
+  ].join(":");
+}
+
 /**
  * Decrypts DM and group messages that carry `cipherMeta`, mirroring the web's
  * behavior. Messages without metadata (legacy plaintext, system messages)
@@ -36,7 +52,9 @@ export function useDecryptedMessages(args: {
   const currentUserId = useAuthStore((state) => state.user?.id ?? null);
   const peerKeyQuery = usePeerPublicKey(peerId);
   const peerPublicKey = peerKeyQuery.data ?? null;
-  const [decrypted, setDecrypted] = useState<Record<string, string | null>>({});
+  const [decrypted, setDecrypted] = useState<Record<string, DecryptedEntry>>(
+    {},
+  );
 
   // Fetch every participant key once per participant list change. Messages
   // from members who have since left are included so old messages stay
@@ -73,18 +91,23 @@ export function useDecryptedMessages(args: {
   useEffect(() => {
     if (!keys || !conversationId) return;
 
-    const pendingMessages = messages.filter(
-      (message) => message.cipherMeta && decrypted[message.id] === undefined,
-    );
+    const pendingMessages = messages.filter((message) => {
+      if (!message.cipherMeta) return false;
+      const existing = decrypted[message.id];
+      return (
+        !existing || existing.fingerprint !== getCipherFingerprint(message)
+      );
+    });
     if (pendingMessages.length === 0) return;
 
     let cancelled = false;
 
     void (async () => {
-      const results: Record<string, string | null> = {};
+      const results: Record<string, DecryptedEntry> = {};
 
       for (const message of pendingMessages) {
         const cipherMeta = message.cipherMeta!;
+        const fingerprint = getCipherFingerprint(message);
 
         if (cipherMeta.mode === "group") {
           if (!currentUserId) continue;
@@ -98,21 +121,27 @@ export function useDecryptedMessages(args: {
           // this effect can retry once the key arrives.
           if (!senderPublicKey) continue;
 
-          results[message.id] = await decryptGroupMessage({
-            privateKey: keys.privateKey,
-            conversationId,
-            senderPublicKey,
-            recipientId: currentUserId,
-            cipherMeta,
-          });
+          results[message.id] = {
+            fingerprint,
+            plaintext: await decryptGroupMessage({
+              privateKey: keys.privateKey,
+              conversationId,
+              senderPublicKey,
+              recipientId: currentUserId,
+              cipherMeta,
+            }),
+          };
         } else {
           if (!conversationKey) continue;
 
-          results[message.id] = await decryptMessage(
-            conversationKey,
-            message.content,
-            cipherMeta,
-          );
+          results[message.id] = {
+            fingerprint,
+            plaintext: await decryptMessage(
+              conversationKey,
+              message.content,
+              cipherMeta,
+            ),
+          };
         }
       }
 
@@ -148,7 +177,12 @@ export function useDecryptedMessages(args: {
         if (message.deletedAt || !message.cipherMeta) return message;
 
         const cipherMeta = message.cipherMeta;
-        const plaintext = decrypted[message.id];
+        const decryptedEntry = decrypted[message.id];
+        const plaintext =
+          decryptedEntry &&
+          decryptedEntry.fingerprint === getCipherFingerprint(message)
+            ? decryptedEntry.plaintext
+            : undefined;
 
         if (plaintext === undefined) {
           const canDecryptMessage =

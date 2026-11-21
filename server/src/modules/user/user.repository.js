@@ -54,6 +54,9 @@ export const searchUser = (search, page, limit, id) => {
         {
           id: { not: id },
         },
+        {
+          profileVisible: true,
+        },
       ],
     },
     take: limit,

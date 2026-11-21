@@ -1,8 +1,12 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import type { User } from "@/types/api";
+
+import {
+  SECURE_AUTH_STORAGE_KEY,
+  secureAuthStorage,
+} from "./secure-auth-storage";
 
 type AuthState = {
   token: string | null;
@@ -41,14 +45,15 @@ export const useAuthStore = create<AuthState>()(
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
     }),
     {
-      name: "live-chat.auth",
-      storage: createJSONStorage(() => AsyncStorage),
+      name: SECURE_AUTH_STORAGE_KEY,
+      storage: createJSONStorage(() => secureAuthStorage),
       partialize: (state) => ({
         token: state.token,
         refreshToken: state.refreshToken,
         user: state.user,
       }),
       onRehydrateStorage: () => (state) => {
+        // Always release the auth gate, even if the keystore read failed.
         state?.setHasHydrated(true);
       },
     },

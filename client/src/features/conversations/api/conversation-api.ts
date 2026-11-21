@@ -189,12 +189,14 @@ export async function markConversationRead(
 
 export async function editMessage(
   messageId: string,
-  content: string
+  content: string,
+  cipherMeta?: Record<string, unknown> | null
 ): Promise<ApiResponse<Message>> {
   const response = await api.patch<ApiResponse<Message>>(
     `/message/${messageId}`,
     {
       content,
+      ...(cipherMeta ? { cipherMeta } : {}),
     }
   );
   return response.data;

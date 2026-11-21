@@ -16,7 +16,16 @@ import { cn } from "@/lib/utils";
 import { formatMessageTime } from "@/lib/datetime";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import type { Attachment, Message, MessageReaction } from "@/types/api";
+import type { Attachment, MessageReaction } from "@/types/api";
+import { useE2EIdentity } from "@/features/e2e/hooks/useE2EIdentity";
+import type { DisplayMessage } from "@/features/e2e/hooks/useDecryptedMessages";
+import {
+  usePeerPublicKey,
+  usePeerPublicKeys,
+} from "@/features/e2e/hooks/usePeerPublicKey";
+import { deriveConversationKey } from "@/lib/crypto/conversationKey";
+import { encryptGroupMessage, encryptMessage } from "@/lib/crypto/messaging";
+import { getEncryptionReadiness } from "../lib/message-encryption";
 import { useEditMessage } from "../hooks/useEditMessage";
 import { useDeleteMessage } from "../hooks/useDeleteMessage";
 import { useToggleReaction } from "../hooks/useToggleReaction";
@@ -64,10 +73,12 @@ export const MessageBubble = memo(function MessageBubble({
   message,
   conversationId,
   isGroup = false,
+  participantIds,
 }: {
-  message: Message;
+  message: DisplayMessage;
   conversationId: string;
   isGroup?: boolean;
+  participantIds?: string[];
 }) {
   const currentUserId = useAuthStore((s) => s.user?.id);
   const setReplyTo = useChatStore((s) => s.setReplyTo);
@@ -77,8 +88,50 @@ export const MessageBubble = memo(function MessageBubble({
   const isEdited =
     Boolean(message.updatedAt) && message.updatedAt > message.createdAt;
 
+  const { keys } = useE2EIdentity();
+  const isEncryptedMessage = Boolean(message.cipherMeta);
+  const editPeerId = !isGroup
+    ? message.senderId === currentUserId
+      ? message.receiverId
+      : message.senderId
+    : null;
+  const { data: editPeerPublicKey } = usePeerPublicKey(
+    isEncryptedMessage ? editPeerId : null
+  );
+  const groupKeyIds = useMemo(
+    () =>
+      isGroup && isEncryptedMessage
+        ? (participantIds ?? []).filter((id) => id !== currentUserId)
+        : [],
+    [isGroup, isEncryptedMessage, participantIds, currentUserId]
+  );
+  const { publicKeys: editGroupPublicKeys } = usePeerPublicKeys(groupKeyIds);
+  const editReadiness = useMemo(
+    () =>
+      getEncryptionReadiness({
+        isGroup,
+        hasKeys: !!keys,
+        currentUserId: currentUserId ?? null,
+        peerPublicKey: editPeerPublicKey,
+        participantIds,
+        groupPublicKeys: editGroupPublicKeys,
+      }),
+    [
+      isGroup,
+      keys,
+      currentUserId,
+      editPeerPublicKey,
+      participantIds,
+      editGroupPublicKeys,
+    ]
+  );
+  const canEncryptEdit = !isEncryptedMessage || editReadiness.ready;
+  const editEncryptionNotice =
+    "Encryption keys are unavailable for some group members. Try again once their keys have loaded.";
+
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
+  const [editError, setEditError] = useState<string | null>(null);
   const [activePopover, setActivePopover] = useState<"react" | "menu" | null>(
     null
   );
@@ -110,21 +163,79 @@ export const MessageBubble = memo(function MessageBubble({
   }, [activePopover]);
 
   const beginEditing = () => {
+    if (!canEncryptEdit) return;
     setActivePopover(null);
+    setEditError(null);
     setDraft(message.content);
     setIsEditing(true);
   };
 
   const cancelEdit = () => {
     setDraft(message.content);
+    setEditError(null);
     setIsEditing(false);
   };
 
-  const saveEdit = () => {
-    const content = draft.trim();
-    if (!content || editMutation.isPending) return;
+  const saveEdit = async () => {
+    const trimmed = draft.trim();
+    if (!trimmed || editMutation.isPending) return;
+    if (!canEncryptEdit) {
+      setEditError(editEncryptionNotice);
+      return;
+    }
+
+    let content = trimmed;
+    let cipherMeta: Record<string, unknown> | undefined;
+
+    if (isEncryptedMessage) {
+      try {
+        if (isGroup) {
+          if (!keys || !currentUserId) {
+            setEditError(editEncryptionNotice);
+            return;
+          }
+          const encrypted = await encryptGroupMessage({
+            privateKey: keys.privateKey,
+            conversationId,
+            currentUserId,
+            plaintext: trimmed,
+            recipientPublicKeys: {
+              ...editGroupPublicKeys,
+              [currentUserId]: keys.publicKey,
+            },
+            requiredRecipientIds: editReadiness.requiredIds,
+          });
+          if (!encrypted) {
+            setEditError(editEncryptionNotice);
+            return;
+          }
+          content = encrypted.content;
+          cipherMeta = encrypted.cipherMeta;
+        } else {
+          if (!keys || !editPeerPublicKey) {
+            setEditError(
+              "Encryption keys are unavailable. Try again in a moment."
+            );
+            return;
+          }
+          const conversationKey = deriveConversationKey({
+            privateKey: keys.privateKey,
+            peerPublicKey: editPeerPublicKey,
+            conversationId,
+          });
+          const encrypted = await encryptMessage(conversationKey, trimmed);
+          content = encrypted.content;
+          cipherMeta = encrypted.cipherMeta;
+        }
+      } catch {
+        setEditError("Couldn't encrypt the edited message. Please try again.");
+        return;
+      }
+    }
+
+    setEditError(null);
     editMutation.mutate(
-      { messageId: message.id, content },
+      { messageId: message.id, content, cipherMeta },
       { onSuccess: () => setIsEditing(false) }
     );
   };
@@ -205,7 +316,7 @@ export const MessageBubble = memo(function MessageBubble({
 
         {activePopover === "menu" && isOwn && (
           <div
-            className="bg-popover text-popover-foreground absolute right-0 bottom-full z-20 mb-1 w-36 origin-bottom-right rounded-lg border p-1 shadow-lg"
+            className="bg-popover text-popover-foreground absolute right-0 bottom-full z-20 mb-1 w-48 origin-bottom-right rounded-lg border p-1 shadow-lg"
             role="menu"
           >
             <Button
@@ -213,11 +324,18 @@ export const MessageBubble = memo(function MessageBubble({
               size="sm"
               role="menuitem"
               onClick={beginEditing}
+              disabled={!canEncryptEdit}
+              title={canEncryptEdit ? undefined : editEncryptionNotice}
               className="w-full justify-start gap-2 font-normal"
             >
               <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
               Edit
             </Button>
+            {!canEncryptEdit && (
+              <p className="text-muted-foreground px-2 py-1 text-[10px] leading-snug">
+                {editEncryptionNotice}
+              </p>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -323,7 +441,13 @@ export const MessageBubble = memo(function MessageBubble({
                   </a>
                 )
               )}
-              {message.content ? (
+              {message.decryptionError ? (
+                <p className="text-[13px] leading-relaxed italic opacity-70">
+                  {message.decryptionError === "keys-unavailable"
+                    ? "Encryption keys unavailable"
+                    : "Unable to decrypt"}
+                </p>
+              ) : message.content ? (
                 <p className="leading-relaxed break-words whitespace-pre-wrap">
                   {message.content}
                 </p>
@@ -338,6 +462,14 @@ export const MessageBubble = memo(function MessageBubble({
             )}
           >
             {formatMessageTime(message.createdAt)}
+            {keys && !message.cipherMeta && !isDeleted && (
+              <span
+                className="ml-1 rounded-sm border px-1 text-[9px] font-medium opacity-70"
+                title="This message was sent without end-to-end encryption"
+              >
+                Not encrypted
+              </span>
+            )}
             {isEdited && !isDeleted && (
               <span className="italic opacity-80">· edited</span>
             )}
@@ -439,6 +571,7 @@ export const MessageBubble = memo(function MessageBubble({
             <Button
               onClick={saveEdit}
               disabled={
+                !canEncryptEdit ||
                 !draft.trim() ||
                 draft.trim() === message.content ||
                 editMutation.isPending
@@ -450,6 +583,7 @@ export const MessageBubble = memo(function MessageBubble({
         }
       >
         <div className="space-y-1.5">
+          {editError && <p className="text-destructive text-xs">{editError}</p>}
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value.slice(0, EDIT_MAX_LENGTH))}

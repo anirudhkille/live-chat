@@ -146,10 +146,17 @@ export const messageApi = {
     >(`/message/read/${conversationId}`);
     return data.data;
   },
-  edit: async (messageId: string, content: string) => {
+  edit: async (
+    messageId: string,
+    content: string,
+    cipherMeta?: Record<string, unknown> | null,
+  ) => {
     const { data } = await api.patch<ApiResponse<Message>>(
       `/message/${messageId}`,
-      { content },
+      {
+        content,
+        ...(cipherMeta ? { cipherMeta } : {}),
+      },
     );
     return data.data;
   },

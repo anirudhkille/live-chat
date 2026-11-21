@@ -634,7 +634,14 @@ export function useCalls() {
     const handleIceCandidate = async (payload: CallIceCandidatePayload) => {
       if (currentCallId() !== payload.callId || !payload.candidate) return;
       const pc = pcsRef.current.get(payload.fromUserId);
-      if (!pc || !pc.remoteDescription) {
+      if (!pc) {
+        // There is no peer connection to attach this to. Queuing candidates
+        // for a peer that never connected would leak memory and apply stale
+        // network paths to a later call.
+        pendingCandidatesRef.current.delete(payload.fromUserId);
+        return;
+      }
+      if (!pc.remoteDescription) {
         const queue = pendingCandidatesRef.current.get(payload.fromUserId);
         if (queue) queue.push(payload.candidate);
         else
@@ -650,7 +657,16 @@ export function useCalls() {
       }
     };
 
+    const clearAutoActionFor = (callId?: string) => {
+      const state = useCallStore.getState();
+      if (!state.autoAction) return;
+      if (!callId || state.autoAction.callId === callId) {
+        state.clearAutoAction();
+      }
+    };
+
     const handleEnded = (payload: CallEndedPayload) => {
+      clearAutoActionFor(payload?.callId);
       const state = useCallStore.getState();
       if (payload?.callId && state.callId !== payload.callId) return;
       if (state.status === "idle" || state.status === "ended") return;
@@ -665,22 +681,26 @@ export function useCalls() {
         useCallStore.getState().removeParticipant(payload.userId);
         return;
       }
+      clearAutoActionFor(payload?.callId);
       endCallFlow("rejected");
     };
 
     const handleCancelled = (payload: CallCancelledPayload) => {
+      clearAutoActionFor(payload?.callId);
       const state = useCallStore.getState();
       if (payload?.callId && state.callId !== payload.callId) return;
       endCallFlow("cancelled");
     };
 
     const handleTimedOut = (payload: CallCancelledPayload) => {
+      clearAutoActionFor(payload?.callId);
       const state = useCallStore.getState();
       if (payload?.callId && state.callId !== payload.callId) return;
       endCallFlow("timedOut");
     };
 
     const handleUnavailable = (payload: CallUnavailablePayload) => {
+      clearAutoActionFor(payload?.callId);
       const state = useCallStore.getState();
       if (state.status !== "outgoing") return;
       if (payload?.callId && state.callId !== payload.callId) return;
@@ -711,12 +731,14 @@ export function useCalls() {
     };
 
     const handlePendingTimedOut = (payload: CallPendingExpiredPayload) => {
+      clearAutoActionFor(payload?.callId);
       const state = useCallStore.getState();
       if (payload?.callId && state.callId !== payload.callId) return;
       endCallFlow("pendingTimedOut");
     };
 
     const handlePendingExpired = (payload: CallPendingExpiredPayload) => {
+      clearAutoActionFor(payload?.callId);
       const state = useCallStore.getState();
       if (payload?.callId && state.callId !== payload.callId) return;
       endCallFlow("timedOut");

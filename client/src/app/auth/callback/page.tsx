@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Spinner } from "@/components/ui/spinner";
+import { exchangeGoogleCode } from "@/features/auth/api/auth-api";
 import { normalizeUser } from "@/types/api";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -11,29 +12,42 @@ function AuthCallbackInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const setSession = useAuthStore((state) => state.setSession);
+  const exchangeStartedRef = useRef(false);
 
   useEffect(() => {
-    const accessToken = searchParams.get("accessToken");
-    const userParam = searchParams.get("user");
+    if (exchangeStartedRef.current) return;
+    exchangeStartedRef.current = true;
 
-    if (!accessToken || !userParam) {
+    const code = searchParams.get("code");
+
+    if (!code) {
       router.replace("/login?error=google_auth_failed");
       return;
     }
 
-    try {
-      const user = normalizeUser(JSON.parse(decodeURIComponent(userParam)));
+    // Deliberately not cancelled on unmount: the one-time code is already
+    // consumed by the request and dev StrictMode's mount/cleanup/mount cycle
+    // must not abort the only exchange attempt.
+    (async () => {
+      try {
+        const response = await exchangeGoogleCode(code);
+        const session = response?.data;
 
-      if (!user) {
+        if (!session?.accessToken) {
+          throw new Error("Missing access token");
+        }
+
+        const user = normalizeUser(session.user);
+        if (!user) {
+          throw new Error("Missing user");
+        }
+
+        setSession({ token: session.accessToken, user });
+        router.replace(user.name ? "/chats" : "/complete-profile");
+      } catch {
         router.replace("/login?error=google_auth_failed");
-        return;
       }
-
-      setSession({ token: accessToken, user });
-      router.replace(user.name ? "/chats" : "/complete-profile");
-    } catch {
-      router.replace("/login?error=google_auth_failed");
-    }
+    })();
   }, [router, searchParams, setSession]);
 
   return (

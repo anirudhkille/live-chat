@@ -97,7 +97,7 @@ describe("group messaging", () => {
     expect(forCarol).toBe(plaintext);
   });
 
-  it("skips recipients without a usable key and still sends to the rest", async () => {
+  it("returns null when a required participant key is missing", async () => {
     const alice = makeConversationKeys();
     const bob = makeConversationKeys();
 
@@ -111,13 +111,10 @@ describe("group messaging", () => {
         bob: bob.publicKey,
         carol: "",
       },
+      requiredRecipientIds: ["alice", "bob", "carol"],
     });
 
-    expect(encrypted).not.toBeNull();
-    expect(Object.keys(encrypted!.cipherMeta.entries).sort()).toEqual([
-      "alice",
-      "bob",
-    ]);
+    expect(encrypted).toBeNull();
   });
 
   it("returns null when no entry can be produced", async () => {
@@ -146,14 +143,6 @@ describe("group messaging", () => {
       recipientPublicKeys: { bob: bob.publicKey },
     });
 
-    const decrypted = await decryptGroupMessage({
-      privateKey: alice.privateKey,
-      conversationId: "conv-group",
-      senderPublicKey: alice.publicKey,
-      recipientId: "alice",
-      cipherMeta: encrypted!.cipherMeta,
-    });
-
-    expect(decrypted).toBeNull();
+    expect(encrypted).toBeNull();
   });
 });

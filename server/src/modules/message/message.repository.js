@@ -1,9 +1,14 @@
 import { prisma } from "../../config/prisma.js";
+import { AppError } from "../../utils/AppError.js";
 
 export const withDetails = {
   include: {
     attachments: true,
-    reads: { take: 1, orderBy: { readAt: "desc" } },
+    reads: {
+      where: { user: { readReceipts: true } },
+      take: 1,
+      orderBy: { readAt: "desc" },
+    },
     reactions: {
       include: {
         user: {
@@ -57,10 +62,13 @@ export const getMessages = (conversationId, before, limit) => {
   });
 };
 
-export const updateMessage = (messageId, content) => {
+export const updateMessage = (messageId, { content, cipherMeta }) => {
   return prisma.message.update({
     where: { id: messageId },
-    data: { content },
+    data: {
+      content,
+      ...(cipherMeta !== undefined ? { cipherMeta } : {}),
+    },
     ...withDetails,
   });
 };
@@ -83,18 +91,36 @@ export const markMessagesRead = async (conversationId, userId) => {
       },
       select: { id: true },
     });
-    if (messages.length === 0) return 0;
 
     const readAt = new Date();
-    await tx.messageRead.createMany({
-      data: messages.map((message) => ({
-        messageId: message.id,
-        userId,
-        readAt,
-      })),
-      skipDuplicates: true,
+    if (messages.length > 0) {
+      await tx.messageRead.createMany({
+        data: messages.map((message) => ({
+          messageId: message.id,
+          userId,
+          readAt,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    await tx.conversationParticipant.updateMany({
+      where: { conversationId, userId },
+      data: { lastReadAt: readAt },
     });
+
     return messages.length;
+  });
+};
+
+/**
+ * Advance the participant's read position without creating read receipts.
+ * Unread counts are derived from this position for users who disabled receipts.
+ */
+export const markReadPosition = (conversationId, userId) => {
+  return prisma.conversationParticipant.updateMany({
+    where: { conversationId, userId },
+    data: { lastReadAt: new Date() },
   });
 };
 
@@ -107,8 +133,10 @@ export const sendMessage = async (
   replyToId,
 ) => {
   const now = new Date();
-  const [message] = await prisma.$transaction([
-    prisma.message.create({
+  const ids = attachmentIds?.length ? [...new Set(attachmentIds)] : [];
+
+  return prisma.$transaction(async (tx) => {
+    const message = await tx.message.create({
       data: {
         senderId,
         conversationId,
@@ -116,20 +144,44 @@ export const sendMessage = async (
         createdAt: now,
         ...(cipherMeta ? { cipherMeta } : {}),
         ...(replyToId ? { replyToId } : {}),
-        ...(attachmentIds?.length
-          ? { attachments: { connect: attachmentIds.map((id) => ({ id })) } }
-          : {}),
       },
       include: withDetails.include,
-    }),
-    prisma.conversation.update({
+    });
+
+    if (ids.length > 0) {
+      // Claim only unclaimed attachments that are stored under the sender's
+      // prefix. The count check rolls the whole transaction back if any id was
+      // already attached (or is not owned by the sender).
+      const claimed = await tx.attachment.updateMany({
+        where: {
+          id: { in: ids },
+          messageId: null,
+          url: { contains: `/attachments/${senderId}/` },
+        },
+        data: { messageId: message.id },
+      });
+      if (claimed.count !== ids.length) {
+        throw new AppError(
+          400,
+          "One or more attachments are invalid, already used, or not owned by you",
+        );
+      }
+    }
+
+    await tx.conversation.update({
       where: { id: conversationId },
       data: {
         lastMessageAt: now,
       },
-    }),
-  ]);
-  return message;
+    });
+
+    if (ids.length === 0) return message;
+
+    return tx.message.findUnique({
+      where: { id: message.id },
+      ...withDetails,
+    });
+  });
 };
 
 export const findUserReaction = (messageId, userId) => {

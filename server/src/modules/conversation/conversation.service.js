@@ -8,6 +8,7 @@ import {
   toConversationResponse,
   toParticipants,
 } from "./conversation.mapper.js";
+import { toMessageResponse } from "../message/message.mapper.js";
 import {
   emitToConversation,
   isUserOnline,
@@ -15,7 +16,6 @@ import {
   removeUserFromConversation,
 } from "../../config/socket.js";
 import { AppError } from "../../utils/AppError.js";
-import { planLeaveGroup } from "./conversation.leave.js";
 
 const GROUP_PHOTO_ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const GROUP_PHOTO_MAX_SIZE = 5 * 1024 * 1024; // 5MB
@@ -38,14 +38,32 @@ const assertGroupAdmin = async (conversationId, actorId) => {
 };
 
 const assertGroupPhoto = async (photoKey) => {
+  if (
+    typeof photoKey !== "string" ||
+    !photoKey.startsWith("groups/") ||
+    photoKey.includes("..") ||
+    photoKey.length > 512
+  ) {
+    throw new AppError(403, "Invalid group photo key");
+  }
+
   let metadata;
   try {
     metadata = await storageService.getObjectMetadata(photoKey);
   } catch {
     throw new AppError(404, "Group photo not found");
   }
+  if ((metadata.ContentLength ?? 0) <= 0) {
+    throw new AppError(400, "Group photo is empty");
+  }
   if ((metadata.ContentLength ?? 0) > GROUP_PHOTO_MAX_SIZE) {
     throw new AppError(400, "Group photo is too large");
+  }
+  if (
+    metadata.ContentType &&
+    !GROUP_PHOTO_ALLOWED_TYPES.includes(metadata.ContentType)
+  ) {
+    throw new AppError(400, "Unsupported group photo type");
   }
 };
 
@@ -54,11 +72,10 @@ export const createOrGetConversation = async (userId1, userId2) => {
     throw new AppError(400, "Cannot create a conversation with yourself");
   }
 
-  let conversation = await conversationRepository.get(userId1, userId2);
-
-  if (!conversation) {
-    conversation = await conversationRepository.create(userId1, userId2);
-  }
+  const conversation = await conversationRepository.getOrCreateDirect(
+    userId1,
+    userId2,
+  );
 
   return toConversationResponse(conversation, userId1);
 };
@@ -92,7 +109,11 @@ export const getConversationWithMessages = async (
   );
   const nextCursor =
     messages.length === limit ? messages[messages.length - 1].createdAt : null;
-  return { conversation, messages, nextCursor };
+  return {
+    conversation,
+    messages: messages.map(toMessageResponse),
+    nextCursor,
+  };
 };
 
 export const createGroup = async (
@@ -262,32 +283,24 @@ export const removeGroupParticipant = async (
 };
 
 export const leaveGroup = async (conversationId, userId) => {
-  const conversation = await conversationRepository.getById(conversationId);
-  if (!conversation || !conversation.isGroup) {
+  const result = await conversationRepository.leaveGroup(
+    conversationId,
+    userId,
+  );
+
+  if (result.status === "not_found") {
     throw new AppError(404, "Group not found");
   }
-
-  const plan = planLeaveGroup(conversation.participants, userId);
-  if (!plan.allowed) {
+  if (result.status === "not_member") {
     throw new AppError(403, "You are not a member of this group");
   }
 
-  if (plan.deleted) {
+  if (result.status === "deleted") {
     removeUserFromConversation(userId, conversationId);
-    await conversationRepository.deleteById(conversationId);
     return { left: true, deleted: true };
   }
 
-  await conversationRepository.removeParticipant(conversationId, userId);
   removeUserFromConversation(userId, conversationId);
-
-  if (plan.promoteUserId) {
-    await conversationRepository.updateParticipantRole(
-      conversationId,
-      plan.promoteUserId,
-      "admin",
-    );
-  }
 
   emitToConversation(conversationId, "conversation-updated", {
     conversationId,

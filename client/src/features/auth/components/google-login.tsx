@@ -37,7 +37,8 @@ export function GoogleLogin() {
       className="w-full gap-2"
       onClick={() => {
         // Full-page redirect to the API origin is intentional: it kicks off
-        // the OAuth handshake on the backend, which redirects back with tokens.
+        // the OAuth handshake on the backend, which redirects back to
+        // /auth/callback with a short-lived one-time code.
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.href = `${API_BASE_URL}/auth/google`;
       }}

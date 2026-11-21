@@ -82,32 +82,6 @@ export default function ChatThreadPage({
     };
   }, [conversationId]);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const acceptId = params.get("accept-call");
-    const declineId = params.get("decline-call");
-    if (!acceptId && !declineId) return;
-
-    const url = new URL(window.location.href);
-    url.searchParams.delete("accept-call");
-    url.searchParams.delete("decline-call");
-    window.history.replaceState(
-      {},
-      "",
-      url.pathname + (url.search ? url.search : "")
-    );
-
-    if (acceptId) {
-      useCallStore
-        .getState()
-        .setAutoAction({ callId: acceptId, action: "accept" });
-    } else if (declineId) {
-      useCallStore
-        .getState()
-        .setAutoAction({ callId: declineId, action: "decline" });
-    }
-  }, []);
-
   useSocketEvents({
     "user-typing": (payload: {
       conversationId: string;

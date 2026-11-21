@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -12,7 +13,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import {
+  Stack,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import {
@@ -42,6 +48,7 @@ import {
   conversationApi,
   messageApi,
 } from "@/features/conversations/api/conversation-api";
+import { userApi } from "@/features/users/api/user-api";
 import {
   DECRYPTION_FAILED_TEXT,
   DECRYPTION_PENDING_TEXT,
@@ -55,7 +62,11 @@ import {
 } from "@/features/e2e/hooks/use-peer-public-key";
 import { deriveConversationKey } from "@/lib/crypto/conversation-key";
 import { encryptGroupMessage, encryptMessage } from "@/lib/crypto/messaging";
-import { socket } from "@/lib/socket";
+import {
+  joinConversationRoom,
+  leaveConversationRoom,
+  socket,
+} from "@/lib/socket";
 import { useAuthStore } from "@/store/auth-store";
 import { useAppTheme } from "@/theme/use-app-theme";
 import {
@@ -66,6 +77,9 @@ import {
 } from "@/types/api";
 
 const PAGE_SIZE = 30;
+const TYPING_THROTTLE_MS = 2000;
+const TYPING_STOP_DELAY_MS = 2500;
+const TYPING_USER_TIMEOUT_MS = 4000;
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 const MAX_ATTACHMENTS = 4;
 const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024;
@@ -268,13 +282,52 @@ export default function ChatScreen() {
 
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState<Message | null>(null);
-  const [editing, setEditing] = useState<Message | null>(null);
+  const [editing, setEditing] = useState<DisplayMessage | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<
     PendingAttachment[]
   >([]);
   const [typingUsers, setTypingUsers] = useState<Record<string, boolean>>({});
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingTimeouts = useRef(
+    new Map<string, ReturnType<typeof setTimeout>>(),
+  );
+  const lastTypingSentAt = useRef(0);
+  const sendingRef = useRef(false);
+  const [sending, setSending] = useState(false);
+  const [composerError, setComposerError] = useState<string | null>(null);
+  const [screenFocused, setScreenFocused] = useState(false);
+  const [appActive, setAppActive] = useState(
+    AppState.currentState === "active",
+  );
+
+  const clearTypingTimer = useCallback(() => {
+    if (typingTimer.current) {
+      clearTimeout(typingTimer.current);
+      typingTimer.current = null;
+    }
+  }, []);
+
+  const clearTypingUserTimeouts = useCallback(() => {
+    for (const timeout of typingTimeouts.current.values()) {
+      clearTimeout(timeout);
+    }
+    typingTimeouts.current.clear();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      setScreenFocused(true);
+      return () => setScreenFocused(false);
+    }, []),
+  );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      setAppActive(state === "active");
+    });
+    return () => subscription.remove();
+  }, []);
 
   const voiceRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(voiceRecorder, 250);
@@ -282,24 +335,21 @@ export default function ChatScreen() {
   const [startingRecording, setStartingRecording] = useState(false);
   const [finalizingRecording, setFinalizingRecording] = useState(false);
 
-  const uploadingAttachments = pendingAttachments.some(
-    (attachment) => attachment.status === "uploading",
-  );
-  const readyAttachmentIds = useMemo(
-    () =>
-      pendingAttachments.flatMap((attachment) =>
-        attachment.status === "ready" && attachment.attachment
-          ? [attachment.attachment.id]
-          : [],
-      ),
-    [pendingAttachments],
-  );
+  const hasPendingAttachments = pendingAttachments.length > 0;
 
   const { data: conversation } = useQuery({
     queryKey: ["conversation", id],
     queryFn: () => conversationApi.getById(id!),
     enabled: !!id,
   });
+
+  const { data: preferences } = useQuery({
+    queryKey: ["user-preferences"],
+    queryFn: userApi.getPreferences,
+    staleTime: 5 * 60 * 1000,
+  });
+  const readReceiptsEnabled = preferences?.readReceipts !== false;
+  const typingIndicatorsEnabled = preferences?.typingIndicators !== false;
 
   const { keys: identityKeys, status: e2eStatus } = useE2EIdentity();
   const isGroup = Boolean(conversation?.isGroup);
@@ -322,13 +372,33 @@ export default function ChatScreen() {
   );
   const groupKeysQuery = usePeerPublicKeys(groupPeerIds);
   const groupPublicKeys = groupKeysQuery.publicKeys;
-  const e2ePlaintextNotice = conversation?.isGroup
-    ? null
-    : e2eStatus === "server-key-missing-local"
-      ? "Your encryption keys aren't on this device. Messages here will be sent unencrypted."
+  const groupKeysComplete =
+    isGroup &&
+    groupPeerIds.every((participantId) =>
+      Boolean(groupPublicKeys[participantId]),
+    );
+  const encryptionReady = Boolean(
+    identityKeys && (isGroup ? groupKeysComplete : peerPublicKey),
+  );
+  const encryptionKeysLoading =
+    e2eStatus === "loading" ||
+    e2eStatus === "idle" ||
+    (!conversation && Boolean(id)) ||
+    (isGroup
+      ? groupKeysQuery.isPending
+      : Boolean(peerId) && peerKeyQuery.isPending);
+  const canEncryptConversation = Boolean(conversation && encryptionReady);
+
+  const e2eNotice =
+    e2eStatus === "server-key-missing-local"
+      ? "Your encryption keys aren't on this device. Restore them from the web app before sending messages here."
       : e2eStatus === "error"
-        ? "Encryption couldn't be initialized. Messages here will be sent unencrypted."
-        : null;
+        ? "Encryption couldn't be initialized. Messages can't be sent until it's available."
+        : conversation && !encryptionKeysLoading && !encryptionReady
+          ? isGroup
+            ? "Waiting for every group member's encryption key. Messages can't be sent until all keys are available."
+            : "This person's encryption key isn't available yet. Messages can't be sent."
+          : null;
 
   const conversationKey = useMemo(() => {
     if (!identityKeys || !peerPublicKey || !id) return null;
@@ -346,8 +416,25 @@ export default function ChatScreen() {
 
   const messagesQuery = useInfiniteQuery({
     queryKey: ["messages", id],
-    queryFn: ({ pageParam }) =>
-      messageApi.list(id!, { before: pageParam, limit: PAGE_SIZE }),
+    queryFn: async ({ pageParam }) => {
+      const page = await messageApi.list(id!, {
+        before: pageParam,
+        limit: PAGE_SIZE,
+      });
+
+      // Messages that arrived before the first page resolved were seeded into
+      // the cache. Merge them into the fetched first page instead of dropping
+      // them when React Query replaces the cache with the response.
+      if (pageParam || !id) return page;
+
+      const cached = queryClient.getQueryData<MessagesData>(["messages", id]);
+      const seeded = cached?.pages[0] ?? [];
+      if (seeded.length === 0) return page;
+
+      const knownIds = new Set(page.map((message) => message.id));
+      const missing = seeded.filter((message) => !knownIds.has(message.id));
+      return missing.length ? [...missing, ...page] : page;
+    },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) =>
       lastPage.length < PAGE_SIZE
@@ -372,17 +459,24 @@ export default function ChatScreen() {
   const addMessageToCache = useCallback(
     (message: Message) => {
       queryClient.setQueryData<MessagesData>(["messages", id], (old) => {
-        if (!old?.pages.length) return old;
-
-        const exists = old.pages.some((page) =>
+        const pages = old?.pages ?? [];
+        const exists = pages.some((page) =>
           page.some((item) => item.id === message.id),
         );
         if (exists) return old;
 
-        const [firstPage, ...rest] = old.pages;
+        if (pages.length === 0) {
+          return {
+            pages: [[message]],
+            pageParams: [undefined],
+          };
+        }
+
+        const [firstPage, ...rest] = pages;
         return {
           ...old,
           pages: [[message, ...firstPage], ...rest],
+          pageParams: old?.pageParams ?? [undefined],
         };
       });
     },
@@ -392,7 +486,12 @@ export default function ChatScreen() {
   const updateMessageInCache = useCallback(
     (message: Message) => {
       queryClient.setQueryData<MessagesData>(["messages", id], (old) => {
-        if (!old) return old;
+        if (!old?.pages.length) {
+          return {
+            pages: [[message]],
+            pageParams: [undefined],
+          };
+        }
 
         let changed = false;
         const pages = old.pages.map((page) =>
@@ -415,15 +514,29 @@ export default function ChatScreen() {
   }, [id]);
 
   useEffect(() => {
-    if (!id || !newestMessageId) return;
+    if (
+      !id ||
+      !newestMessageId ||
+      !screenFocused ||
+      !appActive ||
+      !readReceiptsEnabled
+    ) {
+      return;
+    }
+
     const timer = setTimeout(markRead, 400);
     return () => clearTimeout(timer);
-  }, [id, newestMessageId, markRead]);
+  }, [
+    appActive,
+    id,
+    markRead,
+    newestMessageId,
+    readReceiptsEnabled,
+    screenFocused,
+  ]);
 
   useEffect(() => {
     if (!id) return;
-
-    const join = () => socket.emit("join-conversation", id);
 
     const onNewMessage = (message: Message) => {
       if (message.conversationId !== id) return;
@@ -465,15 +578,39 @@ export default function ChatScreen() {
 
     const onTyping = ({ conversationId, userId, isTyping }: TypingEvent) => {
       if (conversationId !== id || userId === currentUserId) return;
-      setTypingUsers((users) => {
-        const next = { ...users };
-        if (isTyping) next[userId] = true;
-        else delete next[userId];
-        return next;
-      });
+
+      const existingTimeout = typingTimeouts.current.get(userId);
+      if (existingTimeout) clearTimeout(existingTimeout);
+
+      if (!isTyping) {
+        typingTimeouts.current.delete(userId);
+        setTypingUsers((users) => {
+          if (!users[userId]) return users;
+          const next = { ...users };
+          delete next[userId];
+          return next;
+        });
+        return;
+      }
+
+      setTypingUsers((users) =>
+        users[userId] ? users : { ...users, [userId]: true },
+      );
+
+      // A "typing" event can be the last one we receive if the sender's app
+      // dies. Expire it locally so the indicator cannot stick forever.
+      const timeout = setTimeout(() => {
+        typingTimeouts.current.delete(userId);
+        setTypingUsers((users) => {
+          if (!users[userId]) return users;
+          const next = { ...users };
+          delete next[userId];
+          return next;
+        });
+      }, TYPING_USER_TIMEOUT_MS);
+      typingTimeouts.current.set(userId, timeout);
     };
 
-    socket.on("connect", join);
     socket.on("new-message", onNewMessage);
     socket.on("message-updated", onMessageUpdated);
     socket.on("message-deleted", onMessageDeleted);
@@ -481,31 +618,39 @@ export default function ChatScreen() {
     socket.on("messages-read", onMessagesRead);
     socket.on("user-typing", onTyping);
     socket.connect();
-    join();
+    joinConversationRoom(id);
 
     return () => {
-      socket.emit("leave-conversation", id);
-      socket.off("connect", join);
+      leaveConversationRoom(id);
       socket.off("new-message", onNewMessage);
       socket.off("message-updated", onMessageUpdated);
       socket.off("message-deleted", onMessageDeleted);
       socket.off("message-reacted", onMessageReacted);
       socket.off("messages-read", onMessagesRead);
       socket.off("user-typing", onTyping);
+
+      clearTypingUserTimeouts();
     };
-  }, [addMessageToCache, currentUserId, id, queryClient, updateMessageInCache]);
+  }, [
+    addMessageToCache,
+    clearTypingUserTimeouts,
+    currentUserId,
+    id,
+    queryClient,
+    updateMessageInCache,
+  ]);
 
   useEffect(() => {
     return () => {
-      if (typingTimer.current) clearTimeout(typingTimer.current);
-      if (id) {
+      clearTypingTimer();
+      if (id && typingIndicatorsEnabled) {
         socket.emit("typing-conversation", {
           conversationId: id,
           isTyping: false,
         });
       }
     };
-  }, [id]);
+  }, [clearTypingTimer, id, typingIndicatorsEnabled]);
 
   useEffect(() => {
     return () => {
@@ -518,6 +663,18 @@ export default function ChatScreen() {
       }).catch(() => undefined);
     };
   }, [voiceRecorder]);
+
+  const beginSending = useCallback(() => {
+    if (sendingRef.current) return false;
+    sendingRef.current = true;
+    setSending(true);
+    return true;
+  }, []);
+
+  const endSending = useCallback(() => {
+    sendingRef.current = false;
+    setSending(false);
+  }, []);
 
   const sendMutation = useMutation({
     mutationFn: (input: {
@@ -533,22 +690,39 @@ export default function ChatScreen() {
       }),
     onSuccess: (message) => {
       addMessageToCache(message);
+      void queryClient.invalidateQueries({ queryKey: ["conversations"] });
       setText("");
       setReplyTo(null);
       setPendingAttachments([]);
+      setComposerError(null);
     },
-    onError: () => Alert.alert("Message not sent", "Please try again."),
+    onError: (error) => {
+      setComposerError(
+        getApiErrorMessage(error, "Message not sent. Please try again."),
+      );
+    },
+    onSettled: endSending,
   });
 
   const editMutation = useMutation({
-    mutationFn: (input: { messageId: string; content: string }) =>
-      messageApi.edit(input.messageId, input.content),
+    mutationFn: (input: {
+      messageId: string;
+      content: string;
+      cipherMeta?: CipherMeta;
+    }) => messageApi.edit(input.messageId, input.content, input.cipherMeta),
     onSuccess: (message) => {
       updateMessageInCache(message);
+      void queryClient.invalidateQueries({ queryKey: ["conversations"] });
       setText("");
       setEditing(null);
+      setComposerError(null);
     },
-    onError: () => Alert.alert("Could not edit message", "Please try again."),
+    onError: (error) => {
+      setComposerError(
+        getApiErrorMessage(error, "Could not edit message. Please try again."),
+      );
+    },
+    onSettled: endSending,
   });
 
   const deleteMutation = useMutation({
@@ -568,23 +742,47 @@ export default function ChatScreen() {
 
   const handleChangeText = (value: string) => {
     setText(value);
+    setComposerError(null);
 
-    if (!id || !socket.connected) return;
+    if (!id || !typingIndicatorsEnabled) return;
 
-    socket.emit("typing-conversation", {
-      conversationId: id,
-      isTyping: value.length > 0,
-    });
+    if (typingTimer.current) {
+      clearTimeout(typingTimer.current);
+      typingTimer.current = null;
+    }
 
-    if (typingTimer.current) clearTimeout(typingTimer.current);
-    if (value.length > 0) {
-      typingTimer.current = setTimeout(() => {
+    if (!value.trim()) {
+      lastTypingSentAt.current = 0;
+      if (socket.connected) {
         socket.emit("typing-conversation", {
           conversationId: id,
           isTyping: false,
         });
-      }, 1500);
+      }
+      return;
     }
+
+    const now = Date.now();
+    if (
+      socket.connected &&
+      now - lastTypingSentAt.current >= TYPING_THROTTLE_MS
+    ) {
+      lastTypingSentAt.current = now;
+      socket.emit("typing-conversation", {
+        conversationId: id,
+        isTyping: true,
+      });
+    }
+
+    typingTimer.current = setTimeout(() => {
+      lastTypingSentAt.current = 0;
+      if (socket.connected) {
+        socket.emit("typing-conversation", {
+          conversationId: id,
+          isTyping: false,
+        });
+      }
+    }, TYPING_STOP_DELAY_MS);
   };
 
   const removePendingAttachment = (pendingId: string) => {
@@ -593,37 +791,56 @@ export default function ChatScreen() {
     );
   };
 
-  const uploadPendingAttachment = async (pending: PendingAttachment) => {
-    try {
-      const attachment = await attachmentApi.upload({
-        uri: pending.uri,
-        contentType: pending.contentType,
-        fileName: pending.fileName,
-        fileSize: pending.fileSize,
-        width: pending.width,
-        height: pending.height,
-        duration: pending.duration,
-      });
+  const uploadPendingAttachments = async (): Promise<string[] | null> => {
+    const attachmentIds: string[] = [];
+
+    for (const pending of pendingAttachments) {
+      if (pending.attachment) {
+        attachmentIds.push(pending.attachment.id);
+        continue;
+      }
+
       setPendingAttachments((attachments) =>
         attachments.map((item) =>
           item.id === pending.id
-            ? { ...item, status: "ready", attachment, error: undefined }
+            ? { ...item, status: "uploading", error: undefined }
             : item,
         ),
       );
-    } catch (error) {
-      setPendingAttachments((attachments) =>
-        attachments.map((item) =>
-          item.id === pending.id
-            ? {
-                ...item,
-                status: "error",
-                error: getApiErrorMessage(error, "Upload failed"),
-              }
-            : item,
-        ),
-      );
+
+      try {
+        const attachment = await attachmentApi.upload({
+          uri: pending.uri,
+          contentType: pending.contentType,
+          fileName: pending.fileName,
+          fileSize: pending.fileSize,
+          width: pending.width,
+          height: pending.height,
+          duration: pending.duration,
+        });
+        setPendingAttachments((attachments) =>
+          attachments.map((item) =>
+            item.id === pending.id
+              ? { ...item, status: "ready", attachment, error: undefined }
+              : item,
+          ),
+        );
+        attachmentIds.push(attachment.id);
+      } catch (error) {
+        const message = getApiErrorMessage(error, "Upload failed.");
+        setPendingAttachments((attachments) =>
+          attachments.map((item) =>
+            item.id === pending.id
+              ? { ...item, status: "error", error: message }
+              : item,
+          ),
+        );
+        setComposerError(message);
+        return null;
+      }
     }
+
+    return attachmentIds;
   };
 
   const pickAttachments = async () => {
@@ -675,7 +892,7 @@ export default function ChatScreen() {
           fileSize,
           width: asset.width || undefined,
           height: asset.height || undefined,
-          status: "uploading",
+          status: "ready",
           attachment: null,
         });
       }
@@ -691,9 +908,6 @@ export default function ChatScreen() {
       if (!next.length) return;
 
       setPendingAttachments((attachments) => [...attachments, ...next]);
-      next.forEach((pending) => {
-        void uploadPendingAttachment(pending);
-      });
     } catch {
       Alert.alert("Could not attach image", "Please try again.");
     }
@@ -820,24 +1034,78 @@ export default function ChatScreen() {
       contentType,
       fileSize,
       duration: formatDurationMillis(durationMillis),
-      status: "uploading",
+      status: "ready",
       attachment: null,
     };
 
     setPendingAttachments((attachments) => [...attachments, pending]);
     setRecordingActive(false);
     setFinalizingRecording(false);
-    void uploadPendingAttachment(pending);
   };
 
-  const encryptForConversation = async (plaintext: string) => {
-    if (!identityKeys || !id || !peerId) return null;
+  const getEncryptionUnavailableMessage = () => {
+    if (e2eStatus === "server-key-missing-local") {
+      return "Your encryption keys aren't on this device. Restore them from the web app before sending messages.";
+    }
+    if (e2eStatus === "error") {
+      return "Encryption couldn't be initialized. Check your connection and try again.";
+    }
+    if (e2eStatus === "loading" || e2eStatus === "idle") {
+      return "Encryption keys are still loading. Try again in a moment.";
+    }
+    return "Encryption isn't available for this conversation yet.";
+  };
+
+  const encryptForConversation = async (
+    plaintext: string,
+    groupMode: boolean,
+  ): Promise<{ content: string; cipherMeta: CipherMeta }> => {
+    if (!identityKeys || !id) {
+      throw new Error(getEncryptionUnavailableMessage());
+    }
+
+    if (groupMode) {
+      if (!currentUserId) {
+        throw new Error(getEncryptionUnavailableMessage());
+      }
+      if (groupKeysQuery.isPending) {
+        throw new Error("Group encryption keys are still loading. Try again.");
+      }
+      if (!groupKeysComplete) {
+        throw new Error(
+          "Waiting for every group member's encryption key. Nothing was sent.",
+        );
+      }
+
+      const encrypted = await encryptGroupMessage({
+        privateKey: identityKeys.privateKey,
+        conversationId: id,
+        currentUserId,
+        plaintext,
+        recipientPublicKeys: {
+          ...groupPublicKeys,
+          [currentUserId]: identityKeys.publicKey,
+        },
+        requiredRecipientIds: [...groupPeerIds, currentUserId],
+      });
+
+      if (!encrypted) {
+        throw new Error(
+          "Could not encrypt this message for everyone. Nothing was sent.",
+        );
+      }
+      return encrypted;
+    }
+
+    if (!peerId) {
+      throw new Error("This conversation isn't ready to encrypt yet.");
+    }
+    if (peerKeyQuery.isPending) {
+      throw new Error("Encryption keys are still loading. Try again.");
+    }
 
     let recipientPublicKey = peerPublicKey;
-    if (
-      !recipientPublicKey &&
-      (peerKeyQuery.isPending || peerKeyQuery.isFetching)
-    ) {
+    if (!recipientPublicKey) {
       try {
         const result = await peerKeyQuery.refetch();
         recipientPublicKey = result.data ?? null;
@@ -846,7 +1114,11 @@ export default function ChatScreen() {
       }
     }
 
-    if (!recipientPublicKey) return null;
+    if (!recipientPublicKey) {
+      throw new Error(
+        "This person's encryption key isn't available yet. Nothing was sent.",
+      );
+    }
 
     const key =
       conversationKey ??
@@ -859,77 +1131,124 @@ export default function ChatScreen() {
     return encryptMessage(key, plaintext);
   };
 
-  const encryptGroupForConversation = async (plaintext: string) => {
-    if (!identityKeys || !id || !currentUserId) return null;
-    if (Object.keys(groupPublicKeys).length === 0) return null;
-
-    return encryptGroupMessage({
-      privateKey: identityKeys.privateKey,
-      conversationId: id,
-      currentUserId,
-      plaintext,
-      recipientPublicKeys: {
-        ...groupPublicKeys,
-        [currentUserId]: identityKeys.publicKey,
-      },
-    });
-  };
-
   const handleSend = async () => {
     const rawContent = text.trim();
     if (!id) return;
 
     if (editing) {
       if (!rawContent) return;
-      editMutation.mutate({ messageId: editing.id, content: rawContent });
+
+      if (editing.cipherMeta) {
+        if (encryptionKeysLoading) {
+          setComposerError(
+            "Encryption keys are still loading. Try again in a moment.",
+          );
+          return;
+        }
+        if (!canEncryptConversation) {
+          setComposerError(getEncryptionUnavailableMessage());
+          return;
+        }
+      }
+
+      if (!beginSending()) return;
+
+      try {
+        if (editing.cipherMeta) {
+          const encrypted = await encryptForConversation(
+            rawContent,
+            editing.cipherMeta.mode === "group",
+          );
+          editMutation.mutate({
+            messageId: editing.id,
+            content: encrypted.content,
+            cipherMeta: encrypted.cipherMeta,
+          });
+        } else {
+          editMutation.mutate({
+            messageId: editing.id,
+            content: rawContent,
+          });
+        }
+      } catch (error) {
+        setComposerError(
+          error instanceof Error
+            ? error.message
+            : "Could not encrypt this edit. Nothing was changed.",
+        );
+        endSending();
+      }
       return;
     }
 
-    if (uploadingAttachments) return;
-    if (!rawContent && readyAttachmentIds.length === 0) return;
+    if (!rawContent && !hasPendingAttachments) return;
+    if (!beginSending()) return;
 
-    let content = rawContent;
-    let cipherMeta: CipherMeta | undefined;
+    try {
+      let content = rawContent;
+      let cipherMeta: CipherMeta | undefined;
 
-    if (rawContent && identityKeys && (isGroup || peerId)) {
-      try {
-        const encrypted = isGroup
-          ? await encryptGroupForConversation(rawContent)
-          : await encryptForConversation(rawContent);
-        if (encrypted) {
-          content = encrypted.content;
-          cipherMeta = encrypted.cipherMeta;
+      if (rawContent) {
+        if (!conversation) {
+          throw new Error("This conversation is still loading. Try again.");
         }
-      } catch {
-        Alert.alert(
-          "Message not sent",
-          "Could not encrypt this message. Please try again.",
-        );
+        if (encryptionKeysLoading) {
+          throw new Error(
+            "Encryption keys are still loading. Try again in a moment.",
+          );
+        }
+        if (!canEncryptConversation) {
+          throw new Error(getEncryptionUnavailableMessage());
+        }
+
+        const encrypted = await encryptForConversation(rawContent, isGroup);
+        content = encrypted.content;
+        cipherMeta = encrypted.cipherMeta;
+      }
+
+      const attachmentIds = await uploadPendingAttachments();
+      if (!attachmentIds) {
+        endSending();
         return;
       }
-    }
 
-    sendMutation.mutate({
-      content,
-      cipherMeta,
-      replyToId: replyTo?.id,
-      attachmentIds: readyAttachmentIds,
-    });
+      sendMutation.mutate({
+        content,
+        cipherMeta,
+        replyToId: replyTo?.id,
+        attachmentIds,
+      });
+    } catch (error) {
+      setComposerError(
+        error instanceof Error
+          ? error.message
+          : "Message not sent. Please try again.",
+      );
+      endSending();
+    }
   };
 
   const startReply = (message: Message) => {
     setEditing(null);
     setReplyTo(message);
     setSelectedId(null);
+    setComposerError(null);
   };
 
-  const startEdit = (message: Message) => {
+  const startEdit = (message: DisplayMessage) => {
     if (message.cipherMeta) {
-      Alert.alert(
-        "Encrypted message",
-        "Editing encrypted messages isn't supported on this device yet.",
-      );
-      return;
+      if (message.decryptionState) {
+        setComposerError("This message can't be decrypted on this device.");
+        return;
+      }
+      if (encryptionKeysLoading) {
+        setComposerError("Encryption keys are still loading.");
+        return;
+      }
+      if (!canEncryptConversation) {
+        setComposerError(getEncryptionUnavailableMessage());
+        return;
+      }
     }
 
     setReplyTo(null);
@@ -937,6 +1256,7 @@ export default function ChatScreen() {
     setSelectedId(null);
     setPendingAttachments([]);
     setText(message.content);
+    setComposerError(null);
   };
 
   const confirmDelete = (message: Message) => {
@@ -955,6 +1275,7 @@ export default function ChatScreen() {
     setEditing(null);
     setReplyTo(null);
     setText("");
+    setComposerError(null);
   };
 
   const typingNames = Object.keys(typingUsers)
@@ -970,11 +1291,20 @@ export default function ChatScreen() {
     ? `${typingNames.join(", ")} ${typingNames.length === 1 ? "is" : "are"} typing…`
     : null;
 
+  const encryptionPendingForText =
+    Boolean(text.trim()) && encryptionKeysLoading;
+  const canEditEncryptedMessage =
+    canEncryptConversation && !encryptionKeysLoading;
+
   const sendDisabled = editing
-    ? !text.trim() || editMutation.isPending
-    : (!text.trim() && readyAttachmentIds.length === 0) ||
-      uploadingAttachments ||
-      sendMutation.isPending;
+    ? !text.trim() ||
+      sending ||
+      editMutation.isPending ||
+      (Boolean(editing.cipherMeta) && !canEditEncryptedMessage)
+    : (!text.trim() && !hasPendingAttachments) ||
+      sending ||
+      sendMutation.isPending ||
+      encryptionPendingForText;
 
   const renderMessage = ({ item }: { item: DisplayMessage }) => {
     const own = item.senderId === currentUserId;
@@ -1024,9 +1354,11 @@ export default function ChatScreen() {
                 <Text style={styles.replyText} numberOfLines={1}>
                   {item.replyTo.deleted
                     ? "Message deleted"
-                    : (item.replyTo.preview ??
-                      item.replyTo.content ??
-                      "Original message")}
+                    : item.replyTo.encrypted
+                      ? "Encrypted message"
+                      : (item.replyTo.preview ??
+                        item.replyTo.content ??
+                        "Original message")}
                 </Text>
               </View>
             ) : null}
@@ -1158,7 +1490,8 @@ export default function ChatScreen() {
                 </TouchableOpacity>
                 {own && !item.deletedAt ? (
                   <>
-                    {!item.cipherMeta ? (
+                    {!item.cipherMeta ||
+                    (!item.decryptionState && canEditEncryptedMessage) ? (
                       <TouchableOpacity onPress={() => startEdit(item)}>
                         <Text style={styles.actionText}>Edit</Text>
                       </TouchableOpacity>
@@ -1190,9 +1523,9 @@ export default function ChatScreen() {
         }}
       />
 
-      {e2ePlaintextNotice ? (
+      {e2eNotice ? (
         <View style={styles.e2eNotice}>
-          <Text style={styles.e2eNoticeText}>{e2ePlaintextNotice}</Text>
+          <Text style={styles.e2eNoticeText}>{e2eNotice}</Text>
         </View>
       ) : null}
 
@@ -1234,6 +1567,14 @@ export default function ChatScreen() {
 
       {typingLabel ? <Text style={styles.typing}>{typingLabel}</Text> : null}
 
+      {composerError ? (
+        <View style={styles.composerError}>
+          <Text style={styles.composerErrorText}>{composerError}</Text>
+        </View>
+      ) : encryptionPendingForText ? (
+        <Text style={styles.composerHint}>Loading encryption keys…</Text>
+      ) : null}
+
       {editing || replyTo ? (
         <View style={styles.composerContext}>
           <View style={styles.composerContextBody}>
@@ -1244,7 +1585,11 @@ export default function ChatScreen() {
             </Text>
             {!editing && replyTo ? (
               <Text style={styles.composerContextText} numberOfLines={1}>
-                {replyTo.deletedAt ? "Message deleted" : replyTo.content}
+                {replyTo.deletedAt
+                  ? "Message deleted"
+                  : replyTo.cipherMeta
+                    ? "Encrypted message"
+                    : replyTo.content}
               </Text>
             ) : null}
           </View>
@@ -1582,6 +1927,20 @@ const createStyles = (palette: Palette) =>
       borderTopWidth: 1,
       borderTopColor: palette.divider,
       backgroundColor: palette.surfaceMuted,
+    },
+    composerError: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderTopWidth: 1,
+      borderTopColor: palette.danger,
+      backgroundColor: palette.surfaceMuted,
+    },
+    composerErrorText: { color: palette.danger, fontSize: 12, lineHeight: 16 },
+    composerHint: {
+      color: palette.textMuted,
+      fontSize: 12,
+      paddingHorizontal: 16,
+      paddingBottom: 4,
     },
     composerContextBody: { flex: 1, gap: 2 },
     composerContextTitle: {

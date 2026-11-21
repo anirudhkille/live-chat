@@ -1,4 +1,8 @@
-import { PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
+import {
+  PutObjectCommand,
+  HeadObjectCommand,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { r2 } from "../../config/r2.js";
 import { env } from "../../config/env.config.js";
@@ -19,4 +23,8 @@ export async function getObjectMetadata(key) {
     new HeadObjectCommand({ Bucket: BUCKET, Key: key }),
   );
   return response;
+}
+
+export async function deleteObject(key) {
+  await r2.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
 }
