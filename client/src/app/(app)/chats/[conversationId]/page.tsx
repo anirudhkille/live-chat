@@ -3,7 +3,11 @@
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Info, Users } from "lucide-react";
-import { socket } from "@/lib/socket";
+import {
+  joinConversationRoom,
+  leaveConversationRoom,
+  socket,
+} from "@/lib/socket";
 import { useSocketEvents } from "@/hooks/useSocketEvents";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -70,17 +74,11 @@ export default function ChatThreadPage({
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const join = () => {
-      socket.emit("join-conversation", conversationId);
-    };
-
     socket.connect();
-    join();
-    socket.on("connect", join);
+    joinConversationRoom(conversationId);
 
     return () => {
-      socket.off("connect", join);
-      socket.emit("leave-conversation", conversationId);
+      leaveConversationRoom(conversationId);
     };
   }, [conversationId]);
 

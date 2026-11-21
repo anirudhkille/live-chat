@@ -15,6 +15,7 @@ import {
   removeUserFromConversation,
 } from "../../config/socket.js";
 import { AppError } from "../../utils/AppError.js";
+import { planLeaveGroup } from "./conversation.leave.js";
 
 const GROUP_PHOTO_ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const GROUP_PHOTO_MAX_SIZE = 5 * 1024 * 1024; // 5MB
@@ -266,18 +267,12 @@ export const leaveGroup = async (conversationId, userId) => {
     throw new AppError(404, "Group not found");
   }
 
-  const participant = conversation.participants.find(
-    (p) => p.userId === userId,
-  );
-  if (!participant) {
+  const plan = planLeaveGroup(conversation.participants, userId);
+  if (!plan.allowed) {
     throw new AppError(403, "You are not a member of this group");
   }
 
-  const remaining = conversation.participants.filter(
-    (p) => p.userId !== userId,
-  );
-
-  if (remaining.length === 0) {
+  if (plan.deleted) {
     removeUserFromConversation(userId, conversationId);
     await conversationRepository.deleteById(conversationId);
     return { left: true, deleted: true };
@@ -286,13 +281,10 @@ export const leaveGroup = async (conversationId, userId) => {
   await conversationRepository.removeParticipant(conversationId, userId);
   removeUserFromConversation(userId, conversationId);
 
-  if (
-    participant.role === "admin" &&
-    !remaining.some((p) => p.role === "admin")
-  ) {
+  if (plan.promoteUserId) {
     await conversationRepository.updateParticipantRole(
       conversationId,
-      remaining[0].userId,
+      plan.promoteUserId,
       "admin",
     );
   }

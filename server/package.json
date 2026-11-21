@@ -9,6 +9,7 @@
     "dev": "nodemon --exec \"node --import ./src/instrument.js src/server.js\" src/server.js",
     "build": "prisma generate",
     "lint": "oxlint src/",
+    "test": "node --test src/",
     "format": "prettier --write src/"
   },
   "lint-staged": {

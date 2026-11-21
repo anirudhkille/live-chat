@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { socket } from "@/lib/socket";
+import {
+  joinConversationRoom,
+  leaveConversationRoom,
+  socket,
+} from "@/lib/socket";
 import { useAuthStore } from "@/store/auth-store";
 import { useCallStore, type CallEndReason, type CallType } from "./call-store";
 
@@ -218,6 +222,8 @@ export function useCalls() {
 
   const endCallFlow = useCallback(
     (reason: CallEndReason) => {
+      const { conversationId } = useCallStore.getState();
+      if (conversationId) leaveConversationRoom(conversationId);
       resetConnection();
       useCallStore.getState().endCall(reason);
     },
@@ -286,6 +292,7 @@ export function useCalls() {
 
     const newCallId = crypto.randomUUID();
     callIdRef.current = newCallId;
+    joinConversationRoom(args.conversationId);
     useCallStore.getState().startOutgoing({
       callId: newCallId,
       type: args.type,
@@ -309,6 +316,7 @@ export function useCalls() {
     const state = useCallStore.getState();
     if (state.status !== "incoming" || !state.callId || !state.type) return;
     callIdRef.current = state.callId;
+    if (state.conversationId) joinConversationRoom(state.conversationId);
 
     try {
       const stream = await ensureLocalStream(state.type);
