@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@/components/theme-provider";
+import { SessionBootstrap } from "@/components/session-bootstrap";
 import { SessionReset } from "@/hooks/use-session-reset";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -21,6 +22,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <SessionBootstrap />
       <SessionReset />
       <ThemeProvider>{children}</ThemeProvider>
     </QueryClientProvider>

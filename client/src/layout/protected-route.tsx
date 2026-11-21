@@ -18,11 +18,11 @@ import { useAuthStore } from "@/store/auth-store";
  */
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { token, user, hasHydrated } = useAuth();
+  const { token, user, hasHydrated, isRestoring } = useAuth();
   const userId = user?.id ?? null;
 
   useEffect(() => {
-    if (!hasHydrated) return;
+    if (!hasHydrated || isRestoring) return;
     if (!token) {
       router.replace("/login");
       return;
@@ -30,7 +30,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     if (!user?.name) {
       router.replace("/complete-profile");
     }
-  }, [router, token, user, hasHydrated]);
+  }, [router, token, user, hasHydrated, isRestoring]);
 
   // Connect for the lifetime of the signed-in user only. A token refresh
   // changes `token` but not `userId`, and must not tear down live rooms.
@@ -69,7 +69,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  if (!hasHydrated || !token || !user?.name) {
+  if (!hasHydrated || isRestoring || !token || !user?.name) {
     return (
       <div className="flex h-dvh items-center justify-center">
         <Spinner />
