@@ -242,6 +242,9 @@ export default function ChatThreadPage({
         conversationId={conversationId}
         peerId={conversation?.otherUserId ?? null}
         isGroup={conversation?.isGroup ?? false}
+        participantIds={conversation?.participants?.map(
+          (participant) => participant.id
+        )}
         initialMessages={conversationData?.messages}
       />
 
@@ -249,6 +252,9 @@ export default function ChatThreadPage({
         conversationId={conversationId}
         peerId={conversation?.otherUserId ?? null}
         isGroup={conversation?.isGroup ?? false}
+        participantIds={conversation?.participants?.map(
+          (participant) => participant.id
+        )}
       />
 
       {conversation?.isGroup && (

@@ -7,6 +7,7 @@ import {
   updateGroup,
   deleteGroup,
   removeGroupParticipant,
+  leaveGroup,
   getGroupPhotoUploadUrl,
 } from "../api/conversation-api";
 import { putPresignedObject } from "@/lib/api";
@@ -66,6 +67,26 @@ export function useRemoveGroupParticipant(conversationId: string) {
     },
     onError: (error) => {
       toast.error(getApiErrorMessage(error, "Couldn't remove member"));
+    },
+  });
+}
+
+export function useLeaveGroup(conversationId: string) {
+  const queryClient = useQueryClient();
+  const router = useRouter();
+
+  return useMutation({
+    mutationFn: () => leaveGroup(conversationId),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      queryClient.removeQueries({
+        queryKey: ["conversation-with-messages", conversationId],
+      });
+      toast.success(response.data.deleted ? "Group deleted" : "Left group");
+      router.replace("/chats");
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, "Couldn't leave group"));
     },
   });
 }

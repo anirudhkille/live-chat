@@ -72,6 +72,15 @@ export async function removeGroupParticipant(
   return response.data;
 }
 
+export async function leaveGroup(
+  conversationId: string
+): Promise<ApiResponse<{ left: boolean; deleted: boolean }>> {
+  const response = await api.delete<
+    ApiResponse<{ left: boolean; deleted: boolean }>
+  >(`/conversation/${conversationId}/leave`);
+  return response.data;
+}
+
 export async function getGroupParticipants(
   conversationId: string
 ): Promise<ApiResponse<GroupParticipant[]>> {

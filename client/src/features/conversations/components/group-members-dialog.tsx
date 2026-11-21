@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Plus, Trash2, Camera, Pencil, X } from "lucide-react";
+import { Plus, Trash2, Camera, Pencil, X, LogOut } from "lucide-react";
 import { toast } from "sonner";
 
 import { Dialog } from "@/components/ui/dialog";
@@ -17,6 +17,7 @@ import {
   useUpdateGroup,
   useDeleteGroup,
   useRemoveGroupParticipant,
+  useLeaveGroup,
   useUploadGroupPhoto,
 } from "../hooks/useGroupAdmin";
 import type { Conversation, GroupParticipant } from "@/types/api";
@@ -36,6 +37,7 @@ export function GroupMembersDialog({
   const updateGroup = useUpdateGroup(conversation.id);
   const deleteGroup = useDeleteGroup(conversation.id);
   const removeMember = useRemoveGroupParticipant(conversation.id);
+  const leaveGroup = useLeaveGroup(conversation.id);
   const uploadPhoto = useUploadGroupPhoto();
 
   const [query, setQuery] = useState("");
@@ -45,6 +47,7 @@ export function GroupMembersDialog({
   const [groupName, setGroupName] = useState(conversation.name ?? "");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   const isAdmin = conversation.currentUserRole === "admin";
 
@@ -292,6 +295,42 @@ export function GroupMembersDialog({
           )}
         </div>
       )}
+
+      <div className="mt-4 border-t pt-4">
+        {!showLeaveConfirm ? (
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => setShowLeaveConfirm(true)}
+          >
+            <LogOut className="h-4 w-4" />
+            Leave group
+          </Button>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-muted-foreground text-xs">
+              You will stop receiving messages from this group.
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowLeaveConfirm(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={() => leaveGroup.mutate()}
+                disabled={leaveGroup.isPending}
+              >
+                {leaveGroup.isPending ? "Leaving..." : "Leave"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
     </Dialog>
   );
 }

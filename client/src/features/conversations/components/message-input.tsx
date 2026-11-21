@@ -1,18 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { AlertTriangle, Mic, Paperclip, Send, X } from "lucide-react";
 import { socket } from "@/lib/socket";
+import { useAuthStore } from "@/store/auth-store";
 import { useChatStore } from "@/store/chat-store";
 import { useSendMessage } from "@/features/conversations/hooks/useSendMessage";
 import { useUserPreferences } from "@/features/users/hooks/useUserPreferences";
 import { useE2EIdentity } from "@/features/e2e/hooks/useE2EIdentity";
-import { usePeerPublicKey } from "@/features/e2e/hooks/usePeerPublicKey";
+import {
+  usePeerPublicKey,
+  usePeerPublicKeys,
+} from "@/features/e2e/hooks/usePeerPublicKey";
 import { deriveConversationKey } from "@/lib/crypto/conversationKey";
-import { encryptMessage } from "@/lib/crypto/messaging";
+import { encryptGroupMessage, encryptMessage } from "@/lib/crypto/messaging";
 import dynamic from "next/dynamic";
 import {
   uploadAttachment,
@@ -32,6 +36,7 @@ type MessageInputProps = {
   conversationId: string;
   peerId: string | null;
   isGroup: boolean;
+  participantIds?: string[];
 };
 
 type PendingAttachment = {
@@ -46,6 +51,7 @@ export function MessageInput({
   conversationId,
   peerId,
   isGroup,
+  participantIds,
 }: MessageInputProps) {
   const draft = useChatStore((s) => s.drafts[conversationId] ?? "");
   const setDraft = useChatStore((s) => s.setDraft);
@@ -60,8 +66,22 @@ export function MessageInput({
   const { data: preferences } = useUserPreferences();
   const typingEnabled = preferences?.typingIndicators !== false;
   const { keys } = useE2EIdentity();
+  const currentUserId = useAuthStore((s) => s.user?.id);
   const { data: peerPublicKey } = usePeerPublicKey(isGroup ? null : peerId);
+  const groupPeerIds = useMemo(
+    () =>
+      isGroup
+        ? (participantIds ?? []).filter((id) => id !== currentUserId)
+        : [],
+    [isGroup, participantIds, currentUserId]
+  );
+  const { publicKeys: groupPublicKeys } = usePeerPublicKeys(groupPeerIds);
   const canEncrypt = !isGroup && !!keys && !!peerPublicKey;
+  const canEncryptGroup =
+    isGroup &&
+    !!keys &&
+    !!currentUserId &&
+    Object.keys(groupPublicKeys).length > 0;
   const typingStopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
@@ -216,6 +236,21 @@ export function MessageInput({
         const encrypted = await encryptMessage(conversationKey, rawContent);
         content = encrypted.content;
         cipherMeta = encrypted.cipherMeta;
+      } else if (canEncryptGroup && rawContent && keys && currentUserId) {
+        const encrypted = await encryptGroupMessage({
+          privateKey: keys.privateKey,
+          conversationId,
+          currentUserId,
+          plaintext: rawContent,
+          recipientPublicKeys: {
+            ...groupPublicKeys,
+            [currentUserId]: keys.publicKey,
+          },
+        });
+        if (encrypted) {
+          content = encrypted.content;
+          cipherMeta = encrypted.cipherMeta;
+        }
       }
     } catch (error) {
       sendingRef.current = false;
@@ -262,6 +297,9 @@ export function MessageInput({
     canEncrypt,
     keys,
     peerPublicKey,
+    canEncryptGroup,
+    currentUserId,
+    groupPublicKeys,
   ]);
 
   const handleKeyDown = useCallback(
