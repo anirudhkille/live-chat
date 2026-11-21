@@ -45,9 +45,16 @@ export type MessageReaction = {
   };
 };
 
+export type CipherMetaEntry = {
+  iv: string;
+  content: string;
+};
+
 export type CipherMeta = {
   version: number;
   iv: string;
+  mode?: "group";
+  entries?: Record<string, CipherMetaEntry>;
   salt?: string;
   publicKey?: string;
   [key: string]: unknown;

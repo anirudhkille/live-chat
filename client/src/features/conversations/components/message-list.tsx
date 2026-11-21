@@ -28,6 +28,7 @@ type MessageListProps = {
   conversationId: string;
   peerId?: string | null;
   isGroup?: boolean;
+  participantIds?: string[];
   initialMessages?: Message[];
 };
 
@@ -93,6 +94,7 @@ export function MessageList({
   conversationId,
   peerId = null,
   isGroup = false,
+  participantIds,
   initialMessages,
 }: MessageListProps) {
   const {
@@ -156,7 +158,8 @@ export function MessageList({
   const displayMessages = useDecryptedMessages(
     conversationId,
     isGroup ? null : peerId,
-    messages
+    messages,
+    { isGroup, participantIds }
   );
 
   const items = useMemo<ListItem[]>(() => {
