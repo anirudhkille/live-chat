@@ -2,11 +2,14 @@
   "name": "live-chat",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=26.0.0"
+  },
   "scripts": {
     "prepare": "husky"
   },
   "devDependencies": {
     "husky": "^9.1.7",
-    "lint-staged": "^17.5.0"
+    "lint-staged": "^17.6.1"
   }
 }
