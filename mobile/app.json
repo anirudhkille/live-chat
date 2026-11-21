@@ -35,6 +35,7 @@
     "plugins": [
       "expo-router",
       "expo-status-bar",
+      "expo-updates",
       [
         "expo-audio",
         {
@@ -50,6 +51,12 @@
         }
       ]
     ],
+    "updates": {
+      "url": "https://u.expo.dev/42710b9a-c6f4-4f6e-bff7-1b3512a9e7d4"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "extra": {
       "router": {
         "asyncRoutes": {
