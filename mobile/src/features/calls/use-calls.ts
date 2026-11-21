@@ -10,6 +10,7 @@ import {
   RTCPeerConnection,
 } from "react-native-webrtc";
 
+import { TURN_CREDENTIAL, TURN_URL, TURN_USERNAME } from "@/lib/env";
 import { socket } from "@/lib/socket";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -37,10 +38,24 @@ import type {
   StartCallArgs,
 } from "./types";
 
-const ICE_SERVERS = [
+type IceServer = {
+  urls: string;
+  username?: string;
+  credential?: string;
+};
+
+const ICE_SERVERS: IceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
 ];
+
+if (TURN_URL) {
+  ICE_SERVERS.push({
+    urls: TURN_URL,
+    username: TURN_USERNAME || undefined,
+    credential: TURN_CREDENTIAL || undefined,
+  });
+}
 
 type PendingCandidate = {
   candidate?: string;

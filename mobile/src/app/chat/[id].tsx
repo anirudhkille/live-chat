@@ -49,9 +49,12 @@ import {
   type DisplayMessage,
 } from "@/features/e2e/hooks/use-decrypted-messages";
 import { useE2EIdentity } from "@/features/e2e/hooks/use-e2e-identity";
-import { usePeerPublicKey } from "@/features/e2e/hooks/use-peer-public-key";
+import {
+  usePeerPublicKey,
+  usePeerPublicKeys,
+} from "@/features/e2e/hooks/use-peer-public-key";
 import { deriveConversationKey } from "@/lib/crypto/conversation-key";
-import { encryptMessage } from "@/lib/crypto/messaging";
+import { encryptGroupMessage, encryptMessage } from "@/lib/crypto/messaging";
 import { socket } from "@/lib/socket";
 import { useAuthStore } from "@/store/auth-store";
 import { useAppTheme } from "@/theme/use-app-theme";
@@ -299,11 +302,26 @@ export default function ChatScreen() {
   });
 
   const { keys: identityKeys, status: e2eStatus } = useE2EIdentity();
-  const peerId = conversation?.isGroup
-    ? null
-    : (conversation?.otherUserId ?? null);
+  const isGroup = Boolean(conversation?.isGroup);
+  const participantIds = useMemo(
+    () =>
+      conversation?.participants?.map((participant) => participant.id) ?? [],
+    [conversation?.participants],
+  );
+  const peerId = isGroup ? null : (conversation?.otherUserId ?? null);
   const peerKeyQuery = usePeerPublicKey(peerId);
   const peerPublicKey = peerKeyQuery.data ?? null;
+  const groupPeerIds = useMemo(
+    () =>
+      isGroup
+        ? participantIds.filter(
+            (participantId) => participantId !== currentUserId,
+          )
+        : [],
+    [isGroup, participantIds, currentUserId],
+  );
+  const groupKeysQuery = usePeerPublicKeys(groupPeerIds);
+  const groupPublicKeys = groupKeysQuery.publicKeys;
   const e2ePlaintextNotice = conversation?.isGroup
     ? null
     : e2eStatus === "server-key-missing-local"
@@ -347,6 +365,7 @@ export default function ChatScreen() {
     conversationId: id,
     peerId,
     messages,
+    participantIds: isGroup ? participantIds : undefined,
   });
   const newestMessageId = messages[0]?.id;
 
@@ -840,6 +859,22 @@ export default function ChatScreen() {
     return encryptMessage(key, plaintext);
   };
 
+  const encryptGroupForConversation = async (plaintext: string) => {
+    if (!identityKeys || !id || !currentUserId) return null;
+    if (Object.keys(groupPublicKeys).length === 0) return null;
+
+    return encryptGroupMessage({
+      privateKey: identityKeys.privateKey,
+      conversationId: id,
+      currentUserId,
+      plaintext,
+      recipientPublicKeys: {
+        ...groupPublicKeys,
+        [currentUserId]: identityKeys.publicKey,
+      },
+    });
+  };
+
   const handleSend = async () => {
     const rawContent = text.trim();
     if (!id) return;
@@ -856,9 +891,11 @@ export default function ChatScreen() {
     let content = rawContent;
     let cipherMeta: CipherMeta | undefined;
 
-    if (rawContent && identityKeys && peerId) {
+    if (rawContent && identityKeys && (isGroup || peerId)) {
       try {
-        const encrypted = await encryptForConversation(rawContent);
+        const encrypted = isGroup
+          ? await encryptGroupForConversation(rawContent)
+          : await encryptForConversation(rawContent);
         if (encrypted) {
           content = encrypted.content;
           cipherMeta = encrypted.cipherMeta;

@@ -1,13 +1,52 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import * as Notifications from "expo-notifications";
+import { router, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useAuthStore } from "@/store/auth-store";
+import { useCallStore } from "@/features/calls/call-store";
 import { CallProvider } from "@/features/calls/call-provider";
 import { E2EIdentityBootstrap } from "@/features/e2e/components/e2e-identity-bootstrap";
-import { registerExpoPushToken } from "@/features/push-notifications/register";
+import {
+  registerExpoPushToken,
+  registerNotificationCategories,
+} from "@/features/push-notifications/register";
 import { useAppTheme } from "@/theme/use-app-theme";
+
+function NotificationRouter() {
+  const response = Notifications.useLastNotificationResponse();
+  const handledRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!response) return;
+
+    const action = response.actionIdentifier;
+    const key = `${response.notification.request.identifier}:${action}`;
+    if (handledRef.current === key) return;
+    handledRef.current = key;
+
+    const data = response.notification.request.content.data ?? {};
+    const conversationId =
+      typeof data.conversationId === "string" ? data.conversationId : null;
+    const callId = typeof data.callId === "string" ? data.callId : null;
+
+    if (callId && (action === "accept" || action === "decline")) {
+      useCallStore.getState().setAutoAction({
+        callId,
+        action: action === "accept" ? "accept" : "decline",
+      });
+    }
+
+    if (conversationId && action !== "decline") {
+      router.push(`/chat/${conversationId}`);
+    }
+
+    Notifications.clearLastNotificationResponseAsync().catch(() => {});
+  }, [response]);
+
+  return null;
+}
 
 export default function RootLayout() {
   const [queryClient] = useState(
@@ -23,6 +62,10 @@ export default function RootLayout() {
   const { scheme, palette } = useAppTheme();
 
   useEffect(() => {
+    registerNotificationCategories().catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (token) {
       registerExpoPushToken().catch(() => {});
     }
@@ -30,6 +73,7 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <NotificationRouter />
       <CallProvider>
         <StatusBar style={scheme === "dark" ? "light" : "dark"} />
         <E2EIdentityBootstrap />

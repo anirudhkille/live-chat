@@ -95,6 +95,12 @@ export const conversationApi = {
     );
     return data.data;
   },
+  leaveGroup: async (conversationId: string) => {
+    const { data } = await api.delete<
+      ApiResponse<{ left: boolean; deleted: boolean }>
+    >(`/conversation/${conversationId}/leave`);
+    return data.data;
+  },
 };
 
 export const messageApi = {

@@ -16,6 +16,15 @@ EXPO_PUBLIC_API_URL=https://live-chat-api.anirudhkille.com/api
 EXPO_PUBLIC_SOCKET_URL=https://live-chat-api.anirudhkille.com
 ```
 
+Optional TURN relay (needed on restrictive/mobile networks):
+```
+EXPO_PUBLIC_TURN_URL=turn:turn.example.com:3478
+EXPO_PUBLIC_TURN_USERNAME=your-turn-username
+EXPO_PUBLIC_TURN_CREDENTIAL=your-turn-password
+```
+Without TURN the app still uses public STUN servers, but calls can fail when
+both peers are behind symmetric NAT or a restrictive firewall.
+
 ## Structure
 ```
 src/

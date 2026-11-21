@@ -15,6 +15,21 @@ Notifications.setNotificationHandler({
   }),
 });
 
+export async function registerNotificationCategories(): Promise<void> {
+  await Notifications.setNotificationCategoryAsync("call", [
+    {
+      identifier: "accept",
+      buttonTitle: "Accept",
+      options: { opensAppToForeground: true },
+    },
+    {
+      identifier: "decline",
+      buttonTitle: "Decline",
+      options: { isDestructive: true, opensAppToForeground: true },
+    },
+  ]);
+}
+
 export async function registerExpoPushToken(): Promise<string | null> {
   if (!Device.isDevice) {
     return null;

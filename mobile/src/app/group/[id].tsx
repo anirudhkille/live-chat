@@ -165,6 +165,30 @@ export default function GroupDetailsScreen() {
       ),
   });
 
+  const leaveGroup = useMutation({
+    mutationFn: () => conversationApi.leaveGroup(conversationId),
+    onSuccess: () => {
+      queryClient.removeQueries({
+        queryKey: ["conversation", conversationId],
+      });
+      queryClient.removeQueries({
+        queryKey: ["participants", conversationId],
+      });
+      queryClient.removeQueries({ queryKey: ["messages", conversationId] });
+      void queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      if (router.canGoBack()) {
+        router.dismissAll();
+      } else {
+        router.replace("/(tabs)");
+      }
+    },
+    onError: (error) =>
+      Alert.alert(
+        "Could not leave group",
+        getApiErrorMessage(error, "Please try again."),
+      ),
+  });
+
   const toggleAddUser = (user: User) => {
     setActionError(null);
     setToAdd((current) =>
@@ -212,6 +236,21 @@ export default function GroupDetailsScreen() {
           text: "Delete",
           style: "destructive",
           onPress: () => deleteGroup.mutate(),
+        },
+      ],
+    );
+  };
+
+  const confirmLeave = () => {
+    Alert.alert(
+      "Leave group?",
+      "You will stop receiving messages from this group. If you are the last member, the group will be deleted.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Leave",
+          style: "destructive",
+          onPress: () => leaveGroup.mutate(),
         },
       ],
     );
@@ -563,6 +602,28 @@ export default function GroupDetailsScreen() {
             members.
           </Text>
         )}
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Leave group</Text>
+          <Text style={styles.dangerHint}>
+            You will stop receiving messages. If you are the last member, the
+            group will be deleted.
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.leaveButton,
+              leaveGroup.isPending && styles.disabled,
+            ]}
+            onPress={confirmLeave}
+            disabled={leaveGroup.isPending}
+          >
+            {leaveGroup.isPending ? (
+              <ActivityIndicator color={palette.danger} size="small" />
+            ) : (
+              <Text style={styles.leaveText}>Leave group</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -742,6 +803,16 @@ const createStyles = (palette: ReturnType<typeof useAppTheme>["palette"]) =>
       backgroundColor: palette.danger,
     },
     deleteText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+    leaveButton: {
+      minHeight: 44,
+      borderRadius: 8,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: palette.danger,
+      backgroundColor: palette.background,
+    },
+    leaveText: { color: palette.danger, fontSize: 14, fontWeight: "700" },
     adminNote: {
       color: palette.textMuted,
       fontSize: 12,

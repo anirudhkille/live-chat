@@ -49,7 +49,8 @@
             "extraProguardRules": "-keep class org.webrtc.** { *; }\n-dontwarn org.webrtc.**\n-keep class com.oney.** { *; }\n-dontwarn com.oney.**"
           }
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "updates": {
       "url": "https://u.expo.dev/42710b9a-c6f4-4f6e-bff7-1b3512a9e7d4"
