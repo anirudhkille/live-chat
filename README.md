@@ -1,6 +1,6 @@
 # Live Chat
 
-A full-stack real-time chat application with OTP and Google authentication, direct and group conversations, typing indicators, read receipts, message reactions and replies, attachments, web push notifications, voice/video calls, end-to-end encryption for direct messages, online/presence status, user preferences, and avatar/photo uploads via Cloudflare R2.
+A full-stack real-time chat application with OTP and Google authentication, direct and group conversations, typing indicators, read receipts, message reactions and replies, attachments, web push notifications, voice/video calls, end-to-end encryption for direct and group messages, online/presence status, user preferences, and avatar/photo uploads via Cloudflare R2.
 
 ## Tech Stack
 
@@ -20,7 +20,7 @@ A full-stack real-time chat application with OTP and Google authentication, dire
 - 🔔 Web push notifications via VAPID
 - 🟢 Online / presence status with last seen
 - ⚙️ Per-user preferences (online status, read receipts, profile/phone visibility, typing indicators, push notifications)
-- 🔒 End-to-end encryption for direct messages
+- 🔒 End-to-end encryption for direct and group messages
 - 📹 Voice and video calls (WebRTC + Socket.IO signalling)
 - 🔐 JWT access + refresh token auth with automatic rotation
 - ⚡ Virtualized message lists, bundle analyzer, and performance-optimized data fetching
@@ -102,6 +102,9 @@ npm run dev                  # http://localhost:3000
 | ---------------------- | ------------------------------------------------- |
 | `NEXT_PUBLIC_API_URL`    | REST base URL, e.g. `http://localhost:8080/api`     |
 | `NEXT_PUBLIC_SOCKET_URL` | Socket.IO URL, e.g. `http://localhost:8080`       |
+| `NEXT_PUBLIC_TURN_URL`   | Optional TURN relay URL, e.g. `turn:turn.example.com:3478` |
+| `NEXT_PUBLIC_TURN_USERNAME` | Optional TURN username                          |
+| `NEXT_PUBLIC_TURN_CREDENTIAL` | Optional TURN credential                      |
 
 ## API Overview
 
@@ -140,6 +143,7 @@ All responses use the envelope `{ success, message, data }`. Every route except 
 | GET    | `/:id/with-messages`           | Get a conversation plus the first page of messages in one call            |
 | GET    | `/:id/participants`            | List a group's participants                                             |
 | POST   | `/:id/participants`            | Add participants to a group                                             |
+| DELETE | `/:id/leave`                   | Leave a group (deletes it when the last member leaves)                  |
 
 ### Messages — `/api/message`
 
